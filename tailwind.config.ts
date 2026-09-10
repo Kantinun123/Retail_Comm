@@ -8,7 +8,14 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        body: ["var(--font-prompt)", "Manrope", "sans-serif"],
+      },
       colors: {
+        "kbank-dark": "#8f1114",
+        surface: "#f7f4f4",
+        "on-surface": "#231313",
+        error: "#ba1a1a",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { PostHogProvider } from "@/components/posthog-provider";
-import { siteConfig } from "@/lib/config";
+import { Prompt } from "next/font/google";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteConfig.url),
-  title: siteConfig.name,
-  description: siteConfig.description,
+  title: "Retail-COMM | Commission Portal",
+  description:
+    "ระบบดูค่าคอมมิชชั่นการขาย Solution สำหรับร้านค้าตัวแทนจำหน่ายและพนักงานขายในเครือ SCG Network",
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const prompt = Prompt({
+  variable: "--font-prompt",
   display: "swap",
-  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  subsets: ["latin", "thai"],
 });
 
 export default function RootLayout({
@@ -23,18 +21,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <PostHogProvider>
-            {children}
-          </PostHogProvider>
-        </ThemeProvider>
+    <html lang="th" suppressHydrationWarning>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+        />
+      </head>
+      <body className={`${prompt.variable} font-body antialiased`}>
+        {children}
       </body>
     </html>
   );
