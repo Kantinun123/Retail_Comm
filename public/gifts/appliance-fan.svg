@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="20" fill="#f1f5f9"/>
+  <circle cx="100" cy="86" r="48" fill="#cbd5e1"/>
+  <g fill="#64748b">
+    <path d="M100 86 q-6 -42 -30 -30 q-4 24 30 30"/>
+    <path d="M100 86 q42 -6 30 -30 q-24 -4 -30 30"/>
+    <path d="M100 86 q6 42 30 30 q4 -24 -30 -30"/>
+    <path d="M100 86 q-42 6 -30 30 q24 4 30 -30"/>
+  </g>
+  <circle cx="100" cy="86" r="8" fill="#334155"/>
+  <rect x="94" y="134" width="12" height="34" fill="#94a3b8"/>
+  <rect x="78" y="166" width="44" height="10" rx="5" fill="#64748b"/>
+  <text x="100" y="192" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#334155" text-anchor="middle">พัดลม</text>
+</svg>

@@ -6,7 +6,15 @@ import { PeriodFilter } from "./period-filter";
 import {
   periodShort,
   selectedGroups,
+  selectedJobGroups,
   selectedPeriods,
+  selectedStatuses,
+  selectedDateField,
+  selectedDateMode,
+  availableBenefitTypes,
+  selectedBenefitTypes,
+  getSales,
+  getSolutions,
 } from "@/lib/commission/logic";
 import { getPanelOpen, setPanelOpen } from "@/lib/commission/session";
 import type { FilterState } from "@/lib/commission/types";
@@ -18,12 +26,23 @@ interface Props {
 }
 
 function summaryText(state: FilterState): string {
-  const periods = selectedPeriods(state);
-  let p = "-";
-  if (periods.length === 1) p = periodShort(periods[0]);
-  else if (periods.length > 1) {
-    const s = periods.slice().sort();
-    p = periodShort(s[0]) + " – " + periodShort(s[s.length - 1]);
+  const dField = selectedDateField(state) === "close" ? "ปิดขาย" : "โอนจ่าย";
+  let p: string;
+  if (selectedDateMode(state) === "range") {
+    const from = state.dateFrom;
+    const to = state.dateTo;
+    if (from && to) p = `${from} – ${to}`;
+    else if (from) p = `ตั้งแต่ ${from}`;
+    else if (to) p = `ถึง ${to}`;
+    else p = "ทุกวันที่";
+    p = dField + " · " + p;
+  } else {
+    const periods = selectedPeriods(state);
+    if (periods.length === 1) p = periodShort(periods[0]);
+    else if (periods.length > 1) {
+      const s = periods.slice().sort();
+      p = periodShort(s[0]) + " – " + periodShort(s[s.length - 1]);
+    } else p = "-";
   }
   const g = selectedGroups(state);
   const gTxt =
@@ -31,10 +50,33 @@ function summaryText(state: FilterState): string {
       ? "ทุกประเภท"
       : g.length === 1
         ? g[0] === "solution"
-          ? "โซลูชัน"
+          ? "บริการ"
           : "สินค้า"
         : "-";
-  return "· " + gTxt + " · " + p;
+  const st = selectedStatuses(state);
+  const stTxt =
+    st.length >= 2
+      ? "ทุกสถานะ"
+      : st.length === 1
+        ? st[0] === "paid"
+          ? "จ่ายแล้ว"
+          : "รอจ่าย"
+        : "-";
+  // กลุ่มของงาน: ถ้าเลือกครบ = ไม่แสดง (ไม่รก), ถ้าเลือกบางส่วน = "N กลุ่ม"
+  const jg = selectedJobGroups(state);
+  const totalInGroup = getSolutions().filter((s) =>
+    g.includes(s.group)
+  ).length;
+  const jgTxt =
+    jg.length > 0 && jg.length < totalInGroup ? ` · ${jg.length} กลุ่มงาน` : "";
+  // ประเภทผลประโยชน์: แสดงเมื่อเลือกบางส่วน (ไม่ครบ)
+  const btAvail = availableBenefitTypes(getSales());
+  const btSel = selectedBenefitTypes(state, btAvail);
+  const btTxt =
+    btAvail.length > 1 && btSel.length > 0 && btSel.length < btAvail.length
+      ? " · " + btSel.join("/")
+      : "";
+  return "· " + gTxt + " · " + stTxt + jgTxt + btTxt + " · " + p;
 }
 
 export function FilterPanel({ state, onChange }: Props) {

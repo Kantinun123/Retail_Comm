@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="20" fill="url(#g)"/>
+  <rect x="28" y="60" width="144" height="80" rx="10" fill="#ffffff"/>
+  <circle cx="28" cy="100" r="9" fill="#1d4ed8"/>
+  <circle cx="172" cy="100" r="9" fill="#1d4ed8"/>
+  <text x="100" y="96" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#1d4ed8" text-anchor="middle">บัตรกำนัล</text>
+  <text x="100" y="122" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#111827" text-anchor="middle">฿100</text>
+  <text x="100" y="40" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">ไฮเปอร์มาร์เก็ต</text>
+</svg>

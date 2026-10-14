@@ -140,3 +140,43 @@ pnpm lint      # Run ESLint validation
 - [ ] Use line ranges or grep search for quick navigation.
 - [ ] Verify build cleanly with `pnpm build` at the end of feature implementation.
 
+
+---
+
+## 🧾 Session Log: Porting commission-app (static HTML) → Next.js
+
+### Encoding: preserve Thai (UTF-8) when extracting data via PowerShell
+```
+# ❌ FAILS - Set-Content default encoding mangled Thai into mojibake (เธ...)
+Set-Content -Path out.ts -Value $data -Encoding UTF8   # still added BOM / wrong page
+
+# ✅ Use .NET UTF8Encoding($false) for both read and write
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$c = [System.IO.File]::ReadAllText($path, $utf8)
+[System.IO.File]::WriteAllText($out, $content, $utf8)
+```
+**Recovery**: When copying Thai/Unicode data literals out of source files, always read AND write with `System.Text.UTF8Encoding($false)`.
+
+### Type exports: import types from where they are declared
+- `MonthBucket`, `GroupAgg`, `SolutionAgg` were declared in `logic.ts`, not `types.ts`.
+- **Recovery**: `import { fn, type TypeName } from "./logic"` — don't assume all types live in `types.ts`.
+
+### sessionStorage in React 19: use useSyncExternalStore, not setState-in-effect
+```
+// ❌ ESLint error react-hooks/set-state-in-effect (cascading renders)
+useEffect(() => { setSession(readSession()); setReady(true); }, []);
+
+// ✅ External store pattern for sessionStorage-backed state
+const session = useSyncExternalStore(subscribe, getSnapshot, () => null);
+// getServerSnapshot returns null so `ready = session !== null` guards SSR/hydration
+```
+**Recovery**: For any browser-only external store (sessionStorage/localStorage), read via `useSyncExternalStore` with a server snapshot of `null`.
+
+### Toolchain: pnpm not on PATH on Windows
+```
+corepack enable
+corepack prepare pnpm@latest --activate   # then `pnpm install` / `pnpm build`
+```
+
+### Environment note
+- `pnpm dev` may report "Another next dev server is already running" on port 3000; a server can already be up. Verify against the existing server instead of forcing a new one.

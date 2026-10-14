@@ -60,6 +60,29 @@
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
+/* Visible, styled scrollbars for data tables (overrides the global hide) */
+.cm-scroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #d32029 #f1e5e5;
+}
+.cm-scroll::-webkit-scrollbar {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+.cm-scroll::-webkit-scrollbar-track {
+  background: #f1e5e5;
+  border-radius: 8px;
+}
+.cm-scroll::-webkit-scrollbar-thumb {
+  background: #d32029;
+  border-radius: 8px;
+  border: 2px solid #f1e5e5;
+}
+.cm-scroll::-webkit-scrollbar-thumb:hover {
+  background: #a11119;
+}
+
 /* subtle entry animations for staggered grid items */
 @keyframes fadeUp {
   from {
@@ -85,4 +108,37 @@
 }
 .stagger-4 {
   animation-delay: 0.2s;
+}
+
+/* ไฮไลต์การ์ดที่ถูกเจาะจงจากการแจ้งเตือน (deep-link ?focus=) */
+@keyframes focusFlash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(211, 32, 41, 0);
+  }
+  20%,
+  60% {
+    box-shadow: 0 0 0 3px rgba(211, 32, 41, 0.55);
+  }
+}
+.focus-flash {
+  animation: focusFlash 1.8s ease-in-out 2;
+}
+
+/* แถบเลื่อนแนวนอนบาง ๆ สำหรับแท็บ (ให้เห็นว่าเลื่อนได้) */
+.scroll-x-tabs {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-x-tabs::-webkit-scrollbar {
+  height: 5px;
+}
+.scroll-x-tabs::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+.scroll-x-tabs::-webkit-scrollbar-track {
+  background: transparent;
 }

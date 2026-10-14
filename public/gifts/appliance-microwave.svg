@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="20" fill="#f1f5f9"/>
+  <rect x="34" y="66" width="132" height="76" rx="10" fill="#475569"/>
+  <rect x="46" y="78" width="76" height="52" rx="6" fill="#0f172a"/>
+  <circle cx="92" cy="104" r="16" fill="#334155"/>
+  <rect x="132" y="80" width="24" height="30" rx="4" fill="#94a3b8"/>
+  <circle cx="144" cy="122" r="5" fill="#cbd5e1"/>
+  <text x="100" y="178" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#334155" text-anchor="middle">ไมโครเวฟ</text>
+</svg>

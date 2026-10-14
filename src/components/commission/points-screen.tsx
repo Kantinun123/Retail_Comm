@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import {
-  POINT_EMPLOYEES,
+  getPointEmployees,
   pointsRankCompanies,
   pointsRankEmployees,
   myPointEmpCode,
@@ -42,7 +42,9 @@ export function PointsScreen() {
   if (!ready || !session) return null;
 
   const isSales = session.isSales;
-  const model = session.dealer.model;
+  // ผู้ดูแลระบบที่ดูทุกร้าน = ไม่กรองตาม Model (เห็นทุก Model); ถ้าเจาะร้าน = ตาม Model ร้านนั้น
+  const model =
+    session.isAdmin && !session.storeFilter ? undefined : session.dealer.model;
 
   let ranked: RankRow[];
   let myKey: string | null;
@@ -61,7 +63,7 @@ export function PointsScreen() {
     }));
   } else {
     const rows = pointsRankCompanies(model);
-    myKey = session.dealer.pointCompanyCode;
+    myKey = session.dealer.code;
     ranked = rows.map((r) => ({
       key: r.code,
       name: r.name,
@@ -93,8 +95,8 @@ export function PointsScreen() {
             </span>
             <span className="text-[11px] font-semibold text-[#b21e1e]">
               {(isSales ? "จัดอันดับพนักงานขาย" : "จัดอันดับร้านค้า") +
-                " · Model " +
-                (model || "-")}
+                " · " +
+                (model ? "Model " + model : "ทุก Model")}
             </span>
           </div>
         </div>
@@ -103,8 +105,45 @@ export function PointsScreen() {
         </div>
       </header>
 
+      {/* สรุป "อันดับของฉัน" — เห็นชัดโดยไม่ต้องเลื่อนหา */}
+      {mine && (
+        <section className="rounded-2xl bg-white border border-red-100 shadow-sm p-3.5 mt-1 flex items-center justify-between">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#d32029] to-[#8f1114] text-white flex items-center justify-center font-bold text-[13px]">
+                {mine.avatar}
+              </div>
+              {mine.rank <= 3 && (
+                <span className="absolute -top-1.5 -right-1.5 text-[15px]">
+                  {MEDAL[mine.rank]}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-slate-400">
+                อันดับของฉัน
+              </p>
+              <p className="text-[14px] font-bold text-slate-800 truncate">
+                {mine.name}
+              </p>
+            </div>
+          </div>
+          <div className="text-right shrink-0 ml-2">
+            <p className="tnum text-[22px] font-bold text-[#a11119] leading-none">
+              #{mine.rank}
+              <span className="text-[12px] font-medium text-slate-400">
+                {" "}/ {ranked.length}
+              </span>
+            </p>
+            <p className="tnum text-[12px] font-semibold text-amber-600 mt-0.5">
+              {fmtPts(mine.points)}
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* Podium */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#8f1114] to-[#d32029] p-4 pt-5 text-white shadow-lg shadow-[#d32029]/25 mt-1">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#8f1114] to-[#d32029] p-4 pt-5 text-white shadow-lg shadow-[#d32029]/25 mt-3">
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <h3 className="text-[14px] font-bold flex items-center space-x-1.5 relative z-10">
           <Icon name="workspace_premium" className="text-lg text-amber-300" fill />
@@ -314,7 +353,7 @@ function RankRowItem({
 
   if (!expandable) return inner;
 
-  const staff = POINT_EMPLOYEES.filter((e) => e.companyCode === myCompanyCode)
+  const staff = getPointEmployees().filter((e) => e.companyCode === myCompanyCode)
     .slice()
     .sort((a, b) => b.points - a.points);
 

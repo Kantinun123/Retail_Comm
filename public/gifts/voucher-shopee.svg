@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="20" fill="url(#g)"/>
+  <path d="M70 70 h60 l-6 60 h-48 z" fill="#ffffff"/>
+  <path d="M84 70 a16 16 0 0 1 32 0" stroke="#ffffff" stroke-width="5" fill="none"/>
+  <text x="100" y="112" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ea580c" text-anchor="middle">฿200</text>
+  <text x="100" y="162" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">ช้อปออนไลน์</text>
+</svg>

@@ -2,65 +2,279 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icon";
 import {
-  DEALERS,
-  SALES_TEAM,
-  dealerByCode,
+  getDealers,
+  employeesWithSalesForDealer,
 } from "@/lib/commission/logic";
 import { doLogin } from "@/lib/commission/session";
-import type { Role } from "@/lib/commission/types";
+import type { Dealer, Role, TeamMember } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
 
-const MODEL_TAG: Record<string, { cls: string; icon: string }> = {
-  "SCG Home": { cls: "bg-red-50 text-[#a11119] border-red-200", icon: "home" },
-  "Housing Expert": {
-    cls: "bg-amber-50 text-amber-700 border-amber-200",
-    icon: "engineering",
-  },
-  GT: { cls: "bg-sky-50 text-sky-700 border-sky-200", icon: "store" },
-};
+/* ---------- Searchable dropdown (combobox) ----------
+   แสดงค่าที่เลือก กดแล้วเปิดช่องค้นหา + รายการที่กรองได้ */
+interface ComboOption {
+  value: string;
+  label: string;
+  sub?: string;
+  tag?: string;
+}
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  emptyText,
+  icon = "search",
+}: {
+  options: ComboOption[];
+  value: string | null;
+  onChange: (value: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyText: string;
+  icon?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = useMemo(
+    () => options.find((o) => o.value === value) ?? null,
+    [options, value]
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options.slice(0, 80);
+    return options
+      .filter(
+        (o) =>
+          o.label.toLowerCase().includes(q) ||
+          (o.sub ?? "").toLowerCase().includes(q) ||
+          o.value.toLowerCase().includes(q)
+      )
+      .slice(0, 80);
+  }, [options, query]);
+
+  // ปิดเมื่อคลิกนอกกล่อง
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  // โฟกัสช่องค้นหาเมื่อเปิด (เป็นการซิงก์กับ DOM จึงอยู่ใน effect ได้)
+  useEffect(() => {
+    if (open) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [open]);
+
+  function toggleOpen() {
+    setOpen((o) => {
+      const next = !o;
+      if (next) setQuery(""); // เคลียร์คำค้นตอนเปิด
+      return next;
+    });
+  }
+
+  return (
+    <div ref={boxRef} className="relative">
+      <button
+        type="button"
+        onClick={toggleOpen}
+        className="w-full bg-[#faf8f8] text-left text-[14px] rounded-xl pl-3.5 pr-10 py-2.5 border border-slate-200/80 hover:border-red-200 focus:border-[#d32029] focus:ring-2 focus:ring-[#d32029]/15 focus:bg-white transition-all relative"
+      >
+        {selected ? (
+          <span className="block truncate text-slate-900">
+            {selected.label}
+            {selected.sub && (
+              <span className="text-slate-400"> · {selected.sub}</span>
+            )}
+          </span>
+        ) : (
+          <span className="block truncate text-slate-400">{placeholder}</span>
+        )}
+        <Icon
+          name={open ? "expand_less" : "expand_more"}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"
+        />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-lg z-30 overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <div className="relative flex items-center">
+              <Icon
+                name={icon}
+                className="absolute left-2.5 text-slate-400 text-base pointer-events-none"
+              />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full bg-[#faf8f8] text-slate-800 text-[13px] rounded-lg pl-8 pr-3 py-2 border border-slate-200 focus:border-[#d32029] focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-4 text-center text-[12px] text-slate-400">
+                {emptyText}
+              </p>
+            ) : (
+              filtered.map((o) => {
+                const active = o.value === value;
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(o.value);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "w-full text-left px-3 py-2.5 border-b border-slate-50 last:border-0 flex items-center justify-between gap-2 transition",
+                      active ? "bg-red-50" : "hover:bg-red-50/40"
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <p
+                        className={cn(
+                          "text-[13px] font-semibold truncate",
+                          active ? "text-[#a11119]" : "text-slate-800"
+                        )}
+                      >
+                        {o.label}
+                      </p>
+                      {o.sub && (
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {o.sub}
+                        </p>
+                      )}
+                    </div>
+                    {o.tag && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 bg-slate-100 text-slate-600 border-slate-200">
+                        {o.tag}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function LoginScreen() {
   const router = useRouter();
+  const dealers = useMemo(() => getDealers(), []);
+
   const [role, setRole] = useState<Role>("dealer");
-  const [dealerCode, setDealerCode] = useState(DEALERS[0].code);
-  const [dealerMenuOpen, setDealerMenuOpen] = useState(false);
-  const [empId, setEmpId] = useState(SALES_TEAM[0].id);
-  const [username, setUsername] = useState("admin");
+  const [dealerCode, setDealerCode] = useState<string>(dealers[0]?.code ?? "");
+  const [empId, setEmpId] = useState<string>("");
   const [password, setPassword] = useState("1234");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
 
-  const dealer = useMemo(() => dealerByCode(dealerCode), [dealerCode]);
+  const selectedDealer = useMemo<Dealer | null>(
+    () => dealers.find((d) => d.code === dealerCode) ?? null,
+    [dealers, dealerCode]
+  );
+
+  // พนักงานของร้านที่เลือก (จากรายการขายจริง)
+  const dealerEmployees = useMemo<TeamMember[]>(
+    () => employeesWithSalesForDealer(dealerCode),
+    [dealerCode]
+  );
+
+  // พนักงานที่เลือกจริง = empId ที่ผู้ใช้เลือก ถ้ายังอยู่ในร้านนี้ ไม่งั้น default คนแรก
+  // (คำนวณตอน render แทนการใช้ effect เพื่อเลี่ยง cascading render)
+  const effectiveEmpId =
+    empId && dealerEmployees.some((e) => e.id === empId)
+      ? empId
+      : dealerEmployees[0]?.id ?? "";
+
+  const dealerOptions: ComboOption[] = useMemo(
+    () =>
+      dealers.map((d) => ({
+        value: d.code,
+        label: d.name,
+        sub: "รหัส " + d.code,
+        tag: d.model,
+      })),
+    [dealers]
+  );
+
+  const employeeOptions: ComboOption[] = useMemo(
+    () =>
+      dealerEmployees.map((e) => ({
+        value: e.id,
+        label: e.name,
+        sub: e.id,
+      })),
+    [dealerEmployees]
+  );
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!dealerByCode(dealerCode)) {
-      setError("ไม่พบรหัสร้านค้านี้ในระบบ");
+
+    // ผู้ดูแลระบบ: ไม่ต้องเลือกร้าน (เห็นทุกร้าน)
+    if (role === "admin") {
+      if (password !== "1234") {
+        setError("รหัสผ่านไม่ถูกต้อง (เดโม: 1234)");
+        return;
+      }
+      doLogin({ role: "admin" });
+      router.push("/app/dashboard");
       return;
     }
+
+    if (!selectedDealer) {
+      setError("กรุณาเลือกร้านค้า");
+      return;
+    }
+
     if (role === "sales") {
-      if (!empId) {
-        setError("กรุณาเลือกพนักงานขาย");
+      if (!effectiveEmpId) {
+        setError("กรุณาเลือกพนักงานขายของร้านนี้");
         return;
       }
       if (password !== "1234") {
-        setError("รหัสผ่านไม่ถูกต้อง");
+        setError("รหัสผ่านไม่ถูกต้อง (เดโม: 1234)");
         return;
       }
-      doLogin({ dealerCode, role: "sales", empId });
+      doLogin({
+        dealerCode: selectedDealer.code,
+        role: "sales",
+        empId: effectiveEmpId,
+      });
       router.push("/app/dashboard");
       return;
     }
-    if (username.trim() === "admin" && password === "1234") {
-      doLogin({ dealerCode, role: "dealer" });
-      router.push("/app/dashboard");
-    } else {
-      setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+
+    // โหมดร้านค้าตัวแทน
+    if (password !== "1234") {
+      setError("รหัสผ่านไม่ถูกต้อง (เดโม: 1234)");
+      return;
     }
+    doLogin({ dealerCode: selectedDealer.code, role: "dealer" });
+    router.push("/app/dashboard");
   }
 
   return (
@@ -117,10 +331,10 @@ export function LoginScreen() {
         <div className="mt-3.5 pt-2.5 border-t border-red-600/60 flex items-center justify-between text-[11px] font-medium text-red-100/90">
           <span className="flex items-center space-x-1">
             <Icon name="event_available" className="text-sm text-red-300" />
-            <span>รอบคำนวณล่าสุด: 12/2025</span>
+            <span>รอบคำนวณล่าสุด: 10/2026</span>
           </span>
           <span className="bg-red-900/40 text-red-200 px-2.5 py-0.5 rounded-md font-semibold border border-red-400/20">
-            ตัดรอบทุกวันที่ 25
+            ตัดรอบทุกวันที่ 20
           </span>
         </div>
       </div>
@@ -130,20 +344,26 @@ export function LoginScreen() {
         <p className="text-[12px] font-semibold text-slate-500 mb-2 px-1">
           เข้าสู่ระบบในฐานะ
         </p>
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-3 gap-2.5">
           {(
             [
               {
                 key: "dealer" as Role,
                 icon: "storefront",
                 title: "ร้านค้าตัวแทน",
-                sub: "Dealer · เห็นทั้งร้าน",
+                sub: "Dealer · ทั้งร้าน",
               },
               {
                 key: "sales" as Role,
                 icon: "badge",
                 title: "พนักงานขาย",
-                sub: "Salesperson · เฉพาะตน",
+                sub: "Sales · เฉพาะตน",
+              },
+              {
+                key: "admin" as Role,
+                icon: "admin_panel_settings",
+                title: "ผู้ดูแลระบบ",
+                sub: "Admin · ทุกร้าน",
               },
             ]
           ).map((r) => {
@@ -157,7 +377,7 @@ export function LoginScreen() {
                   setError("");
                 }}
                 className={cn(
-                  "flex items-center space-x-2.5 p-3 rounded-2xl border transition text-left",
+                  "flex flex-col items-center text-center gap-1.5 p-2.5 rounded-2xl border transition",
                   active
                     ? "bg-red-50 border-[#d32029] shadow-sm"
                     : "bg-white border-slate-200 hover:border-red-200"
@@ -171,11 +391,11 @@ export function LoginScreen() {
                 >
                   <Icon name={r.icon} className="text-xl" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-bold leading-tight truncate">
+                <div className="min-w-0 w-full">
+                  <p className="text-[12px] font-bold leading-tight truncate">
                     {r.title}
                   </p>
-                  <p className="text-[10px] text-slate-500 leading-tight truncate">
+                  <p className="text-[9px] text-slate-500 leading-tight truncate">
                     {r.sub}
                   </p>
                 </div>
@@ -188,134 +408,86 @@ export function LoginScreen() {
       {/* Login Form */}
       <form className="flex flex-col space-y-3.5" onSubmit={handleLogin}>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col space-y-3.5">
-          {/* Dealer ID */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[13px] font-semibold text-slate-800 flex items-center space-x-1.5">
-                <Icon name="storefront" className="text-base text-[#d32029]" />
-                <span>รหัสร้านค้าตัวแทน (Dealer ID)</span>
-              </span>
-              <span className="text-[11px] font-medium text-[#a11119] bg-red-50 border border-red-200/60 px-2 py-0.5 rounded-md">
-                SCG Partner
-              </span>
-            </div>
-            <div className="relative flex items-center">
-              <input
-                readOnly
-                value={dealerCode}
-                onClick={() => setDealerMenuOpen((o) => !o)}
-                className="w-full bg-[#faf8f8] text-slate-900 text-[14px] rounded-xl pl-3.5 pr-10 py-2.5 border border-slate-200/80 focus:border-[#d32029] focus:ring-2 focus:ring-[#d32029]/15 focus:bg-white transition-all cursor-pointer"
+          {/* ผู้ดูแลระบบ: ไม่ต้องเลือกร้าน */}
+          {role === "admin" && (
+            <div className="flex items-start space-x-2.5 rounded-xl bg-red-50/60 border border-red-200/60 p-3">
+              <Icon
+                name="admin_panel_settings"
+                className="text-xl text-[#d32029] mt-0.5"
               />
-              <button
-                type="button"
-                onClick={() => setDealerMenuOpen((o) => !o)}
-                className="absolute right-2 p-1 text-slate-400"
-              >
-                <Icon
-                  name={dealerMenuOpen ? "expand_less" : "expand_more"}
-                  className="text-lg"
-                />
-              </button>
-              {dealerMenuOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-lg z-30 overflow-hidden">
-                  {DEALERS.map((d) => {
-                    const t = MODEL_TAG[d.model] ?? {
-                      cls: "bg-slate-100 text-slate-600 border-slate-200",
-                      icon: "storefront",
-                    };
-                    return (
-                      <button
-                        key={d.code}
-                        type="button"
-                        onClick={() => {
-                          setDealerCode(d.code);
-                          setDealerMenuOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2.5 hover:bg-red-50/40 border-b border-slate-50 last:border-0 flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-800 truncate">
-                            {d.name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {d.code} · {d.branch}
-                          </p>
-                        </div>
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0",
-                            t.cls
-                          )}
-                        >
-                          <Icon
-                            name={t.icon}
-                            style={{ fontSize: 13 }}
-                            className="mr-0.5"
-                          />
-                          {d.model}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            {dealer && (
-              <p className="text-[11px] font-medium text-[#d32029] mt-1.5 flex items-center space-x-1">
-                <Icon name="verified" style={{ fontSize: 15 }} />
-                <span>
-                  {dealer.name} ({dealer.branch}) · Model {dealer.model}
-                </span>
-              </p>
-            )}
-          </div>
-
-          {/* Salesperson picker */}
-          {role === "sales" && (
-            <div>
-              <span className="text-[13px] font-semibold text-slate-800 flex items-center space-x-1.5 mb-1.5">
-                <Icon name="person" className="text-base text-[#d32029]" />
-                <span>เลือกพนักงานขาย</span>
-              </span>
-              <div className="relative flex items-center">
-                <select
-                  value={empId}
-                  onChange={(e) => setEmpId(e.target.value)}
-                  className="w-full bg-[#faf8f8] text-slate-900 text-[14px] rounded-xl pl-3.5 pr-10 py-2.5 border border-slate-200/80 focus:border-[#d32029] focus:ring-2 focus:ring-[#d32029]/15 focus:bg-white transition-all appearance-none"
-                >
-                  {SALES_TEAM.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name} · {e.role} ({e.id})
-                    </option>
-                  ))}
-                </select>
-                <Icon
-                  name="expand_more"
-                  className="absolute right-3 text-slate-400 text-lg pointer-events-none"
-                />
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-slate-900">
+                  เข้าสู่ระบบในฐานะผู้ดูแลระบบ
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  เห็นข้อมูลทุกร้านทุกพนักงาน และเลือกเจาะดูรายร้านได้ภายหลัง
+                </p>
               </div>
             </div>
           )}
 
-          {/* Username (dealer mode) */}
-          {role === "dealer" && (
+          {/* ร้านค้า — ค้นหาได้ (เฉพาะ dealer / sales) */}
+          {role !== "admin" && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[13px] font-semibold text-slate-800 flex items-center space-x-1.5">
+                  <Icon name="storefront" className="text-base text-[#d32029]" />
+                  <span>ร้านค้าตัวแทนจำหน่าย</span>
+                </span>
+                <span className="text-[11px] font-medium text-[#a11119] bg-red-50 border border-red-200/60 px-2 py-0.5 rounded-md">
+                  SCG Partner
+                </span>
+              </div>
+              <SearchableSelect
+                options={dealerOptions}
+                value={dealerCode}
+                onChange={(v) => {
+                  setDealerCode(v);
+                  setError("");
+                }}
+                placeholder="เลือกร้านค้า"
+                searchPlaceholder="ค้นหาร้าน (ชื่อ / รหัส)"
+                emptyText="ไม่พบร้านที่ค้นหา"
+              />
+              {selectedDealer && (
+                <p className="text-[11px] font-medium text-[#d32029] mt-1.5 flex items-center space-x-1">
+                  <Icon name="verified" style={{ fontSize: 15 }} />
+                  <span>
+                    ชื่อผู้ใช้: {selectedDealer.name} · Model{" "}
+                    {selectedDealer.model}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* พนักงาน — ค้นหาได้ (เฉพาะโหมดพนักงาน) */}
+          {role === "sales" && (
             <div>
               <span className="text-[13px] font-semibold text-slate-800 flex items-center space-x-1.5 mb-1.5">
-                <Icon name="badge" className="text-base text-[#d32029]" />
-                <span>ชื่อผู้ใช้ / เบอร์โทรลงทะเบียน</span>
+                <Icon name="person" className="text-base text-[#d32029]" />
+                <span>ชื่อผู้ใช้ (พนักงานขายของร้านนี้)</span>
               </span>
-              <div className="relative flex items-center">
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin หรือ 08X-XXX-XXXX"
-                  className="w-full bg-[#faf8f8] text-slate-900 text-[14px] rounded-xl pl-3.5 pr-10 py-2.5 border border-slate-200/80 focus:border-[#d32029] focus:ring-2 focus:ring-[#d32029]/15 focus:bg-white transition-all"
-                />
-                <Icon
-                  name="contact_phone"
-                  className="absolute right-3 text-slate-400 text-lg pointer-events-none"
-                />
-              </div>
+              <SearchableSelect
+                options={employeeOptions}
+                value={effectiveEmpId}
+                onChange={(v) => {
+                  setEmpId(v);
+                  setError("");
+                }}
+                placeholder={
+                  employeeOptions.length
+                    ? "เลือกพนักงานขาย"
+                    : "— ไม่พบพนักงานของร้านนี้ —"
+                }
+                searchPlaceholder="ค้นหาพนักงาน (ชื่อ / รหัส)"
+                emptyText="ไม่พบพนักงานที่ค้นหา"
+                icon="person_search"
+              />
+              <p className="text-[10px] text-slate-400 mt-1.5">
+                แสดงเฉพาะพนักงานที่มีรายการขายในร้านที่เลือก (
+                {employeeOptions.length} คน)
+              </p>
             </div>
           )}
 
@@ -353,11 +525,11 @@ export function LoginScreen() {
             <p className="text-[11px] text-slate-400 mt-1.5">
               {role === "sales" ? (
                 <>
-                  เดโม: เลือกพนักงาน แล้วใช้รหัสผ่าน <b>1234</b>
+                  เดโม: เลือกร้านและพนักงาน แล้วใช้รหัสผ่าน <b>1234</b>
                 </>
               ) : (
                 <>
-                  เดโม: ผู้ใช้ <b>admin</b> รหัสผ่าน <b>1234</b>
+                  เดโม: เลือกร้านค้า แล้วใช้รหัสผ่าน <b>1234</b>
                 </>
               )}
             </p>
