@@ -9,7 +9,19 @@ import {
   dealerByCode,
   employeeById,
 } from "./logic";
+import { subscribeDataset } from "./dataset";
 import type { Dealer, FilterState, Role, TeamMember } from "./types";
+
+/** ร้าน placeholder กัน session.dealer เป็น undefined ตอน dataset ยังไม่โหลด */
+const EMPTY_DEALER: Dealer = {
+  code: "",
+  name: "",
+  branch: "",
+  taxId: "",
+  tier: "",
+  model: "",
+  pointCompanyCode: "",
+};
 
 const KEYS = {
   loggedIn: "loggedIn",
@@ -67,9 +79,11 @@ function readSession(): SessionData {
     ? sessionStorage.getItem(KEYS.storeFilter) || null
     : null;
   // dealer ที่ใช้แสดงผล: dealer/sales ใช้ dealerCode, admin ใช้ร้านที่เจาะ (ถ้ามี) ไม่งั้น fallback ร้านแรก
+  // NB: ก่อน dataset hydrate จาก Supabase เสร็จ getDealers() อาจว่าง -> ใช้ placeholder กัน undefined
   const dealer =
     dealerByCode((isAdmin ? storeFilter : dealerCode) || "") ||
-    getDealers()[0];
+    getDealers()[0] ||
+    EMPTY_DEALER;
   return {
     loggedIn: sessionStorage.getItem(KEYS.loggedIn) === "true",
     role,
@@ -179,4 +193,11 @@ export function setPanelOpen(open: boolean) {
   } catch {
     /* ignore */
   }
+}
+
+/* เมื่อ dataset ถูก hydrate จาก Supabase เสร็จ ให้ล้าง cache ของ session
+   แล้วแจ้ง subscriber — เพราะ readSession() ใช้ getDealers()/employeeById()
+   ซึ่งค่าจะเปลี่ยนหลังข้อมูลโหลดเข้ามา (me/dealer ต้อง resolve ใหม่) */
+if (typeof window !== "undefined") {
+  subscribeDataset(() => emit());
 }

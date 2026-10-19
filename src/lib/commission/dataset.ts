@@ -26,6 +26,23 @@ import type {
   Solution,
   TeamMember,
 } from "./types";
+import { useSyncExternalStore } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { hasEnvVars } from "@/lib/utils";
+import {
+  mapDealer,
+  mapSolution,
+  mapEmployee,
+  mapSale,
+  mapPointCompany,
+  mapPointEmployee,
+  type DealerRow,
+  type SolutionRow,
+  type EmployeeRow,
+  type SaleRow,
+  type PointCompanyRow,
+  type PointEmployeeRow,
+} from "./supabase-map";
 
 export interface Dataset {
   dealers: Dealer[];
@@ -125,4 +142,142 @@ export function resetDataset() {
   writeOverrides(overrides);
   current = defaultDataset();
   emit();
+}
+
+/* =============================================================
+   Supabase hydration (Phase ง) — DORMANT / ยังไม่เปิดใช้งาน
+   -------------------------------------------------------------
+   ⚠️ โค้ดส่วนนี้พร้อมใช้แต่ยัง "ไม่ถูกเรียก" จากที่ใด เพราะ RLS บน Supabase
+   เป็น authenticated-only ขณะที่แอป login ด้วย sessionStorage (ไม่ใช่
+   Supabase Auth) ฝั่ง client จึงเป็น anon และ RLS จะบล็อก (คืน 0 แถว).
+   จะเปิดใช้ (เรียก useDatasetReady()/hydrateFromSupabase() ใน AppGuard)
+   เมื่อเชื่อม Supabase Auth จริงในเฟสถัดไป.
+
+   ดีไซน์: getDataset() ยังคง synchronous เหมือนเดิม ทุก screen/logic ไม่ต้องแก้
+   เราแค่ "เติม" current จาก Supabase แบบ async แล้ว emit() ให้ re-render
+
+   ลำดับความสำคัญของข้อมูล:
+     1) override ที่ admin อัปโหลด (localStorage) — ชนะเสมอ
+     2) ข้อมูลจาก Supabase (ถ้าโหลดสำเร็จ)
+     3) mock จาก raw-data.ts (fallback ก่อนโหลด/เมื่อ env ไม่ครบ)
+   ============================================================= */
+
+type ReadyState = "idle" | "loading" | "ready" | "error";
+let readyState: ReadyState = "idle";
+let hydratePromise: Promise<void> | null = null;
+
+const readyListeners = new Set<() => void>();
+function emitReady() {
+  readyListeners.forEach((l) => l());
+}
+
+export function getDatasetReady(): ReadyState {
+  return readyState;
+}
+
+/** ดึงข้อมูลทั้ง 6 ตารางจาก Supabase แล้วเติมเข้า current (ครั้งเดียว) */
+export async function hydrateFromSupabase(): Promise<void> {
+  // ถ้าไม่มี env (เช่น ตอน dev ยังไม่ตั้ง) -> ใช้ mock เดิม ถือว่าพร้อมเลย
+  if (!hasEnvVars) {
+    readyState = "ready";
+    emitReady();
+    return;
+  }
+  if (hydratePromise) return hydratePromise;
+
+  readyState = "loading";
+  emitReady();
+
+  hydratePromise = (async () => {
+    try {
+      const sb = createClient();
+      // ดึงทุกตารางขนานกัน; sales ต้องดึงเป็นหน้า ๆ (เกิน default 1000 แถว)
+      const [dealers, solutions, employees, pointCompanies, pointEmployees] =
+        await Promise.all([
+          sb.from("dealers").select("*"),
+          sb.from("solutions").select("*"),
+          sb.from("employees").select("*"),
+          sb.from("point_companies").select("*"),
+          sb.from("point_employees").select("*"),
+        ]);
+
+      const firstErr =
+        dealers.error ||
+        solutions.error ||
+        employees.error ||
+        pointCompanies.error ||
+        pointEmployees.error;
+      if (firstErr) throw firstErr;
+
+      const sales = await fetchAllSales(sb);
+
+      const fromDb: Dataset = {
+        dealers: (dealers.data as DealerRow[]).map(mapDealer),
+        solutions: (solutions.data as SolutionRow[]).map(mapSolution),
+        salesTeam: (employees.data as EmployeeRow[]).map(mapEmployee),
+        sales: sales.map(mapSale),
+        pointCompanies: (pointCompanies.data as PointCompanyRow[]).map(mapPointCompany),
+        pointEmployees: (pointEmployees.data as PointEmployeeRow[]).map(mapPointEmployee),
+      };
+
+      // override ที่อัปโหลดไว้ชนะข้อมูล DB เสมอ
+      current = { ...fromDb, ...overrides };
+      readyState = "ready";
+      emit(); // แจ้ง subscriber ของ dataset ให้คำนวณใหม่
+      emitReady();
+    } catch (e) {
+      // โหลดไม่สำเร็จ -> คง mock เดิมไว้ (ไม่ทำแอปพัง) แต่บันทึกสถานะ error
+      console.error("[dataset] hydrate from Supabase failed:", e);
+      readyState = "error";
+      emitReady();
+    }
+  })();
+
+  return hydratePromise;
+}
+
+/** ดึง sales ทั้งหมดแบบแบ่งหน้า (Supabase จำกัด ~1000 แถว/คำขอ) */
+async function fetchAllSales(
+  sb: ReturnType<typeof createClient>
+): Promise<SaleRow[]> {
+  const PAGE = 1000;
+  const all: SaleRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("sales")
+      .select("*")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as SaleRow[];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
+}
+
+/* ---- React hook: ให้ screen รอจนข้อมูลพร้อม ----
+   เริ่ม hydrate ครั้งแรกที่ถูกเรียก (ฝั่ง client เท่านั้น) */
+function subscribeReady(cb: () => void): () => void {
+  readyListeners.add(cb);
+  return () => readyListeners.delete(cb);
+}
+function getReadySnapshot(): ReadyState {
+  return readyState;
+}
+function getReadyServerSnapshot(): ReadyState {
+  return "idle";
+}
+
+export function useDatasetReady(): ReadyState {
+  const state = useSyncExternalStore(
+    subscribeReady,
+    getReadySnapshot,
+    getReadyServerSnapshot
+  );
+  // kick off hydration on first client use
+  if (typeof window !== "undefined" && readyState === "idle") {
+    void hydrateFromSupabase();
+  }
+  return state;
 }
