@@ -145,13 +145,13 @@ export function resetDataset() {
 }
 
 /* =============================================================
-   Supabase hydration (Phase ง) — DORMANT / ยังไม่เปิดใช้งาน
+   Supabase hydration (Phase ง/จ) — เปิดใช้งานแล้ว
    -------------------------------------------------------------
-   ⚠️ โค้ดส่วนนี้พร้อมใช้แต่ยัง "ไม่ถูกเรียก" จากที่ใด เพราะ RLS บน Supabase
-   เป็น authenticated-only ขณะที่แอป login ด้วย sessionStorage (ไม่ใช่
-   Supabase Auth) ฝั่ง client จึงเป็น anon และ RLS จะบล็อก (คืน 0 แถว).
-   จะเปิดใช้ (เรียก useDatasetReady()/hydrateFromSupabase() ใน AppGuard)
-   เมื่อเชื่อม Supabase Auth จริงในเฟสถัดไป.
+   AppGuard เรียก useDatasetReady() ซึ่ง trigger hydrateFromSupabase().
+   เนื่องจากแอป login ด้วย sessionStorage (ไม่ใช่ Supabase Auth) ฝั่ง client
+   จึงใช้ "anonymous sign-in" เป็นสะพาน (ensureAnonAuth) ให้ client เป็น role
+   authenticated เพื่อผ่าน RLS policy (to authenticated) แล้วจึง query ได้.
+   ต้องเปิด Anonymous Sign-ins ใน Supabase Dashboard ด้วย.
 
    ดีไซน์: getDataset() ยังคง synchronous เหมือนเดิม ทุก screen/logic ไม่ต้องแก้
    เราแค่ "เติม" current จาก Supabase แบบ async แล้ว emit() ให้ re-render
@@ -175,6 +175,17 @@ export function getDatasetReady(): ReadyState {
   return readyState;
 }
 
+/** ให้แน่ใจว่ามี Supabase session (anonymous ถ้ายังไม่มี) ก่อน query
+ *  เพื่อให้ผ่าน RLS policy ที่เป็น "to authenticated" */
+async function ensureAnonAuth(
+  sb: ReturnType<typeof createClient>
+): Promise<void> {
+  const { data } = await sb.auth.getSession();
+  if (data.session) return; // มี session อยู่แล้ว (anon หรือจริง)
+  const { error } = await sb.auth.signInAnonymously();
+  if (error) throw error;
+}
+
 /** ดึงข้อมูลทั้ง 6 ตารางจาก Supabase แล้วเติมเข้า current (ครั้งเดียว) */
 export async function hydrateFromSupabase(): Promise<void> {
   // ถ้าไม่มี env (เช่น ตอน dev ยังไม่ตั้ง) -> ใช้ mock เดิม ถือว่าพร้อมเลย
@@ -191,6 +202,10 @@ export async function hydrateFromSupabase(): Promise<void> {
   hydratePromise = (async () => {
     try {
       const sb = createClient();
+      // ต้องมี Supabase session (authenticated) ก่อน ไม่งั้น RLS บล็อก
+      // แอป login ด้วย sessionStorage จึงใช้ anonymous sign-in เป็นสะพานให้ client
+      // เป็น role "authenticated" (RLS policy to authenticated ผ่าน)
+      await ensureAnonAuth(sb);
       // ดึงทุกตารางขนานกัน; sales ต้องดึงเป็นหน้า ๆ (เกิน default 1000 แถว)
       const [dealers, solutions, employees, pointCompanies, pointEmployees] =
         await Promise.all([
