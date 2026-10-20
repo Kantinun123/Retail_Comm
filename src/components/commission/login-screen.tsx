@@ -11,6 +11,17 @@ import {
 import { doLogin } from "@/lib/commission/session";
 import type { Dealer, Role, TeamMember } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
+import { RealLoginForm } from "./real-login-form";
+
+/** เปิด login จริง (email/password + Supabase Auth) เมื่อ NEXT_PUBLIC_REAL_AUTH=1
+ *  ค่าเริ่มต้น = โหมดเดโม (dropdown เลือก role) เพื่อไม่ให้ production เดิมพัง
+ *  จะสลับเป็น real auth เต็มตัวเมื่อพร้อม (ตั้ง flag บน Vercel) */
+const REAL_AUTH = process.env.NEXT_PUBLIC_REAL_AUTH === "1";
+
+/** เลือกหน้า login ตาม flag: ของจริง (email/password) หรือ เดโม (dropdown) */
+export function LoginScreen() {
+  return REAL_AUTH ? <RealLoginForm /> : <DemoLoginScreen />;
+}
 
 /* ---------- Searchable dropdown (combobox) ----------
    แสดงค่าที่เลือก กดแล้วเปิดช่องค้นหา + รายการที่กรองได้ */
@@ -180,7 +191,8 @@ function SearchableSelect({
   );
 }
 
-export function LoginScreen() {
+/** หน้า login เลือก role จาก dropdown (เดโม) — ใช้เมื่อ NEXT_PUBLIC_DEMO_LOGIN=1 */
+function DemoLoginScreen() {
   const router = useRouter();
   const dealers = useMemo(() => getDealers(), []);
 

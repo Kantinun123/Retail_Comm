@@ -175,15 +175,26 @@ export function getDatasetReady(): ReadyState {
   return readyState;
 }
 
-/** ให้แน่ใจว่ามี Supabase session (anonymous ถ้ายังไม่มี) ก่อน query
- *  เพื่อให้ผ่าน RLS policy ที่เป็น "to authenticated" */
+/** ให้แน่ใจว่ามี Supabase session ก่อน query (ผ่าน RLS "to authenticated")
+ *  - โหมดเดโม (ค่าเริ่มต้น): ใช้ anonymous sign-in เป็นสะพาน
+ *    (dropdown login ไม่สร้าง Supabase session จริง)
+ *  - โหมด real auth (NEXT_PUBLIC_REAL_AUTH=1): ต้องมี session จาก login จริงอยู่แล้ว
+ *    ถ้าไม่มี session -> โยน error (flow login จะพาไป login) */
 async function ensureAnonAuth(
   sb: ReturnType<typeof createClient>
 ): Promise<void> {
   const { data } = await sb.auth.getSession();
-  if (data.session) return; // มี session อยู่แล้ว (anon หรือจริง)
-  const { error } = await sb.auth.signInAnonymously();
-  if (error) throw error;
+  if (data.session) return; // มี session อยู่แล้ว (จริง หรือ anon)
+
+  const realAuth = process.env.NEXT_PUBLIC_REAL_AUTH === "1";
+  if (!realAuth) {
+    // โหมดเดโม: anon sign-in เป็นสะพาน
+    const { error } = await sb.auth.signInAnonymously();
+    if (error) throw error;
+    return;
+  }
+  // โหมด real auth: ไม่มี session = ยังไม่ login จริง
+  throw new Error("no authenticated session (real-auth mode)");
 }
 
 /** ดึงข้อมูลทั้ง 6 ตารางจาก Supabase แล้วเติมเข้า current (ครั้งเดียว) */
