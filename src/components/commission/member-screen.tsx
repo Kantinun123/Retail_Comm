@@ -55,6 +55,15 @@ import type {
   GiftItem,
 } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
+import { DiceBearAvatar, DICEBEAR_STYLES, type DiceBearStyle } from "./dicebear-avatar";
+import {
+  getAvatarStyle,
+  subscribeAvatarStyle,
+  DEFAULT_STYLE,
+  type AvatarStyleConfig,
+} from "@/lib/commission/avatar-style";
+/* ระบบแต่งตัวเดิม (CharacterAvatar/DressingRoom/character.ts) เก็บโค้ดไว้
+   เผื่อเรียกใช้อนาคต — ถอดออกจาก UI ชั่วคราว */
 
 function fmtPts(n: number): string {
   return Number(n).toLocaleString("th-TH");
@@ -83,6 +92,8 @@ export function MemberScreen() {
   const [address, setAddress] = useState("");
   // รายการเดินแต้ม (statement)
   const [showStatement, setShowStatement] = useState(false);
+  // avatar (DiceBear)
+  const [avatarStyle, setAvatarStyle] = useState<AvatarStyleConfig | null>(null);
 
   // พนักงาน = มุมมอง incentive, ร้าน/แอดมิน = commission
   setBenefitView(session?.isSales ? "emp" : null);
@@ -119,11 +130,24 @@ export function MemberScreen() {
     return unsub;
   }, [pKey]);
 
+  // โหลด avatar style + subscribe
+  useEffect(() => {
+    if (!pKey) return;
+    const refresh = () => setAvatarStyle(getAvatarStyle(pKey));
+    refresh();
+    const unsub = subscribeAvatarStyle(refresh);
+    return unsub;
+  }, [pKey]);
+
   // re-render เมื่อแอดมินเพิ่มแต้ม (adjustments เปลี่ยน)
   const [, forceTick] = useState(0);
   useEffect(() => subscribeAdjustments(() => forceTick((n) => n + 1)), []);
 
   if (!ready || !session) return null;
+
+  // seed ประจำตัวสำหรับ DiceBear (empId / dealerCode)
+  const avatarSeed =
+    (isSales ? session.empId : session.dealer.code) || "guest";
 
   // ขอบเขตสรุปผลประโยชน์ (ตลอดทุกช่วงเวลา)
   const empScope = isSales ? session.empId : null;
@@ -182,7 +206,8 @@ export function MemberScreen() {
   const nearestExpire = soonLots
     .map((l) => l.expireDate)
     .sort()[0];
-  const canRedeem = !!pKey && !!myPoints;
+  // แลกของรางวัลได้เฉพาะพนักงาน (sales) — ร้านค้าตัวแทน/แอดมินไม่มีสิทธิ์แลก
+  const canRedeem = isSales && !!pKey && !!myPoints;
 
   const ownerName =
     isSales && session?.me ? session.me.name : session?.dealer.name ?? "สมาชิก";
@@ -334,6 +359,52 @@ export function MemberScreen() {
             </div>
           </div>
         </section>
+
+        {/* การ์ดตัวละคร (DiceBear) — เฉพาะผู้มี pKey = sales/dealer */}
+        {canEdit && (
+          <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-bold text-slate-900 flex items-center space-x-1.5">
+                <Icon name="face" className="text-lg text-[#d32029]" />
+                <span>ตัวละครของฉัน</span>
+              </h3>
+              <Link
+                href="/app/avatar-preview"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-[#d32029] hover:bg-[#b91c21] px-3 py-1.5 rounded-full active:scale-95 transition"
+              >
+                <Icon name="palette" style={{ fontSize: 14 }} />
+                เลือกสไตล์
+              </Link>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="shrink-0 rounded-2xl bg-slate-50 border border-slate-100 p-1">
+                <DiceBearAvatar
+                  seed={avatarSeed}
+                  styleId={(avatarStyle?.styleId ?? DEFAULT_STYLE) as DiceBearStyle}
+                  size={96}
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="min-w-0">
+                {avatarStyle ? (
+                  <p className="text-[13px] text-slate-600 leading-relaxed">
+                    สไตล์:{" "}
+                    <span className="font-bold text-[#a11119]">
+                      {DICEBEAR_STYLES.find((s) => s.id === avatarStyle.styleId)?.label ?? avatarStyle.styleId}
+                    </span>
+                    <br />กด &quot;เลือกสไตล์&quot; เพื่อเปลี่ยน avatar
+                  </p>
+                ) : (
+                  <p className="text-[13px] text-slate-600 leading-relaxed">
+                    เลือก avatar ประจำตัวของคุณ 🎨 กด{" "}
+                    <span className="font-bold text-[#a11119]">เลือกสไตล์</span>{" "}
+                    จาก {DICEBEAR_STYLES.length} สไตล์
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* การ์ดข้อมูลติดต่อ (แก้ไขได้) */}
         {canEdit && (
@@ -854,6 +925,7 @@ export function MemberScreen() {
           </div>
         </div>
       )}
+
 
       {/* Toast ผลการแลก */}
       {redeemMsg && (
