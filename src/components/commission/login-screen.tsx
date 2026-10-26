@@ -333,20 +333,17 @@ function DemoLoginScreen() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-[17px] font-bold text-white tracking-tight">
-              ระบบดูค่าคอมมิชชั่นการขาย Solution
+              ระบบดูผลประโยชน์จากการขาย
             </h2>
             <p className="text-[12px] text-red-100/90 mt-1 leading-relaxed font-light">
-              สำหรับร้านค้าตัวแทนจำหน่ายและพนักงานขายในเครือ SCG Network
+              สำหรับร้านค้าตัวแทนจำหน่ายและพนักงานขายในเครือ SCG
             </p>
           </div>
         </div>
-        <div className="mt-3.5 pt-2.5 border-t border-red-600/60 flex items-center justify-between text-[11px] font-medium text-red-100/90">
+        <div className="mt-3.5 pt-2.5 border-t border-red-600/60 flex items-center text-[11px] font-medium text-red-100/90">
           <span className="flex items-center space-x-1">
             <Icon name="event_available" className="text-sm text-red-300" />
             <span>รอบคำนวณล่าสุด: 10/2026</span>
-          </span>
-          <span className="bg-red-900/40 text-red-200 px-2.5 py-0.5 rounded-md font-semibold border border-red-400/20">
-            ตัดรอบทุกวันที่ 20
           </span>
         </div>
       </div>
