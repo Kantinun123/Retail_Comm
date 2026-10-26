@@ -62,11 +62,19 @@ import {
   DEFAULT_STYLE,
   type AvatarStyleConfig,
 } from "@/lib/commission/avatar-style";
+import {
+  fetchCheckinState,
+  checkinTotalPoints,
+  getCachedState,
+  subscribeCheckin,
+} from "@/lib/commission/checkin-store";
 /* ระบบแต่งตัวเดิม (CharacterAvatar/DressingRoom/character.ts) เก็บโค้ดไว้
    เผื่อเรียกใช้อนาคต — ถอดออกจาก UI ชั่วคราว */
 
+/** แสดงแต้ม: รองรับทศนิยมสูงสุด 2 ตำแหน่ง (เช็คอินให้แต้มทศนิยม 0.1/0.2/0.5)
+ *  จำนวนเต็มไม่โชว์ .00 */
 function fmtPts(n: number): string {
-  return Number(n).toLocaleString("th-TH");
+  return Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
 }
 
 export function MemberScreen() {
@@ -143,6 +151,15 @@ export function MemberScreen() {
   const [, forceTick] = useState(0);
   useEffect(() => subscribeAdjustments(() => forceTick((n) => n + 1)), []);
 
+  // โหลดแต้มเช็คอินสะสม (เฉพาะ sales) + subscribe ให้ยอดคงเหลืออัปเดต
+  const checkinEmpId =
+    session && session.isSales ? session.empId : null;
+  useEffect(() => {
+    if (!checkinEmpId) return;
+    fetchCheckinState(checkinEmpId).catch(() => {});
+    return subscribeCheckin(() => forceTick((n) => n + 1));
+  }, [checkinEmpId]);
+
   if (!ready || !session) return null;
 
   // seed ประจำตัวสำหรับ DiceBear (empId / dealerCode)
@@ -186,8 +203,13 @@ export function MemberScreen() {
   const lots = pKey ? deriveLots(pKey, baseEarned) : [];
   // redemptions เป็น dependency โดยปริยาย (re-render เมื่อ state เปลี่ยน)
   void redemptions;
+  // แต้มเช็คอินสะสม (server-authoritative; รวมเข้า pool แต้มเดียวกัน) — เฉพาะ sales
+  const checkinTotal = empCode ? checkinTotalPoints(empCode) : 0;
+  const checkinCached = empCode ? getCachedState(empCode) : null;
+  const checkinCachedToday = checkinCached?.checkedToday ?? false;
+  const checkinStreak = checkinCached?.currentStreak ?? 0;
   const balance = pKey
-    ? Math.max(0, availableBalance(pKey, lots) + adjTotal)
+    ? Math.max(0, availableBalance(pKey, lots) + adjTotal + checkinTotal)
     : 0;
   const statement = pKey
     ? [
@@ -199,6 +221,21 @@ export function MemberScreen() {
           amount: a.points,
           time: a.time,
         })),
+        // สรุปแต้มเช็คอินเป็นรายการเดียว (รายละเอียดรายวันดูได้ในหน้าเช็คอิน)
+        // ใช้เวลาจาก state (today ของ server) เพื่อให้ pure — ไม่เรียก Date.now() ตอน render
+        ...(checkinTotal > 0
+          ? [
+              {
+                id: "checkin-total",
+                kind: "earn" as const,
+                label: "แต้มจากการเช็คอินรายวัน",
+                amount: checkinTotal,
+                time: checkinCached?.today
+                  ? new Date(checkinCached.today + "T23:59:59").getTime()
+                  : 0,
+              },
+            ]
+          : []),
       ].sort((x, y) => y.time - x.time)
     : [];
   const soonLots = expiringLots(lots);
@@ -359,6 +396,38 @@ export function MemberScreen() {
             </div>
           </div>
         </section>
+
+        {/* Entry: เช็คอินรายวัน — เฉพาะพนักงานขาย (sales) */}
+        {isSales && (
+          <Link
+            href="/app/check-in"
+            className="block rounded-2xl bg-white border border-[#d32029]/20 shadow-sm p-4 active:scale-[0.99] transition hover:-translate-y-0.5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-[#fff0f0] flex items-center justify-center text-[22px] shrink-0">
+                🔥
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-bold text-slate-900">
+                  เช็คอินรายวัน
+                </p>
+                <p className="text-[12px] text-slate-500 mt-0.5">
+                  {checkinCachedToday
+                    ? `เช็คอินวันนี้แล้ว · ต่อเนื่อง ${checkinStreak} วัน`
+                    : "กดรับแต้มวันนี้ สะสม streak 7 วัน"}
+                </p>
+              </div>
+              {!checkinCachedToday ? (
+                <span className="shrink-0 inline-flex items-center gap-1 text-[12px] font-bold text-white bg-[#d32029] px-3 py-1.5 rounded-full">
+                  เช็คอิน
+                  <Icon name="arrow_forward" style={{ fontSize: 14 }} />
+                </span>
+              ) : (
+                <Icon name="check_circle" className="text-[#16a34a] text-2xl shrink-0" fill />
+              )}
+            </div>
+          </Link>
+        )}
 
         {/* การ์ดตัวละคร (DiceBear) — เฉพาะผู้มี pKey = sales/dealer */}
         {canEdit && (
