@@ -92,22 +92,21 @@ export async function POST(req: NextRequest) {
   const points = Number(body.points);
   const startsAt = String(body.startsAt ?? "").trim();
   const endsAt = String(body.endsAt ?? "").trim();
-  const audienceMode = String(body.audienceMode ?? "all").trim();
-  const audienceValues = Array.isArray(body.audienceValues)
-    ? (body.audienceValues as unknown[]).map(String)
-    : null;
+
+  // audience cascade 3 ชั้น (เว้นว่าง = ไม่จำกัดชั้นนั้น; ว่างหมด = ทุกคน)
+  const toArr = (v: unknown): string[] | null => {
+    if (!Array.isArray(v) || v.length === 0) return null;
+    return (v as unknown[]).map(String).filter(Boolean);
+  };
+  const audienceModels = toArr(body.audienceModels);
+  const audienceDealers = toArr(body.audienceDealers);
+  const audienceEmployees = toArr(body.audienceEmployees);
 
   if (!title || !code || !startsAt || !endsAt) {
     return NextResponse.json({ ok: false, error: "กรอกข้อมูลไม่ครบ" }, { status: 400 });
   }
   if (!Number.isFinite(points) || points < 0) {
     return NextResponse.json({ ok: false, error: "แต้มไม่ถูกต้อง" }, { status: 400 });
-  }
-  if (!["all", "dealers", "models", "employees"].includes(audienceMode)) {
-    return NextResponse.json({ ok: false, error: "โหมด audience ไม่ถูกต้อง" }, { status: 400 });
-  }
-  if (audienceMode !== "all" && (!audienceValues || audienceValues.length === 0)) {
-    return NextResponse.json({ ok: false, error: "เลือกกลุ่มเป้าหมายอย่างน้อย 1 รายการ" }, { status: 400 });
   }
 
   let meetingUrl: string | null;
@@ -130,8 +129,9 @@ export async function POST(req: NextRequest) {
         starts_at: startsAt,
         ends_at: endsAt,
         meeting_url: meetingUrl,
-        audience_mode: audienceMode,
-        audience_values: audienceMode === "all" ? null : audienceValues,
+        audience_models: audienceModels,
+        audience_dealers: audienceDealers,
+        audience_employees: audienceEmployees,
         created_by: String(body.createdBy ?? ""),
       })
       .select()

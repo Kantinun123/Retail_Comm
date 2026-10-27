@@ -2,7 +2,9 @@
 
 /* =============================================================
    แผงจัดการกิจกรรม (Event Check-in) — ฝั่ง admin ในหน้าฐานข้อมูล
-   - ฟอร์มสร้างกิจกรรม: ชื่อ/รายละเอียด/เวลา/แต้ม/รหัส/Teams link/audience (4 โหมด)
+   - ฟอร์มสร้างกิจกรรม: ชื่อ/รายละเอียด/เวลา/แต้ม/รหัส/Teams link
+   - audience แบบ cascade 3 ชั้น: โมเดล → ร้าน (กรองตามโมเดล) → คน (กรองตามร้าน)
+     เว้นว่างชั้นไหน = ไม่จำกัดชั้นนั้น; ว่างทั้งหมด = ทุกคน (AND)
    - รายการกิจกรรม + จำนวนเช็คอิน + ปุ่มปิด
    ============================================================= */
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,39 +19,107 @@ import {
 } from "@/lib/commission/event-store";
 import { cn } from "@/lib/utils";
 
-type AudienceMode = "all" | "dealers" | "models" | "employees";
-
-const MODE_LABELS: Record<AudienceMode, string> = {
-  all: "ทั้งหมด",
-  dealers: "ตามร้าน",
-  models: "ตามโมเดล",
-  employees: "รายคน",
-};
-
 function fmtPts(n: number): string {
   return Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
 }
 
+interface Option {
+  value: string;
+  label: string;
+}
+
+/** รายการเลือกแบบ checkbox + ค้นหา + chips (ใช้ซ้ำ 3 ชั้น) */
+function CascadePicker({
+  title,
+  hint,
+  options,
+  selected,
+  onToggle,
+  disabled,
+}: {
+  title: string;
+  hint: string;
+  options: Option[];
+  selected: string[];
+  onToggle: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(search.trim().toLowerCase())
+  );
+
+  return (
+    <div className={cn("rounded-lg bg-white border border-slate-200 p-2.5", disabled && "opacity-50")}>
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-bold text-slate-700">{title}</span>
+        <span className="text-[10px] text-slate-400">
+          {selected.length > 0 ? `เลือก ${selected.length}` : "ทั้งหมด"}
+        </span>
+      </div>
+      <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>
+
+      {!disabled && (
+        <>
+          {/* chips */}
+          {selected.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {selected.map((v) => {
+                const opt = options.find((o) => o.value === v);
+                return (
+                  <span
+                    key={v}
+                    className="inline-flex items-center gap-1 text-[10px] text-[#a11119] bg-[#fff0f0] border border-[#f1c0c2] px-2 py-0.5 rounded-full"
+                  >
+                    {opt?.label ?? v}
+                    <button type="button" onClick={() => onToggle(v)}>
+                      <Icon name="close" style={{ fontSize: 11 }} />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <input
+            className="w-full h-8 rounded-lg bg-slate-50 border border-slate-200 px-2.5 text-[12px] outline-none focus:border-[#d32029] mt-2"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`ค้นหา${title}...`}
+          />
+          <div className="mt-1.5 max-h-36 overflow-y-auto rounded-lg border border-slate-100 divide-y divide-slate-50">
+            {filtered.slice(0, 50).map((o) => {
+              const checked = selected.includes(o.value);
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => onToggle(o.value)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-slate-50"
+                >
+                  <span
+                    className={cn(
+                      "w-4 h-4 rounded flex items-center justify-center shrink-0",
+                      checked ? "bg-[#d32029] text-white" : "border border-slate-300"
+                    )}
+                  >
+                    {checked && <Icon name="check" style={{ fontSize: 11 }} />}
+                  </span>
+                  <span className="text-[12px] text-slate-700">{o.label}</span>
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="text-[11px] text-slate-400 px-2 py-2.5 text-center">ไม่พบรายการ</p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function EventManagePanel({ createdBy }: { createdBy?: string }) {
   const ds = getDataset();
-
-  // ตัวเลือก audience จาก dataset
-  const dealerOptions = useMemo(
-    () => ds.dealers.map((d) => ({ value: d.code, label: `${d.name} (${d.code})` })),
-    [ds.dealers]
-  );
-  const modelOptions = useMemo(() => {
-    const set = new Set<string>();
-    ds.dealers.forEach((d) => d.model && set.add(d.model));
-    return Array.from(set).sort().map((m) => ({ value: m, label: m }));
-  }, [ds.dealers]);
-  const employeeOptions = useMemo(
-    () =>
-      ds.salesTeam
-        .filter((e) => e.role === "พนักงานขาย" || true)
-        .map((e) => ({ value: e.id, label: `${e.name} (${e.id})` })),
-    [ds.salesTeam]
-  );
 
   // ฟอร์ม
   const [title, setTitle] = useState("");
@@ -59,14 +129,46 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>("all");
-  const [audienceValues, setAudienceValues] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
+
+  // audience cascade 3 ชั้น
+  const [selModels, setSelModels] = useState<string[]>([]);
+  const [selDealers, setSelDealers] = useState<string[]>([]);
+  const [selEmployees, setSelEmployees] = useState<string[]>([]);
+
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-
-  // รายการกิจกรรม
   const [events, setEvents] = useState<AdminEvent[]>([]);
+
+  /* ---- ตัวเลือกแต่ละชั้น (กรองตามชั้นบน) ---- */
+  const modelOptions = useMemo<Option[]>(() => {
+    const set = new Set<string>();
+    ds.dealers.forEach((d) => d.model && set.add(d.model));
+    return Array.from(set).sort().map((m) => ({ value: m, label: m }));
+  }, [ds.dealers]);
+
+  // ร้าน: ถ้าเลือกโมเดล -> เฉพาะร้านในโมเดลนั้น; ไม่เลือก -> ทุกร้าน
+  const dealerOptions = useMemo<Option[]>(() => {
+    const inModel = (m: string) => selModels.length === 0 || selModels.includes(m);
+    return ds.dealers
+      .filter((d) => inModel(d.model))
+      .map((d) => ({ value: d.code, label: `${d.name} (${d.code})` }));
+  }, [ds.dealers, selModels]);
+
+  // คน: ถ้าเลือกร้าน -> เฉพาะคนในร้านนั้น; ไม่งั้นจำกัดตามโมเดล (ร้านที่อยู่ในโมเดล)
+  const employeeOptions = useMemo<Option[]>(() => {
+    const dealersInModel = new Set(
+      ds.dealers
+        .filter((d) => selModels.length === 0 || selModels.includes(d.model))
+        .map((d) => d.code)
+    );
+    return ds.salesTeam
+      .filter((e) => {
+        if (selDealers.length > 0) return e.dealerCode && selDealers.includes(e.dealerCode);
+        if (selModels.length > 0) return e.dealerCode && dealersInModel.has(e.dealerCode);
+        return true;
+      })
+      .map((e) => ({ value: e.id, label: `${e.name} (${e.id})` }));
+  }, [ds.salesTeam, ds.dealers, selModels, selDealers]);
 
   const loadEvents = useCallback(() => {
     fetchAdminEvents()
@@ -86,29 +188,55 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
     };
   }, []);
 
-  const currentOptions =
-    audienceMode === "dealers"
-      ? dealerOptions
-      : audienceMode === "models"
-        ? modelOptions
-        : audienceMode === "employees"
-          ? employeeOptions
-          : [];
-
-  const filteredOptions = currentOptions.filter((o) =>
-    o.label.toLowerCase().includes(search.trim().toLowerCase())
-  );
-
-  function toggleValue(v: string) {
-    setAudienceValues((prev) =>
-      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]
-    );
+  function toggle(list: string[], setList: (v: string[]) => void, v: string) {
+    setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   }
 
-  function changeMode(m: AudienceMode) {
-    setAudienceMode(m);
-    setAudienceValues([]);
-    setSearch("");
+  /** toggle โมเดล + ตัดร้าน/คนที่หลุดขอบเขตใหม่ออก (prune ชั้นล่าง) */
+  function toggleModel(v: string) {
+    const nextModels = selModels.includes(v)
+      ? selModels.filter((x) => x !== v)
+      : [...selModels, v];
+    setSelModels(nextModels);
+
+    // ร้านที่ยังอยู่ในขอบเขตโมเดลใหม่
+    const dealersInModel = new Set(
+      ds.dealers
+        .filter((d) => nextModels.length === 0 || nextModels.includes(d.model))
+        .map((d) => d.code)
+    );
+    const nextDealers = selDealers.filter((c) => dealersInModel.has(c));
+    setSelDealers(nextDealers);
+
+    // คนที่ยังอยู่ในขอบเขต (ตามร้านที่เหลือ หรือโมเดล)
+    pruneEmployees(nextModels, nextDealers);
+  }
+
+  /** toggle ร้าน + ตัดคนที่หลุดออก */
+  function toggleDealer(v: string) {
+    const nextDealers = selDealers.includes(v)
+      ? selDealers.filter((x) => x !== v)
+      : [...selDealers, v];
+    setSelDealers(nextDealers);
+    pruneEmployees(selModels, nextDealers);
+  }
+
+  /** ตัดคนที่ไม่อยู่ในขอบเขตโมเดล/ร้านที่กำหนด */
+  function pruneEmployees(models: string[], dealers: string[]) {
+    const dealersInModel = new Set(
+      ds.dealers
+        .filter((d) => models.length === 0 || models.includes(d.model))
+        .map((d) => d.code)
+    );
+    setSelEmployees((prev) =>
+      prev.filter((empId) => {
+        const emp = ds.salesTeam.find((e) => e.id === empId);
+        if (!emp?.dealerCode) return false;
+        if (dealers.length > 0) return dealers.includes(emp.dealerCode);
+        if (models.length > 0) return dealersInModel.has(emp.dealerCode);
+        return true;
+      })
+    );
   }
 
   function resetForm() {
@@ -119,21 +247,16 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
     setStartsAt("");
     setEndsAt("");
     setMeetingUrl("");
-    setAudienceMode("all");
-    setAudienceValues([]);
-    setSearch("");
+    setSelModels([]);
+    setSelDealers([]);
+    setSelEmployees([]);
   }
 
   async function submit() {
     if (busy) return;
     setMsg(null);
-    // validate เบื้องต้นฝั่ง client (server validate ซ้ำ)
     if (!title.trim() || !code.trim() || !startsAt || !endsAt) {
       setMsg("กรอกชื่อ รหัส และช่วงเวลาให้ครบ");
-      return;
-    }
-    if (audienceMode !== "all" && audienceValues.length === 0) {
-      setMsg("เลือกกลุ่มเป้าหมายอย่างน้อย 1 รายการ");
       return;
     }
     const input: NewEventInput = {
@@ -144,8 +267,9 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString(),
       meetingUrl: meetingUrl.trim() || undefined,
-      audienceMode,
-      audienceValues: audienceMode === "all" ? undefined : audienceValues,
+      audienceModels: selModels.length > 0 ? selModels : undefined,
+      audienceDealers: selDealers.length > 0 ? selDealers : undefined,
+      audienceEmployees: selEmployees.length > 0 ? selEmployees : undefined,
       createdBy,
     };
     setBusy(true);
@@ -169,6 +293,15 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
   async function onClose(id: number) {
     const res = await closeEvent(id);
     if (res.ok) loadEvents();
+  }
+
+  /** สรุป audience ของกิจกรรมเป็นข้อความ */
+  function audienceSummary(ev: AdminEvent): string {
+    const parts: string[] = [];
+    if (ev.audienceModels?.length) parts.push(`${ev.audienceModels.length} โมเดล`);
+    if (ev.audienceDealers?.length) parts.push(`${ev.audienceDealers.length} ร้าน`);
+    if (ev.audienceEmployees?.length) parts.push(`${ev.audienceEmployees.length} คน`);
+    return parts.length === 0 ? "ทุกคน" : parts.join(" · ");
   }
 
   const inputCls =
@@ -224,90 +357,59 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
           <p className="text-[10px] text-slate-400 mt-1">รองรับเฉพาะ https ของ teams.microsoft.com / teams.live.com</p>
         </div>
 
-        {/* audience */}
+        {/* audience cascade 3 ชั้น */}
         <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
           <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
             <Icon name="group" style={{ fontSize: 14 }} className="text-slate-400" />
-            กลุ่มผู้เห็นกิจกรรม
+            กลุ่มผู้เห็นกิจกรรม (เลือกซ้อนลำดับชั้น)
           </label>
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {(Object.keys(MODE_LABELS) as AudienceMode[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => changeMode(m)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-[12px] font-semibold transition active:scale-95",
-                  audienceMode === m
-                    ? "bg-[#d32029] text-white"
-                    : "bg-white border border-slate-200 text-slate-600"
-                )}
-              >
-                {MODE_LABELS[m]}
-              </button>
-            ))}
-          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            เว้นว่างทุกชั้น = ทุกคน · เลือกชั้นบนเพื่อกรองชั้นล่าง
+          </p>
 
-          {audienceMode !== "all" && (
-            <div className="mt-2.5">
-              {/* chips ที่เลือก */}
-              {audienceValues.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {audienceValues.map((v) => {
-                    const opt = currentOptions.find((o) => o.value === v);
-                    return (
-                      <span
-                        key={v}
-                        className="inline-flex items-center gap-1 text-[11px] text-[#a11119] bg-[#fff0f0] border border-[#f1c0c2] px-2 py-1 rounded-full"
-                      >
-                        {opt?.label ?? v}
-                        <button type="button" onClick={() => toggleValue(v)}>
-                          <Icon name="close" style={{ fontSize: 12 }} />
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-              <input
-                className={inputCls}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={`ค้นหา${MODE_LABELS[audienceMode]}...`}
-              />
-              <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-slate-100 divide-y divide-slate-50">
-                {filteredOptions.slice(0, 50).map((o) => {
-                  const checked = audienceValues.includes(o.value);
-                  return (
-                    <button
-                      key={o.value}
-                      type="button"
-                      onClick={() => toggleValue(o.value)}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-slate-50"
-                    >
-                      <span
-                        className={cn(
-                          "w-4 h-4 rounded flex items-center justify-center shrink-0",
-                          checked ? "bg-[#d32029] text-white" : "border border-slate-300"
-                        )}
-                      >
-                        {checked && <Icon name="check" style={{ fontSize: 12 }} />}
-                      </span>
-                      <span className="text-[12px] text-slate-700">{o.label}</span>
-                    </button>
-                  );
-                })}
-                {filteredOptions.length === 0 && (
-                  <p className="text-[11px] text-slate-400 px-2.5 py-3 text-center">ไม่พบรายการ</p>
-                )}
-              </div>
+          <div className="mt-2.5 space-y-2">
+            {/* ชั้น 1: โมเดล */}
+            <CascadePicker
+              title="โมเดล"
+              hint="เลือกโมเดลร้าน (เว้นว่าง = ทุกโมเดล)"
+              options={modelOptions}
+              selected={selModels}
+              onToggle={toggleModel}
+            />
+            {/* ชั้น 2: ร้าน (กรองตามโมเดล) */}
+            <div className="flex justify-center">
+              <Icon name="south" style={{ fontSize: 16 }} className="text-slate-300" />
             </div>
-          )}
+            <CascadePicker
+              title="ร้าน"
+              hint={
+                selModels.length > 0
+                  ? "เฉพาะร้านในโมเดลที่เลือก (เว้นว่าง = ทุกร้านในโมเดล)"
+                  : "เลือกร้าน (เว้นว่าง = ทุกร้าน)"
+              }
+              options={dealerOptions}
+              selected={selDealers}
+              onToggle={toggleDealer}
+            />
+            {/* ชั้น 3: คน (กรองตามร้าน) */}
+            <div className="flex justify-center">
+              <Icon name="south" style={{ fontSize: 16 }} className="text-slate-300" />
+            </div>
+            <CascadePicker
+              title="รายคน"
+              hint={
+                selDealers.length > 0
+                  ? "เฉพาะพนักงานในร้านที่เลือก (เว้นว่าง = ทุกคนในร้าน)"
+                  : "เลือกพนักงาน (เว้นว่าง = ทุกคนในขอบเขตด้านบน)"
+              }
+              options={employeeOptions}
+              selected={selEmployees}
+              onToggle={(v) => toggle(selEmployees, setSelEmployees, v)}
+            />
+          </div>
         </div>
 
-        {msg && (
-          <p className="text-[12px] font-semibold text-[#a11119]">{msg}</p>
-        )}
+        {msg && <p className="text-[12px] font-semibold text-[#a11119]">{msg}</p>}
 
         <button
           type="button"
@@ -336,10 +438,7 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-bold text-slate-900 truncate">{ev.title}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    รหัส {ev.code} · +{fmtPts(ev.points)} แต้ม ·{" "}
-                    {ev.audienceMode === "all"
-                      ? "ทุกคน"
-                      : `${MODE_LABELS[ev.audienceMode]} ${ev.audienceValues?.length ?? 0} รายการ`}
+                    รหัส {ev.code} · +{fmtPts(ev.points)} แต้ม · {audienceSummary(ev)}
                   </p>
                   <span className="inline-block mt-1 text-[10px] font-bold text-[#16a34a] bg-emerald-50 px-2 py-0.5 rounded-full">
                     เช็คอินแล้ว {ev.checkinCount}

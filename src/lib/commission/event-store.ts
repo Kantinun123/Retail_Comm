@@ -30,8 +30,10 @@ export interface AdminEvent {
   startsAt: string;
   endsAt: string;
   meetingUrl: string | null;
-  audienceMode: "all" | "dealers" | "models" | "employees";
-  audienceValues: string[] | null;
+  // audience cascade 3 ชั้น (null = ไม่จำกัดชั้นนั้น)
+  audienceModels: string[] | null;
+  audienceDealers: string[] | null;
+  audienceEmployees: string[] | null;
   active: boolean;
   checkinCount: number;
   createdAt: string;
@@ -52,8 +54,10 @@ export interface NewEventInput {
   startsAt: string; // ISO
   endsAt: string; // ISO
   meetingUrl?: string;
-  audienceMode: "all" | "dealers" | "models" | "employees";
-  audienceValues?: string[];
+  // audience cascade 3 ชั้น (เว้นว่าง = ไม่จำกัดชั้นนั้น)
+  audienceModels?: string[];
+  audienceDealers?: string[];
+  audienceEmployees?: string[];
   createdBy?: string;
 }
 
@@ -106,8 +110,9 @@ function mapVisible(r: RawVisible): VisibleEvent {
 
 type RawAdmin = RawVisible & {
   code: string;
-  audience_mode: AdminEvent["audienceMode"];
-  audience_values: string[] | null;
+  audience_models: string[] | null;
+  audience_dealers: string[] | null;
+  audience_employees: string[] | null;
   active: boolean;
   checkin_count: number;
   created_at: string;
@@ -123,8 +128,9 @@ function mapAdmin(r: RawAdmin): AdminEvent {
     startsAt: r.starts_at,
     endsAt: r.ends_at,
     meetingUrl: r.meeting_url,
-    audienceMode: r.audience_mode,
-    audienceValues: r.audience_values,
+    audienceModels: r.audience_models,
+    audienceDealers: r.audience_dealers,
+    audienceEmployees: r.audience_employees,
     active: r.active,
     checkinCount: Number(r.checkin_count ?? 0),
     createdAt: r.created_at,
