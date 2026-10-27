@@ -213,3 +213,37 @@ export async function closeEvent(id: number): Promise<{ ok: boolean; error?: str
   const raw = (await res.json()) as { ok?: boolean; error?: string };
   return { ok: !!raw.ok, error: raw.error };
 }
+
+/** รายชื่อคนที่เช็คอินของกิจกรรม (admin) */
+export interface EventCheckinEntry {
+  empId: string;
+  name: string;
+  dealerCode: string | null;
+  points: number;
+  createdAt: string;
+}
+
+export async function fetchEventCheckins(eventId: number): Promise<EventCheckinEntry[]> {
+  const res = await fetch(`/api/events/admin/checkins?eventId=${eventId}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  const raw = (await res.json()) as {
+    ok?: boolean;
+    checkins?: {
+      emp_id: string;
+      name: string;
+      dealer_code: string | null;
+      points: number | string;
+      created_at: string;
+    }[];
+  };
+  if (!raw.ok || !Array.isArray(raw.checkins)) return [];
+  return raw.checkins.map((c) => ({
+    empId: c.emp_id,
+    name: c.name,
+    dealerCode: c.dealer_code,
+    points: Number(c.points),
+    createdAt: c.created_at,
+  }));
+}

@@ -14,10 +14,25 @@ import {
   fetchAdminEvents,
   createEvent,
   closeEvent,
+  fetchEventCheckins,
   type AdminEvent,
   type NewEventInput,
+  type EventCheckinEntry,
 } from "@/lib/commission/event-store";
 import { cn } from "@/lib/utils";
+
+function fmtDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("th-TH", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 function fmtPts(n: number): string {
   return Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -118,6 +133,184 @@ function CascadePicker({
   );
 }
 
+/** map รหัส -> ชื่อ (โมเดลใช้ค่าตรง, ร้าน/คนแปลงเป็นชื่อ) */
+function labelList(values: string[] | null, resolve: (v: string) => string): string[] {
+  if (!values || values.length === 0) return [];
+  return values.map(resolve);
+}
+
+/** modal รายละเอียดกิจกรรม + รายชื่อคนเช็คอิน */
+function EventDetailModal({
+  event,
+  dealerName,
+  empName,
+  onClose,
+}: {
+  event: AdminEvent;
+  dealerName: (code: string) => string;
+  empName: (id: string) => string;
+  onClose: () => void;
+}) {
+  const [checkins, setCheckins] = useState<EventCheckinEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchEventCheckins(event.id)
+      .then((list) => {
+        if (!cancelled) setCheckins(list);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id]);
+
+  const models = labelList(event.audienceModels, (m) => m);
+  const dealers = labelList(event.audienceDealers, dealerName);
+  const emps = labelList(event.audienceEmployees, empName);
+  const noAudience = models.length === 0 && dealers.length === 0 && emps.length === 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* header */}
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+          <span className="text-[15px] font-bold text-slate-900">รายละเอียดกิจกรรม</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95"
+          >
+            <Icon name="close" style={{ fontSize: 18 }} />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {/* ข้อมูลหลัก */}
+          <div>
+            <p className="text-[16px] font-bold text-slate-900">{event.title}</p>
+            {event.description && (
+              <p className="text-[12px] text-slate-500 mt-0.5">{event.description}</p>
+            )}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              <span className="text-[11px] font-bold text-[#a11119] bg-[#fff0f0] px-2 py-1 rounded-full">
+                +{fmtPts(event.points)} แต้ม
+              </span>
+              <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
+                รหัส {event.code}
+              </span>
+              <span
+                className={cn(
+                  "text-[11px] font-semibold px-2 py-1 rounded-full",
+                  event.active
+                    ? "text-[#16a34a] bg-emerald-50"
+                    : "text-slate-500 bg-slate-100"
+                )}
+              >
+                {event.active ? "เปิดอยู่" : "ปิดแล้ว"}
+              </span>
+            </div>
+          </div>
+
+          {/* เวลา */}
+          <div className="rounded-xl bg-slate-50 p-3 text-[12px] text-slate-600 space-y-1">
+            <div className="flex justify-between">
+              <span>เริ่มเช็คอิน</span>
+              <span className="font-semibold text-slate-800">{fmtDateTime(event.startsAt)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>สิ้นสุด</span>
+              <span className="font-semibold text-slate-800">{fmtDateTime(event.endsAt)}</span>
+            </div>
+          </div>
+
+          {/* Teams link */}
+          {event.meetingUrl && (
+            <a
+              href={event.meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2.5 rounded-xl bg-[#5b5fc7] text-white text-[13px] font-bold flex items-center justify-center gap-1.5"
+            >
+              <Icon name="groups" style={{ fontSize: 18 }} />
+              เปิดลิงก์ Microsoft Teams
+              <Icon name="open_in_new" style={{ fontSize: 14 }} />
+            </a>
+          )}
+
+          {/* audience */}
+          <div>
+            <p className="text-[12px] font-bold text-slate-700 mb-1.5">กลุ่มผู้เห็นกิจกรรม</p>
+            {noAudience ? (
+              <p className="text-[12px] text-slate-500">ทุกคน (ไม่จำกัด)</p>
+            ) : (
+              <div className="space-y-1.5 text-[12px]">
+                {models.length > 0 && (
+                  <div>
+                    <span className="text-slate-400">โมเดล ({models.length}): </span>
+                    <span className="text-slate-700">{models.join(", ")}</span>
+                  </div>
+                )}
+                {dealers.length > 0 && (
+                  <div>
+                    <span className="text-slate-400">ร้าน ({dealers.length}): </span>
+                    <span className="text-slate-700">{dealers.join(", ")}</span>
+                  </div>
+                )}
+                {emps.length > 0 && (
+                  <div>
+                    <span className="text-slate-400">รายคน ({emps.length}): </span>
+                    <span className="text-slate-700">{emps.join(", ")}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* รายชื่อคนเช็คอิน */}
+          <div>
+            <p className="text-[12px] font-bold text-slate-700 mb-1.5">
+              คนที่เช็คอินแล้ว ({checkins.length})
+            </p>
+            {loading ? (
+              <p className="text-[12px] text-slate-400">กำลังโหลด...</p>
+            ) : checkins.length === 0 ? (
+              <p className="text-[12px] text-slate-400">ยังไม่มีคนเช็คอิน</p>
+            ) : (
+              <div className="rounded-xl border border-slate-100 divide-y divide-slate-50 max-h-56 overflow-y-auto">
+                {checkins.map((c) => (
+                  <div key={c.empId} className="flex items-center justify-between px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-semibold text-slate-800 truncate">{c.name}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {c.empId}
+                        {c.dealerCode ? ` · ${dealerName(c.dealerCode)}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-slate-400 shrink-0">
+                      {fmtDateTime(c.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EventManagePanel({ createdBy }: { createdBy?: string }) {
   const ds = getDataset();
 
@@ -138,6 +331,23 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [events, setEvents] = useState<AdminEvent[]>([]);
+  const [detailEvent, setDetailEvent] = useState<AdminEvent | null>(null);
+
+  // lookup ชื่อร้าน/พนักงาน จากรหัส (ใช้ใน modal)
+  const dealerName = useCallback(
+    (code: string) => {
+      const d = ds.dealers.find((x) => x.code === code);
+      return d ? `${d.name} (${code})` : code;
+    },
+    [ds.dealers]
+  );
+  const empName = useCallback(
+    (id: string) => {
+      const e = ds.salesTeam.find((x) => x.id === id);
+      return e ? `${e.name} (${id})` : id;
+    },
+    [ds.salesTeam]
+  );
 
   /* ---- ตัวเลือกแต่ละชั้น (กรองตามชั้นบน) ---- */
   const modelOptions = useMemo<Option[]>(() => {
@@ -407,6 +617,26 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
               onToggle={(v) => toggle(selEmployees, setSelEmployees, v)}
             />
           </div>
+
+          {/* สรุปรวมที่เลือก */}
+          <div className="mt-3 rounded-lg bg-white border border-[#d32029]/20 px-3 py-2">
+            <p className="text-[11px] font-bold text-slate-700 mb-1">สรุปกลุ่มที่เลือก</p>
+            {selModels.length === 0 && selDealers.length === 0 && selEmployees.length === 0 ? (
+              <p className="text-[12px] text-[#a11119] font-semibold">ทุกคน (ไม่จำกัด)</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                  โมเดล {selModels.length === 0 ? "ทั้งหมด" : selModels.length}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                  ร้าน {selDealers.length === 0 ? "ทั้งหมด" : selDealers.length}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                  รายคน {selEmployees.length === 0 ? "ทั้งหมด" : selEmployees.length}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {msg && <p className="text-[12px] font-semibold text-[#a11119]">{msg}</p>}
@@ -449,19 +679,38 @@ export function EventManagePanel({ createdBy }: { createdBy?: string }) {
                     </span>
                   )}
                 </div>
-                {ev.active && (
+                <div className="shrink-0 flex flex-col gap-1.5">
                   <button
                     type="button"
-                    onClick={() => onClose(ev.id)}
-                    className="shrink-0 text-[11px] font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full hover:border-red-200 active:scale-95 transition"
+                    onClick={() => setDetailEvent(ev)}
+                    className="text-[11px] font-semibold text-[#a11119] bg-[#fff0f0] border border-[#f1c0c2] px-3 py-1.5 rounded-full hover:bg-[#ffe3e4] active:scale-95 transition"
                   >
-                    ปิด
+                    ดูรายละเอียด
                   </button>
-                )}
+                  {ev.active && (
+                    <button
+                      type="button"
+                      onClick={() => onClose(ev.id)}
+                      className="text-[11px] font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full hover:border-red-200 active:scale-95 transition"
+                    >
+                      ปิด
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {/* modal รายละเอียด */}
+      {detailEvent && (
+        <EventDetailModal
+          event={detailEvent}
+          dealerName={dealerName}
+          empName={empName}
+          onClose={() => setDetailEvent(null)}
+        />
       )}
     </section>
   );
