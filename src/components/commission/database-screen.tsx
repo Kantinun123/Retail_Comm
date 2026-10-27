@@ -27,6 +27,7 @@ import {
   getAdjustments,
   subscribeAdjustments,
 } from "@/lib/commission/point-adjustments";
+import { EventManagePanel } from "./event-manage-panel";
 import { cn } from "@/lib/utils";
 
 interface SectionDef {
@@ -201,6 +202,9 @@ export function DatabaseScreen() {
 
       {/* เพิ่มแต้มให้พนักงาน (admin) */}
       <AddPointsPanel />
+
+      {/* จัดการกิจกรรม (เช็คอินรับแต้ม) */}
+      <EventManagePanel createdBy={session.me?.name ?? "admin"} />
 
       {/* Reset */}
       <button

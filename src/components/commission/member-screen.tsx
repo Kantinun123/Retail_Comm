@@ -68,6 +68,7 @@ import {
   getCachedState,
   subscribeCheckin,
 } from "@/lib/commission/checkin-store";
+import { EventBanner } from "./event-banner";
 /* ระบบแต่งตัวเดิม (CharacterAvatar/DressingRoom/character.ts) เก็บโค้ดไว้
    เผื่อเรียกใช้อนาคต — ถอดออกจาก UI ชั่วคราว */
 
@@ -396,6 +397,9 @@ export function MemberScreen() {
             </div>
           </div>
         </section>
+
+        {/* แบนเนอร์กิจกรรม (Event Check-in) — เฉพาะพนักงานขาย (sales) */}
+        {isSales && session.empId && <EventBanner empId={session.empId} />}
 
         {/* Entry: เช็คอินรายวัน — เฉพาะพนักงานขาย (sales) */}
         {isSales && (
