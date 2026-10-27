@@ -177,6 +177,30 @@ function EventCard({
   );
 }
 
+/** อ่าน/เขียน set ของ event id ที่พนักงานคนนี้ "เคยเห็น" (localStorage ต่อ empId)
+ *  ใช้ตรวจว่ากิจกรรมไหนเป็นของใหม่ เพื่อแจ้งเตือนครั้งเดียว */
+function seenKey(empId: string): string {
+  return `cmSeenEvents:${empId}`;
+}
+function readSeen(empId: string): Set<number> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(seenKey(empId));
+    const arr = raw ? (JSON.parse(raw) as number[]) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+function writeSeen(empId: string, ids: Set<number>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(seenKey(empId), JSON.stringify([...ids]));
+  } catch {
+    /* ignore quota */
+  }
+}
+
 /** แบนเนอร์รวม: โหลด visible events แล้ว render ทีละการ์ด */
 export function EventBanner({ empId }: { empId: string }) {
   const [events, setEvents] = useState<VisibleEvent[]>([]);
@@ -193,11 +217,38 @@ export function EventBanner({ empId }: { empId: string }) {
       .catch(() => {});
   }, [empId]);
 
+  // โหลดครั้งแรก + ตรวจกิจกรรมใหม่ (แจ้งเตือนครั้งเดียวต่อกิจกรรม)
   useEffect(() => {
     let cancelled = false;
     fetchVisibleEvents(empId)
       .then((ev) => {
-        if (!cancelled) setEvents(ev);
+        if (cancelled) return;
+        setEvents(ev);
+
+        // หา event ที่ยังไม่เคยเห็น -> แจ้งเตือน (เฉพาะที่ยังไม่เช็คอิน)
+        const seen = readSeen(empId);
+        const fresh = ev.filter((e) => !seen.has(e.id) && !e.checkedIn);
+        if (fresh.length > 0) {
+          fresh.forEach((e) => {
+            notify({
+              title: "มีกิจกรรมใหม่",
+              detail: `${e.title} · รับ +${fmtPts(e.points)} แต้ม`,
+              icon: "campaign",
+              audience: [`emp:${empId}`],
+              link: "/app/member",
+            });
+          });
+          // toast รวม (กันเด้งถี่): โชว์อันแรก + จำนวนที่เหลือ
+          const first = fresh[0];
+          setToast(
+            fresh.length === 1
+              ? `📣 มีกิจกรรมใหม่: ${first.title} · รับ +${fmtPts(first.points)} แต้ม`
+              : `📣 มีกิจกรรมใหม่ ${fresh.length} รายการ · เปิดดูในหน้านี้`
+          );
+          setTimeout(() => setToast(null), 3500);
+        }
+        // อัปเดต seen = ทุก event ที่เห็นรอบนี้ (merge)
+        writeSeen(empId, new Set([...seen, ...ev.map((e) => e.id)]));
       })
       .catch(() => {});
     return () => {
