@@ -13,6 +13,7 @@ import {
   performEventCheckin,
   type VisibleEvent,
 } from "@/lib/commission/event-store";
+import { notify } from "@/lib/commission/notifications";
 import { cn } from "@/lib/utils";
 
 function fmtPts(n: number): string {
@@ -37,10 +38,12 @@ function EventCard({
   empId,
   event,
   onDone,
+  onToast,
 }: {
   empId: string;
   event: VisibleEvent;
   onDone: () => void;
+  onToast: (msg: string) => void;
 }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,7 +56,16 @@ function EventCard({
     try {
       const res = await performEventCheckin(empId, event.id, code.trim());
       if (res.ok && !res.already) {
-        setMsg(`เช็คอินสำเร็จ รับ +${fmtPts(res.points)} แต้ม 🎉`);
+        const text = `🎉 เช็คอินสำเร็จ! รับ +${fmtPts(res.points)} แต้มจากกิจกรรม "${event.title}"`;
+        onToast(text);
+        // แจ้งเตือนเข้ากระดิ่ง (เก็บประวัติ, เฉพาะพนักงานคนนี้)
+        notify({
+          title: "ได้รับแต้มจากกิจกรรม",
+          detail: `+${fmtPts(res.points)} แต้ม · ${event.title}`,
+          icon: "celebration",
+          audience: [`emp:${empId}`],
+          link: "/app/member",
+        });
         onDone();
       } else if (res.already) {
         setMsg("คุณเช็คอินกิจกรรมนี้ไปแล้ว");
@@ -168,6 +180,12 @@ function EventCard({
 /** แบนเนอร์รวม: โหลด visible events แล้ว render ทีละการ์ด */
 export function EventBanner({ empId }: { empId: string }) {
   const [events, setEvents] = useState<VisibleEvent[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = useCallback((m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 3500);
+  }, []);
 
   const load = useCallback(() => {
     fetchVisibleEvents(empId)
@@ -192,8 +210,23 @@ export function EventBanner({ empId }: { empId: string }) {
   return (
     <div className="space-y-3">
       {events.map((ev) => (
-        <EventCard key={ev.id} empId={empId} event={ev} onDone={load} />
+        <EventCard
+          key={ev.id}
+          empId={empId}
+          event={ev}
+          onDone={load}
+          onToast={showToast}
+        />
       ))}
+
+      {/* toast กลางจอ (เด้งตอนเช็คอินสำเร็จ) */}
+      {toast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 max-w-[90%]">
+          <div className="bg-[#231313] text-white text-[13px] font-semibold px-4 py-3 rounded-2xl shadow-lg text-center">
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
