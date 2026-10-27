@@ -20,6 +20,7 @@ import {
   performCheckin,
   type CheckinState,
 } from "@/lib/commission/checkin-store";
+import { notify } from "@/lib/commission/notifications";
 import { cn } from "@/lib/utils";
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
@@ -79,6 +80,14 @@ export function CheckinScreen() {
       const res = await performCheckin(empId);
       if (res.ok && !res.already) {
         setToast(`เช็คอินสำเร็จ รับ +${fmtPts(res.points)} แต้ม 🎉`);
+        // แจ้งเตือนเข้ากระดิ่ง (เก็บประวัติ, เฉพาะพนักงานคนนี้)
+        notify({
+          title: "เช็คอินรายวันสำเร็จ",
+          detail: `+${fmtPts(res.points)} แต้ม · ต่อเนื่อง ${res.streak} วัน 🔥`,
+          icon: "event_available",
+          audience: [`emp:${empId}`],
+          link: "/app/check-in",
+        });
       } else if (res.already) {
         setToast("วันนี้เช็คอินไปแล้ว พรุ่งนี้มาใหม่นะ");
       } else {
