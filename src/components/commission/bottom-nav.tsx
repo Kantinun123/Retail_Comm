@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 type NavKey =
   | "dashboard"
   | "staffIncentive"
+  | "backMargin"
   | "analysis"
   | "points"
   | "database"
@@ -59,6 +60,14 @@ const DATABASE_ITEM = {
   label: "ฐานข้อมูล",
 };
 
+/** เมนู back margin (ผลประโยชน์ร้านค้า rebate) — dealer + admin */
+const BACK_MARGIN_ITEM = {
+  key: "backMargin" as NavKey,
+  href: "/app/back-margin",
+  icon: "savings",
+  label: "แบ็คมาร์จิน",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -76,6 +85,7 @@ export function BottomNav({ active }: { active: NavKey }) {
     ? [
         baseItems[0],
         STAFF_INCENTIVE_ITEM,
+        BACK_MARGIN_ITEM, // ผลประโยชน์ร้านค้า rebate (dealer/admin)
         ...baseItems.slice(1),
         ...(isAdmin ? [DATABASE_ITEM] : []), // ฐานข้อมูลเฉพาะผู้ดูแลระบบ
         CHAT_ITEM,
