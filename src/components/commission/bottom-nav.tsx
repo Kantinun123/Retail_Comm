@@ -11,6 +11,7 @@ type NavKey =
   | "staffIncentive"
   | "backMargin"
   | "commissionProduct"
+  | "baIncentive"
   | "analysis"
   | "points"
   | "database"
@@ -77,6 +78,14 @@ const COMMISSION_PRODUCT_ITEM = {
   label: "ค่าคอมฯ สินค้า",
 };
 
+/** เมนูค่าคอมฯ งานบริการ (BA Incentive Q-CHANG) — dealer + admin */
+const BA_INCENTIVE_ITEM = {
+  key: "baIncentive" as NavKey,
+  href: "/app/ba-incentive",
+  icon: "home_repair_service",
+  label: "ค่าคอมฯ งานบริการ",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -96,6 +105,7 @@ export function BottomNav({ active }: { active: NavKey }) {
         STAFF_INCENTIVE_ITEM,
         BACK_MARGIN_ITEM, // ผลประโยชน์ร้านค้า rebate (dealer/admin)
         COMMISSION_PRODUCT_ITEM, // ค่าคอมฯ สินค้า ฝั่งพนักงาน (dealer/admin)
+        BA_INCENTIVE_ITEM, // ค่าคอมฯ งานบริการ Q-CHANG (dealer/admin)
         ...baseItems.slice(1),
         ...(isAdmin ? [DATABASE_ITEM] : []), // ฐานข้อมูลเฉพาะผู้ดูแลระบบ
         CHAT_ITEM,
