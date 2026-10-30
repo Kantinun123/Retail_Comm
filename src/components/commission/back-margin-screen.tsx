@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { doLogout, useSession } from "@/lib/commission/session";
+import { ProfileCard } from "./profile-card";
 import {
   fetchBackMarginSummary,
   fetchBackMarginMonthLines,
@@ -206,6 +207,9 @@ export function BackMarginScreen() {
       </header>
 
       <div className="space-y-4 pb-4">
+        {/* การ์ดโปรไฟล์สมาชิก */}
+        <ProfileCard />
+
         {/* Hero สรุปรวม */}
         <section className="rounded-3xl bg-gradient-to-br from-[#8f1114] to-[#d32029] p-5 text-white shadow-lg shadow-[#d32029]/25 relative overflow-hidden animate-fade-up">
           <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
