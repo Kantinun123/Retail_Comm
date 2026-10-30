@@ -620,3 +620,140 @@ export function downloadSection(section: DatasetSection, ds: Dataset) {
     download(wb, "ฐานข้อมูลแต้มกิจกรรม.xlsx");
   }
 }
+
+/* =============================================================
+   ดาวน์โหลดข้อมูลหน้า Back Margin / ค่าคอมฯ สินค้า / ค่าคอมฯ BA
+   - รับ "รายบรรทัดทุกเดือน" (ที่หน้าจอ fetch มาแล้ว) + ชื่อร้าน/ช่วง
+   - สร้างชีทเดียว หัวคอลัมน์ภาษาไทย + number format + แถวรวมท้ายตาราง
+   ใช้ moneySheet เดิมเพื่อให้รูปแบบตรงกับไฟล์อื่นในระบบ
+   ============================================================= */
+
+/** แถว back margin สำหรับ export (period มาจากเดือนที่ fetch) */
+export interface BmExportRow {
+  period: string;
+  dealerCode: string;
+  dealerName: string | null;
+  docNo: string | null;
+  salesDate: string | null;
+  custName: string | null;
+  itemName: string | null;
+  saleName: string | null;
+  qty: number | null;
+  netAmount: number;
+  backMargin: number;
+}
+
+export function downloadBackMargin(rows: BmExportRow[], filename = "แบ็คมาร์จิน.xlsx") {
+  const COLS = [
+    "เดือน", "รหัสร้าน", "ชื่อร้าน", "เลขที่เอกสาร", "วันที่ขาย",
+    "ลูกค้า", "สินค้า", "พนักงานขาย", "จำนวน", "ยอดขายที่ใช้คำนวณ", "แบ็คมาร์จิน",
+  ];
+  const MONEY = ["ยอดขายที่ใช้คำนวณ", "แบ็คมาร์จิน"];
+  const built: Row[] = rows.map((r) => ({
+    "เดือน": r.period,
+    "รหัสร้าน": r.dealerCode,
+    "ชื่อร้าน": r.dealerName ?? "",
+    "เลขที่เอกสาร": r.docNo ?? "",
+    "วันที่ขาย": r.salesDate ?? "",
+    "ลูกค้า": r.custName ?? "",
+    "สินค้า": r.itemName ?? "",
+    "พนักงานขาย": r.saleName ?? "",
+    "จำนวน": r.qty ?? "",
+    "ยอดขายที่ใช้คำนวณ": r.netAmount,
+    "แบ็คมาร์จิน": r.backMargin,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "แบ็คมาร์จิน");
+  download(wb, filename);
+}
+
+/** แถวค่าคอมฯ สินค้า สำหรับ export */
+export interface CpExportRow {
+  period: string;
+  dealerCode: string;
+  dealerName: string | null;
+  vendorName: string | null;
+  saleName: string | null;
+  docNo: string | null;
+  salesDate: string | null;
+  custName: string | null;
+  itemName: string | null;
+  qty: number | null;
+  netAmount: number;
+  gross: number;
+  net: number;
+}
+
+export function downloadCommissionProduct(rows: CpExportRow[], filename = "ค่าคอมมิชชั่นสินค้า.xlsx") {
+  const COLS = [
+    "เดือน", "รหัสร้าน", "ชื่อร้าน", "ผู้รับเงิน", "พนักงานขาย", "เลขที่เอกสาร",
+    "วันที่ขาย", "ลูกค้า", "สินค้า", "จำนวน", "ยอดขาย", "ค่าคอมฯ (ก่อนหัก)", "ค่าคอมฯ (หลังหัก 3%)",
+  ];
+  const MONEY = ["ยอดขาย", "ค่าคอมฯ (ก่อนหัก)", "ค่าคอมฯ (หลังหัก 3%)"];
+  const built: Row[] = rows.map((r) => ({
+    "เดือน": r.period,
+    "รหัสร้าน": r.dealerCode,
+    "ชื่อร้าน": r.dealerName ?? "",
+    "ผู้รับเงิน": r.vendorName ?? "",
+    "พนักงานขาย": r.saleName ?? "",
+    "เลขที่เอกสาร": r.docNo ?? "",
+    "วันที่ขาย": r.salesDate ?? "",
+    "ลูกค้า": r.custName ?? "",
+    "สินค้า": r.itemName ?? "",
+    "จำนวน": r.qty ?? "",
+    "ยอดขาย": r.netAmount,
+    "ค่าคอมฯ (ก่อนหัก)": r.gross,
+    "ค่าคอมฯ (หลังหัก 3%)": r.net,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ค่าคอมฯ สินค้า");
+  download(wb, filename);
+}
+
+/** แถวค่าคอมฯ BA (งานบริการ) สำหรับ export */
+export interface BaExportRow {
+  period: string;
+  dealerCode: string;
+  dealerName: string | null;
+  channelName: string | null;
+  empId: string | null;
+  saleRepName: string | null;
+  empCode: string | null;
+  jobCode: string | null;
+  worktypeName: string | null;
+  serviceGroup: string | null;
+  customerName: string | null;
+  winDate: string | null;
+  datePayment: string | null;
+  gmvService: number;
+  totalIncentive: number;
+}
+
+export function downloadBaIncentive(rows: BaExportRow[], filename = "ค่าคอมมิชชั่นงานบริการBA.xlsx") {
+  const COLS = [
+    "เดือน", "รหัสร้าน", "ชื่อร้าน", "ชื่อร้าน (ต้นทาง)", "รหัสพนักงาน (BA)", "ชื่อพนักงานขาย",
+    "รหัส CR", "เลขที่งาน", "ประเภทงาน", "กลุ่มบริการ", "ลูกค้า", "วันปิดงาน", "วันที่จ่าย",
+    "ยอดงาน (GMV)", "ค่าคอมมิชชั่น",
+  ];
+  const MONEY = ["ยอดงาน (GMV)", "ค่าคอมมิชชั่น"];
+  const built: Row[] = rows.map((r) => ({
+    "เดือน": r.period,
+    "รหัสร้าน": r.dealerCode,
+    "ชื่อร้าน": r.dealerName ?? "",
+    "ชื่อร้าน (ต้นทาง)": r.channelName ?? "",
+    "รหัสพนักงาน (BA)": r.empId ?? "",
+    "ชื่อพนักงานขาย": r.saleRepName ?? "",
+    "รหัส CR": r.empCode ?? "",
+    "เลขที่งาน": r.jobCode ?? "",
+    "ประเภทงาน": r.worktypeName ?? "",
+    "กลุ่มบริการ": r.serviceGroup ?? "",
+    "ลูกค้า": r.customerName ?? "",
+    "วันปิดงาน": r.winDate ?? "",
+    "วันที่จ่าย": r.datePayment ?? "",
+    "ยอดงาน (GMV)": r.gmvService,
+    "ค่าคอมมิชชั่น": r.totalIncentive,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ค่าคอมฯ BA");
+  download(wb, filename);
+}

@@ -21,6 +21,7 @@ import {
   type CommissionMonth,
   type CommissionLine,
 } from "@/lib/commission/commission-product-store";
+import { downloadCommissionProduct, type CpExportRow } from "@/lib/commission/excel";
 
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -254,6 +255,7 @@ export function CommissionProductScreen() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<CommissionMonth | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales ไม่เกี่ยว
   const dealerCode = session
@@ -263,6 +265,25 @@ export function CommissionProductScreen() {
         ? null
         : session.dealer.code
     : null;
+
+  async function handleDownload(monthsToExport: CommissionMonth[]) {
+    if (downloading || monthsToExport.length === 0) return;
+    setDownloading(true);
+    try {
+      const all = await Promise.all(
+        monthsToExport.map((m) =>
+          fetchCommissionMonthLines(dealerCode, m.period).then((lines) =>
+            lines.map((l) => ({ ...l, period: m.period }) as CpExportRow)
+          )
+        )
+      );
+      downloadCommissionProduct(all.flat());
+    } catch {
+      /* เงียบไว้ */
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   useEffect(() => {
     if (ready && session && session.isSales) {
@@ -329,11 +350,26 @@ export function CommissionProductScreen() {
         <section className="rounded-3xl bg-gradient-to-br from-[#8f1114] to-[#d32029] p-5 text-white shadow-lg shadow-[#d32029]/25 relative overflow-hidden animate-fade-up">
           <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
           <div className="relative">
-            <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
-              <Icon name="payments" style={{ fontSize: 16 }} />
-              ค่าคอมฯ สินค้าสะสม (จ่ายจริง หลังหัก 3%)
-              {session.isAdmin && !session.storeFilter ? " · ทุกร้าน" : ""}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
+                <Icon name="payments" style={{ fontSize: 16 }} />
+                ค่าคอมฯ สินค้าสะสม (จ่ายจริง หลังหัก 3%)
+                {session.isAdmin && !session.storeFilter ? " · ทุกร้าน" : ""}
+              </p>
+              <button
+                type="button"
+                onClick={() => handleDownload(months)}
+                disabled={downloading || months.length === 0}
+                className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-full border border-white/25 active:scale-95 transition disabled:opacity-50"
+              >
+                <Icon
+                  name={downloading ? "progress_activity" : "download"}
+                  className={downloading ? "animate-spin" : ""}
+                  style={{ fontSize: 14 }}
+                />
+                {downloading ? "กำลังเตรียม..." : "ดาวน์โหลดข้อมูล"}
+              </button>
+            </div>
             <p className="tnum text-[36px] font-bold leading-none mt-1">{baht(totalNet)}</p>
             <div className="grid grid-cols-2 gap-2 mt-4">
               <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-3 py-2">
