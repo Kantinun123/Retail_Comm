@@ -10,6 +10,7 @@ type NavKey =
   | "dashboard"
   | "staffIncentive"
   | "backMargin"
+  | "commissionProduct"
   | "analysis"
   | "points"
   | "database"
@@ -68,6 +69,14 @@ const BACK_MARGIN_ITEM = {
   label: "แบ็คมาร์จิน",
 };
 
+/** เมนูค่าคอมฯ สินค้า (ฝั่งพนักงาน) — dealer + admin */
+const COMMISSION_PRODUCT_ITEM = {
+  key: "commissionProduct" as NavKey,
+  href: "/app/commission-product",
+  icon: "payments",
+  label: "ค่าคอมฯ สินค้า",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -86,6 +95,7 @@ export function BottomNav({ active }: { active: NavKey }) {
         baseItems[0],
         STAFF_INCENTIVE_ITEM,
         BACK_MARGIN_ITEM, // ผลประโยชน์ร้านค้า rebate (dealer/admin)
+        COMMISSION_PRODUCT_ITEM, // ค่าคอมฯ สินค้า ฝั่งพนักงาน (dealer/admin)
         ...baseItems.slice(1),
         ...(isAdmin ? [DATABASE_ITEM] : []), // ฐานข้อมูลเฉพาะผู้ดูแลระบบ
         CHAT_ITEM,
