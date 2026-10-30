@@ -13,6 +13,7 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { doLogout, useSession } from "@/lib/commission/session";
 import { ProfileCard } from "./profile-card";
+import { YearFilter, computeYearFilter } from "./year-filter";
 import {
   fetchCommissionSummary,
   fetchCommissionMonthLines,
@@ -252,6 +253,7 @@ export function CommissionProductScreen() {
   const [summary, setSummary] = useState<CommissionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<CommissionMonth | null>(null);
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
   // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales ไม่เกี่ยว
   const dealerCode = session
@@ -286,10 +288,13 @@ export function CommissionProductScreen() {
   if (!ready || !session) return null;
   if (session.isSales) return null;
 
-  const months = summary?.months ?? [];
+  const allMonths = summary?.months ?? [];
   const totalNet = summary?.totalNet ?? 0;
   const totalGross = summary?.totalGross ?? 0;
-  const paidMonths = months.filter((m) => m.paidDate != null).length;
+  const paidMonths = allMonths.filter((m) => m.paidDate != null).length;
+  // กรองปี (auto-show เมื่อ >1 ปี)
+  const yf = computeYearFilter(allMonths, selectedYear);
+  const months = yf.filtered;
 
   return (
     <>
@@ -343,11 +348,19 @@ export function CommissionProductScreen() {
           </div>
         </section>
 
+        {/* ตัวกรองปี (โผล่เมื่อมี >1 ปี) */}
+        <YearFilter years={yf.years} activeYear={yf.activeYear} onSelect={setSelectedYear} />
+
         {/* รายเดือน */}
         <section>
           <h3 className="text-[15px] font-bold text-slate-900 mb-2.5 flex items-center gap-1.5">
             <Icon name="calendar_month" className="text-lg text-[#d32029]" />
             ค่าคอมฯ สินค้า สำหรับพนักงาน รายเดือน
+            {yf.multiYear && yf.activeYear && (
+              <span className="text-[12px] font-semibold text-slate-400">
+                · ปี {Number(yf.activeYear) + 543}
+              </span>
+            )}
           </h3>
 
           {loading ? (
