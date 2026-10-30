@@ -83,7 +83,7 @@ const BA_INCENTIVE_ITEM = {
   key: "baIncentive" as NavKey,
   href: "/app/ba-incentive",
   icon: "home_repair_service",
-  label: "ค่าคอมฯ งานบริการ",
+  label: "ค่าคอมฯ BA",
 };
 
 export function BottomNav({ active }: { active: NavKey }) {

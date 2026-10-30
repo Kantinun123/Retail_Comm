@@ -294,7 +294,7 @@ export function BaIncentiveScreen() {
           >
             <Icon name="arrow_back" className="text-xl" />
           </Link>
-          <span className="font-bold text-[16px] text-[#231313]">ค่าคอมฯ งานบริการ</span>
+          <span className="font-bold text-[16px] text-[#231313]">ค่าคอมฯ งานบริการ ระบบ BA (พนักงาน)</span>
         </div>
         <button
           onClick={() => {
@@ -342,7 +342,7 @@ export function BaIncentiveScreen() {
         <section>
           <h3 className="text-[15px] font-bold text-slate-900 mb-2.5 flex items-center gap-1.5">
             <Icon name="calendar_month" className="text-lg text-[#d32029]" />
-            ค่าคอมฯ งานบริการ สำหรับพนักงาน รายเดือน
+            ค่าคอมฯ งานบริการ ระบบBA สำหรับพนักงาน รายเดือน
             {yf.multiYear && yf.activeYear && (
               <span className="text-[12px] font-semibold text-slate-400">
                 · ปี {Number(yf.activeYear) + 543}
