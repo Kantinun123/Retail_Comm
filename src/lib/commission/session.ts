@@ -180,6 +180,13 @@ export function useSession(): {
   return { session, ready: session !== null, setFilter };
 }
 
+/** ปลายทางปุ่ม "กลับ"/หน้าหลักตาม role: ร้านค้าตัวแทน -> Hub, admin/sales -> dashboard เดิม */
+export function useHomeHref(): string {
+  const { session } = useSession();
+  if (session && !session.isAdmin && !session.isSales) return "/app/home";
+  return "/app/dashboard";
+}
+
 export function getPanelOpen(): boolean {
   try {
     return sessionStorage.getItem(KEYS.panelOpen) === "1";

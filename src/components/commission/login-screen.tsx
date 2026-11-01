@@ -286,7 +286,7 @@ function DemoLoginScreen() {
       return;
     }
     doLogin({ dealerCode: selectedDealer.code, role: "dealer" });
-    router.push("/app/dashboard");
+    router.push("/app/home");
   }
 
   return (

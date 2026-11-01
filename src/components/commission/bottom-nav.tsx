@@ -7,6 +7,7 @@ import { useSession } from "@/lib/commission/session";
 import { cn } from "@/lib/utils";
 
 type NavKey =
+  | "home"
   | "dashboard"
   | "staffIncentive"
   | "backMargin"
@@ -25,6 +26,14 @@ const BASE_ITEMS: { key: NavKey; href: string; icon: string; label: string }[] =
   // "การวิเคราะห์" ย้ายไปเป็นกล่องเปิด/ซ่อนในหน้าภาพรวมแล้ว (route /app/analysis ยังคงอยู่)
   { key: "points", href: "/app/points", icon: "emoji_events", label: "แต้มกิจกรรม" },
 ];
+
+/** เมนูหน้าหลัก (Hub) — ร้านค้าตัวแทน */
+const HOME_ITEM = {
+  key: "home" as NavKey,
+  href: "/app/home",
+  icon: "home",
+  label: "หน้าหลัก",
+};
 
 /** เมนูสอบถาม (แชท FAQ) — แสดงทุก role */
 const CHAT_ITEM = {
@@ -110,27 +119,35 @@ export function BottomNav({ active }: { active: NavKey }) {
   // เมนูเพิ่ม (ผลประโยชน์พนักงานในร้าน + ฐานข้อมูล) โชว์ให้ร้านค้าตัวแทนและผู้ดูแลระบบ
   const isSales = !!session && session.isSales;
   const isAdmin = !!session && session.isAdmin;
-  const showExtra = !!session && !session.isSales; // dealer หรือ admin
+  const isDealer = !!session && !session.isSales && !session.isAdmin;
   const baseItems = BASE_ITEMS.map((item) =>
     item.key === "dashboard"
       ? { ...item, label: dashboardLabel({ isSales, isAdmin }) }
       : item
   );
-  // dealer/admin: ภาพรวม -> ผลประโยชน์พนักงานในร้าน -> แต้มกิจกรรม [-> ฐานข้อมูล (เฉพาะ admin)] -> สอบถาม
-  const items = showExtra
-    ? [
-        baseItems[0],
-        STAFF_INCENTIVE_ITEM,
-        BACK_MARGIN_ITEM, // ผลประโยชน์ร้านค้า rebate (dealer/admin)
-        COMMISSION_PRODUCT_ITEM, // ค่าคอมฯ สินค้า ฝั่งพนักงาน (dealer/admin)
-        BA_INCENTIVE_ITEM, // ค่าคอมฯ งานบริการ Q-CHANG (dealer/admin)
-        BA_PROFIT_SHARE_ITEM, // ผลประโยชน์ร้านค้า BA (dealer/admin)
-        LHS_COMMISSION_ITEM, // ค่าคอมฯ LHS ระบบ Rudy (dealer/admin)
-        ...baseItems.slice(1),
-        ...(isAdmin ? [DATABASE_ITEM] : []), // ฐานข้อมูลเฉพาะผู้ดูแลระบบ
-        CHAT_ITEM,
-      ]
-    : [...baseItems, CHAT_ITEM];
+
+  let items: { key: NavKey; href: string; icon: string; label: string }[];
+  if (isDealer) {
+    // ร้านค้าตัวแทน: ใช้หน้าหลัก (Hub) รวมเมนูผลประโยชน์ -> เหลือ หน้าหลัก + สอบถาม (+ กระดิ่ง + ฉัน)
+    items = [HOME_ITEM, CHAT_ITEM];
+  } else if (isAdmin) {
+    // ผู้ดูแลระบบ: เมนูเต็มเหมือนเดิม
+    items = [
+      baseItems[0],
+      STAFF_INCENTIVE_ITEM,
+      BACK_MARGIN_ITEM,
+      COMMISSION_PRODUCT_ITEM,
+      BA_INCENTIVE_ITEM,
+      BA_PROFIT_SHARE_ITEM,
+      LHS_COMMISSION_ITEM,
+      ...baseItems.slice(1),
+      DATABASE_ITEM,
+      CHAT_ITEM,
+    ];
+  } else {
+    // พนักงานขาย (sales): เมนูพื้นฐานเดิม
+    items = [...baseItems, CHAT_ITEM];
+  }
 
   // คอลัมน์เมนู + กระดิ่งแจ้งเตือน + ปุ่ม "ฉัน"
   const cols = items.length + 2;
