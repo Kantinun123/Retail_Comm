@@ -22,6 +22,7 @@ import { fetchCommissionSummary } from "@/lib/commission/commission-product-stor
 import { fetchBaSummary } from "@/lib/commission/ba-incentive-store";
 import { fetchLhsSummary } from "@/lib/commission/lhs-commission-store";
 import { downloadBenefitRollup, type RollupExportRow } from "@/lib/commission/excel";
+import { DownloadMonthSheet } from "./download-month-sheet";
 
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -52,6 +53,7 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [openPeriod, setOpenPeriod] = useState<string | null>(null);
+  const [showDownload, setShowDownload] = useState(false);
 
   const dealerCode = session
     ? session.isAdmin
@@ -150,9 +152,12 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
   const months = yf.filtered as MonthRow[];
 
   const sourceLabels = sources.map((s) => s.label);
-  function handleDownload() {
-    if (months.length === 0) return;
-    const rows: RollupExportRow[] = months.map((m) => {
+  // ดาวน์โหลดเฉพาะเดือนที่เลือกจาก sheet (ใช้ monthRows ทั้งหมด ไม่ติดตัวกรองปีบนจอ)
+  function handleDownload(chosenPeriods: string[]) {
+    const chosen = new Set(chosenPeriods);
+    const picked = monthRows.filter((m) => chosen.has(m.period));
+    if (picked.length === 0) return;
+    const rows: RollupExportRow[] = picked.map((m) => {
       const parts: Record<string, number> = {};
       for (const label of sourceLabels) {
         const found = m.parts.find((p) => p.label === label);
@@ -162,6 +167,7 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
     });
     const fname = kind === "store" ? "รวมผลประโยชน์ร้านค้า.xlsx" : "รวมผลประโยชน์พนักงาน.xlsx";
     downloadBenefitRollup(rows, sourceLabels, fname);
+    setShowDownload(false);
   }
 
   return (
@@ -203,8 +209,8 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
               </p>
               <button
                 type="button"
-                onClick={handleDownload}
-                disabled={loading || months.length === 0}
+                onClick={() => setShowDownload(true)}
+                disabled={loading || monthRows.length === 0}
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-full border border-white/25 active:scale-95 transition disabled:opacity-50"
               >
                 <Icon name="download" style={{ fontSize: 14 }} />
@@ -312,6 +318,15 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
           รวมทุกระบบในกลุ่มเป็นรายเดือน · กดแต่ละเดือนเพื่อดูยอดแยกระบบ
         </p>
       </div>
+
+      {showDownload && (
+        <DownloadMonthSheet
+          periods={monthRows.map((m) => m.period)}
+          defaultYear={yf.activeYear}
+          onConfirm={handleDownload}
+          onClose={() => setShowDownload(false)}
+        />
+      )}
 
       <BottomNav active={kind === "store" ? "dashboard" : "staffIncentive"} />
     </>
