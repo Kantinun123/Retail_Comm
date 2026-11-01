@@ -22,6 +22,7 @@ import {
   type BaLine,
 } from "@/lib/commission/ba-incentive-store";
 import { downloadBaIncentive, type BaExportRow } from "@/lib/commission/excel";
+import { DownloadMonthSheet } from "./download-month-sheet";
 
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -244,6 +245,7 @@ export function BaIncentiveScreen() {
   const [detail, setDetail] = useState<BaMonth | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
 
   // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales ไม่เกี่ยว
   const dealerCode = session
@@ -254,14 +256,15 @@ export function BaIncentiveScreen() {
         : session.dealer.code
     : null;
 
-  async function handleDownload(monthsToExport: BaMonth[]) {
-    if (downloading || monthsToExport.length === 0) return;
+  async function handleDownload(chosenPeriods: string[]) {
+    if (downloading || chosenPeriods.length === 0) return;
+    setShowDownload(false);
     setDownloading(true);
     try {
       const all = await Promise.all(
-        monthsToExport.map((m) =>
-          fetchBaMonthLines(dealerCode, m.period).then((lines) =>
-            lines.map((l) => ({ ...l, period: m.period }) as BaExportRow)
+        chosenPeriods.map((period) =>
+          fetchBaMonthLines(dealerCode, period).then((lines) =>
+            lines.map((l) => ({ ...l, period }) as BaExportRow)
           )
         )
       );
@@ -346,8 +349,8 @@ export function BaIncentiveScreen() {
               </p>
               <button
                 type="button"
-                onClick={() => handleDownload(months)}
-                disabled={downloading || months.length === 0}
+                onClick={() => setShowDownload(true)}
+                disabled={downloading || allMonths.length === 0}
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-full border border-white/25 active:scale-95 transition disabled:opacity-50"
               >
                 <Icon
@@ -459,6 +462,15 @@ export function BaIncentiveScreen() {
 
       {detail && (
         <MonthDetailModal dealerCode={dealerCode} month={detail} onClose={() => setDetail(null)} />
+      )}
+
+      {showDownload && (
+        <DownloadMonthSheet
+          periods={allMonths.map((m) => m.period)}
+          defaultYear={yf.activeYear}
+          onConfirm={handleDownload}
+          onClose={() => setShowDownload(false)}
+        />
       )}
 
       <BottomNav active="baIncentive" />

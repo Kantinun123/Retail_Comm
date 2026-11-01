@@ -22,6 +22,7 @@ import {
   type ProfitShareLine,
 } from "@/lib/commission/ba-profit-share-store";
 import { downloadProfitShare, type PsExportRow } from "@/lib/commission/excel";
+import { DownloadMonthSheet } from "./download-month-sheet";
 
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -160,6 +161,7 @@ export function BaProfitShareScreen() {
   const [detail, setDetail] = useState<ProfitShareMonth | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
 
   const dealerCode = session
     ? session.isAdmin
@@ -200,14 +202,15 @@ export function BaProfitShareScreen() {
   const yf = computeYearFilter(allMonths, selectedYear);
   const months = yf.filtered;
 
-  async function handleDownload(monthsToExport: ProfitShareMonth[]) {
-    if (downloading || monthsToExport.length === 0) return;
+  async function handleDownload(chosenPeriods: string[]) {
+    if (downloading || chosenPeriods.length === 0) return;
+    setShowDownload(false);
     setDownloading(true);
     try {
       const all = await Promise.all(
-        monthsToExport.map((m) =>
-          fetchProfitShareMonthLines(dealerCode, m.period).then((lines) =>
-            lines.map((l) => ({ ...l, period: m.period }) as PsExportRow)
+        chosenPeriods.map((period) =>
+          fetchProfitShareMonthLines(dealerCode, period).then((lines) =>
+            lines.map((l) => ({ ...l, period }) as PsExportRow)
           )
         )
       );
@@ -260,8 +263,8 @@ export function BaProfitShareScreen() {
               </p>
               <button
                 type="button"
-                onClick={() => handleDownload(months)}
-                disabled={downloading || months.length === 0}
+                onClick={() => setShowDownload(true)}
+                disabled={downloading || allMonths.length === 0}
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-full border border-white/25 active:scale-95 transition disabled:opacity-50"
               >
                 <Icon
@@ -373,6 +376,15 @@ export function BaProfitShareScreen() {
 
       {detail && (
         <MonthDetailModal dealerCode={dealerCode} month={detail} onClose={() => setDetail(null)} />
+      )}
+
+      {showDownload && (
+        <DownloadMonthSheet
+          periods={allMonths.map((m) => m.period)}
+          defaultYear={yf.activeYear}
+          onConfirm={handleDownload}
+          onClose={() => setShowDownload(false)}
+        />
       )}
 
       <BottomNav active="baProfitShare" />
