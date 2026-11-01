@@ -78,6 +78,41 @@ function HubCard({ c }: { c: CardData }) {
   );
 }
 
+/** แถบสรุปยอดรวมของกลุ่ม (hero เล็ก) */
+function SummaryBar({
+  icon,
+  label,
+  total,
+  loading,
+  note,
+}: {
+  icon: string;
+  label: string;
+  total: number | null;
+  loading: boolean;
+  note?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-[#8f1114] to-[#d32029] text-white p-4 shadow-md shadow-[#d32029]/20 relative overflow-hidden">
+      <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-2xl" />
+      <div className="relative flex items-center justify-between">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <Icon name={icon} style={{ fontSize: 19 }} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] text-red-100/90 leading-tight">{label}</p>
+            {note && <p className="text-[9.5px] text-red-100/70 leading-tight">{note}</p>}
+          </div>
+        </div>
+        <p className="tnum text-[22px] font-bold leading-none shrink-0">
+          {loading ? "…" : baht(total)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function HomeHubScreen() {
   const { session, ready } = useSession();
   const router = useRouter();
@@ -124,6 +159,14 @@ export function HomeHubScreen() {
 
   if (!ready || !session) return null;
 
+  // ยอดรวมแต่ละกลุ่ม (จ่ายจริง) — null ถ้ายังโหลดไม่เสร็จทั้งกลุ่ม
+  const storeTotal =
+    backMargin === null && profitBa === null ? null : (backMargin ?? 0) + (profitBa ?? 0);
+  const empTotal =
+    commProduct === null && baInc === null && lhs === null
+      ? null
+      : (commProduct ?? 0) + (baInc ?? 0) + (lhs ?? 0);
+
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
     { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "แบ็คมาร์จิน", total: backMargin, loading },
@@ -164,7 +207,8 @@ export function HomeHubScreen() {
             <Icon name="storefront" style={{ fontSize: 16 }} />
             ผลประโยชน์ร้านค้า
           </h3>
-          <div className="grid grid-cols-2 gap-2.5">
+          <SummaryBar icon="store" label="รวมผลประโยชน์ร้านค้า" total={storeTotal} loading={loading} />
+          <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {storeCards.map((c) => (
               <HubCard key={c.key} c={c} />
             ))}
@@ -177,7 +221,8 @@ export function HomeHubScreen() {
             <Icon name="groups" style={{ fontSize: 16 }} />
             ผลประโยชน์พนักงานของร้าน
           </h3>
-          <div className="grid grid-cols-2 gap-2.5">
+          <SummaryBar icon="groups" label="รวมผลประโยชน์พนักงาน" total={empTotal} loading={loading} note="จ่ายจริง (หลังหักภาษี)" />
+          <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {empCards.map((c) => (
               <HubCard key={c.key} c={c} />
             ))}
