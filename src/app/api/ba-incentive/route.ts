@@ -10,6 +10,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export async function GET(req: NextRequest) {
   const dealerCode = req.nextUrl.searchParams.get("dealerCode")?.trim() || null;
+  const repCode = req.nextUrl.searchParams.get("repCode")?.trim() || null;
   const period = req.nextUrl.searchParams.get("period")?.trim() || null;
 
   try {
@@ -18,11 +19,12 @@ export async function GET(req: NextRequest) {
       const { data, error } = await sb.rpc("ba_incentive_month_lines", {
         p_period: period,
         p_dealer: dealerCode,
+        p_rep: repCode,
       });
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
       return NextResponse.json(data);
     }
-    const { data, error } = await sb.rpc("ba_incentive_summary", { p_dealer: dealerCode });
+    const { data, error } = await sb.rpc("ba_incentive_summary", { p_dealer: dealerCode, p_rep: repCode });
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     return NextResponse.json(data);
   } catch (e) {

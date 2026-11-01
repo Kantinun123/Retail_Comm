@@ -127,8 +127,11 @@ function mapLine(r: RawLine): BaLine {
 
 /* ---------------- API calls ---------------- */
 
-export async function fetchBaSummary(dealerCode: string | null): Promise<BaSummary> {
-  const q = dealerCode ? `?dealerCode=${encodeURIComponent(dealerCode)}` : "";
+export async function fetchBaSummary(dealerCode: string | null, repCode?: string | null): Promise<BaSummary> {
+  const p = new URLSearchParams();
+  if (repCode) p.set("repCode", repCode);
+  else if (dealerCode) p.set("dealerCode", dealerCode);
+  const q = p.toString() ? `?${p.toString()}` : "";
   const res = await fetch(`/api/ba-incentive${q}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as {
     ok?: boolean;
@@ -151,10 +154,12 @@ export async function fetchBaSummary(dealerCode: string | null): Promise<BaSumma
 
 export async function fetchBaMonthLines(
   dealerCode: string | null,
-  period: string
+  period: string,
+  repCode?: string | null
 ): Promise<BaLine[]> {
   const params = new URLSearchParams({ period });
-  if (dealerCode) params.set("dealerCode", dealerCode);
+  if (repCode) params.set("repCode", repCode);
+  else if (dealerCode) params.set("dealerCode", dealerCode);
   const res = await fetch(`/api/ba-incentive?${params.toString()}`, {
     method: "GET",
     cache: "no-store",

@@ -126,11 +126,10 @@ export function HomeHubScreen() {
 
   const dealerCode = session && !session.isAdmin && !session.isSales ? session.dealer.code : null;
 
-  // Hub ใช้สำหรับร้านค้าตัวแทน; admin/sales กลับไปหน้าเดิม
+  // Hub (ร้านค้า) — admin -> dashboard, sales -> Hub พนักงาน
   useEffect(() => {
-    if (ready && session && (session.isAdmin || session.isSales)) {
-      router.replace("/app/dashboard");
-    }
+    if (ready && session && session.isAdmin) router.replace("/app/dashboard");
+    else if (ready && session && session.isSales) router.replace("/app/home-staff");
   }, [ready, session, router]);
 
   // ยอดสรุปแต่ละระบบ

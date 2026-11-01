@@ -147,8 +147,11 @@ export function BottomNav({ active }: { active: NavKey }) {
       CHAT_ITEM,
     ];
   } else {
-    // พนักงานขาย (sales): เมนูพื้นฐานเดิม
-    items = [...baseItems, CHAT_ITEM];
+    // พนักงานขาย (sales): หน้าหลัก (Hub พนักงาน) + สอบถาม (+ กระดิ่ง + ฉัน)
+    items = [
+      { key: "home", href: "/app/home-staff", icon: "home", label: "หน้าหลัก" },
+      CHAT_ITEM,
+    ];
   }
 
   // คอลัมน์เมนู + กระดิ่งแจ้งเตือน + ปุ่ม "ฉัน"

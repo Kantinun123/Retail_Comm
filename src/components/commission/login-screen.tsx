@@ -4,12 +4,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icon";
-import {
-  getDealers,
-  employeesWithSalesForDealer,
-} from "@/lib/commission/logic";
+import { getDealers } from "@/lib/commission/logic";
 import { doLogin } from "@/lib/commission/session";
-import type { Dealer, Role, TeamMember } from "@/lib/commission/types";
+import { fetchSaleReps, type SaleRep } from "@/lib/commission/sale-reps-store";
+import type { Dealer, Role } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
 import { RealLoginForm } from "./real-login-form";
 
@@ -198,28 +196,33 @@ function DemoLoginScreen() {
 
   const [role, setRole] = useState<Role>("dealer");
   const [dealerCode, setDealerCode] = useState<string>(dealers[0]?.code ?? "");
-  const [empId, setEmpId] = useState<string>("");
   const [password, setPassword] = useState("1234");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
+  // พนักงานขาย (sale_reps) ของร้านที่เลือก — ใช้ตอน role=sales
+  const [reps, setReps] = useState<SaleRep[]>([]);
+  const [repCode, setRepCode] = useState<string>("");
+
+  useEffect(() => {
+    if (role !== "sales" || !dealerCode) {
+      setReps([]);
+      return;
+    }
+    let cancelled = false;
+    fetchSaleReps(dealerCode)
+      .then((r) => {
+        if (!cancelled) setReps(r);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [role, dealerCode]);
 
   const selectedDealer = useMemo<Dealer | null>(
     () => dealers.find((d) => d.code === dealerCode) ?? null,
     [dealers, dealerCode]
   );
-
-  // พนักงานของร้านที่เลือก (จากรายการขายจริง)
-  const dealerEmployees = useMemo<TeamMember[]>(
-    () => employeesWithSalesForDealer(dealerCode),
-    [dealerCode]
-  );
-
-  // พนักงานที่เลือกจริง = empId ที่ผู้ใช้เลือก ถ้ายังอยู่ในร้านนี้ ไม่งั้น default คนแรก
-  // (คำนวณตอน render แทนการใช้ effect เพื่อเลี่ยง cascading render)
-  const effectiveEmpId =
-    empId && dealerEmployees.some((e) => e.id === empId)
-      ? empId
-      : dealerEmployees[0]?.id ?? "";
 
   const dealerOptions: ComboOption[] = useMemo(
     () =>
@@ -232,15 +235,13 @@ function DemoLoginScreen() {
     [dealers]
   );
 
-  const employeeOptions: ComboOption[] = useMemo(
-    () =>
-      dealerEmployees.map((e) => ({
-        value: e.id,
-        label: e.name,
-        sub: e.id,
-      })),
-    [dealerEmployees]
+  // พนักงานขาย (sale_reps) สำหรับ role=sales
+  const repOptions: ComboOption[] = useMemo(
+    () => reps.map((r) => ({ value: r.repCode, label: r.name, sub: r.crCode ?? r.repCode })),
+    [reps]
   );
+  const effectiveRep =
+    repCode && reps.some((r) => r.repCode === repCode) ? repCode : reps[0]?.repCode ?? "";
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -263,7 +264,7 @@ function DemoLoginScreen() {
     }
 
     if (role === "sales") {
-      if (!effectiveEmpId) {
+      if (!effectiveRep) {
         setError("กรุณาเลือกพนักงานขายของร้านนี้");
         return;
       }
@@ -271,12 +272,15 @@ function DemoLoginScreen() {
         setError("รหัสผ่านไม่ถูกต้อง (เดโม: 1234)");
         return;
       }
+      const rep = reps.find((r) => r.repCode === effectiveRep);
       doLogin({
         dealerCode: selectedDealer.code,
         role: "sales",
-        empId: effectiveEmpId,
+        empId: effectiveRep, // ใช้ rep_code (SR####) เป็น empId สำหรับ scope + session
+        repCode: effectiveRep,
+        repName: rep?.name,
       });
-      router.push("/app/dashboard");
+      router.push("/app/home-staff");
       return;
     }
 
@@ -478,14 +482,14 @@ function DemoLoginScreen() {
                 <span>ชื่อผู้ใช้ (พนักงานขายของร้านนี้)</span>
               </span>
               <SearchableSelect
-                options={employeeOptions}
-                value={effectiveEmpId}
+                options={repOptions}
+                value={effectiveRep}
                 onChange={(v) => {
-                  setEmpId(v);
+                  setRepCode(v);
                   setError("");
                 }}
                 placeholder={
-                  employeeOptions.length
+                  repOptions.length
                     ? "เลือกพนักงานขาย"
                     : "— ไม่พบพนักงานของร้านนี้ —"
                 }
@@ -494,8 +498,7 @@ function DemoLoginScreen() {
                 icon="person_search"
               />
               <p className="text-[10px] text-slate-400 mt-1.5">
-                แสดงเฉพาะพนักงานที่มีรายการขายในร้านที่เลือก (
-                {employeeOptions.length} คน)
+                พนักงานขายของร้านที่เลือก ({repOptions.length} คน)
               </p>
             </div>
           )}

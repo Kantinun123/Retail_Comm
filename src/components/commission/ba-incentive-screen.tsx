@@ -87,10 +87,12 @@ function groupBySale(lines: BaLine[]): Group[] {
 /* ---------------- modal drill-down 2 ชั้น: พนักงานขาย -> งาน ---------------- */
 function MonthDetailModal({
   dealerCode,
+  repCode,
   month,
   onClose,
 }: {
   dealerCode: string | null;
+  repCode: string | null;
   month: BaMonth;
   onClose: () => void;
 }) {
@@ -100,7 +102,7 @@ function MonthDetailModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetchBaMonthLines(dealerCode, month.period)
+    fetchBaMonthLines(dealerCode, month.period, repCode)
       .then((l) => {
         if (!cancelled) setLines(l);
       })
@@ -111,7 +113,7 @@ function MonthDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [dealerCode, month.period]);
+  }, [dealerCode, repCode, month.period]);
 
   const sales = groupBySale(lines);
   const curSale = saleKey ? sales.find((s) => s.key === saleKey) ?? null : null;
@@ -247,7 +249,8 @@ export function BaIncentiveScreen() {
   const [downloading, setDownloading] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
 
-  // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales ไม่เกี่ยว
+  // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales -> scope ด้วย repCode
+  const repCode = session?.isSales ? session.repCode : null;
   const dealerCode = session
     ? session.isAdmin
       ? session.storeFilter
@@ -263,7 +266,7 @@ export function BaIncentiveScreen() {
     try {
       const all = await Promise.all(
         chosenPeriods.map((period) =>
-          fetchBaMonthLines(dealerCode, period).then((lines) =>
+          fetchBaMonthLines(dealerCode, period, repCode).then((lines) =>
             lines.map((l) => ({ ...l, period }) as BaExportRow)
           )
         )
@@ -277,14 +280,8 @@ export function BaIncentiveScreen() {
   }
 
   useEffect(() => {
-    if (ready && session && session.isSales) {
-      router.replace("/app/member");
-    }
-  }, [ready, session, router]);
-
-  useEffect(() => {
     let cancelled = false;
-    fetchBaSummary(dealerCode)
+    fetchBaSummary(dealerCode, repCode)
       .then((s) => {
         if (!cancelled) setSummary(s);
       })
@@ -295,10 +292,9 @@ export function BaIncentiveScreen() {
     return () => {
       cancelled = true;
     };
-  }, [dealerCode]);
+  }, [dealerCode, repCode]);
 
   if (!ready || !session) return null;
-  if (session.isSales) return null;
 
   const allMonths = summary?.months ?? [];
   const totalIncentive = summary?.totalIncentive ?? 0;
@@ -461,7 +457,7 @@ BA Commission รายเดือน
       </div>
 
       {detail && (
-        <MonthDetailModal dealerCode={dealerCode} month={detail} onClose={() => setDetail(null)} />
+        <MonthDetailModal dealerCode={dealerCode} repCode={repCode} month={detail} onClose={() => setDetail(null)} />
       )}
 
       {showDownload && (

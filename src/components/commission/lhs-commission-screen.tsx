@@ -79,10 +79,12 @@ function groupByVendor(lines: LhsLine[]): Group[] {
 /* ---------------- modal drill-down 2 ชั้น: พนักงานขาย -> งาน ---------------- */
 function MonthDetailModal({
   dealerCode,
+  repCode,
   month,
   onClose,
 }: {
   dealerCode: string | null;
+  repCode: string | null;
   month: LhsMonth;
   onClose: () => void;
 }) {
@@ -92,7 +94,7 @@ function MonthDetailModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetchLhsMonthLines(dealerCode, month.period)
+    fetchLhsMonthLines(dealerCode, month.period, repCode)
       .then((l) => {
         if (!cancelled) setLines(l);
       })
@@ -103,7 +105,7 @@ function MonthDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [dealerCode, month.period]);
+  }, [dealerCode, repCode, month.period]);
 
   const vendors = groupByVendor(lines);
   const curVendor = vendorKey ? vendors.find((v) => v.key === vendorKey) ?? null : null;
@@ -229,6 +231,7 @@ export function LhsCommissionScreen() {
   const [downloading, setDownloading] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
 
+  const repCode = session?.isSales ? session.repCode : null;
   const dealerCode = session
     ? session.isAdmin
       ? session.storeFilter
@@ -238,14 +241,8 @@ export function LhsCommissionScreen() {
     : null;
 
   useEffect(() => {
-    if (ready && session && session.isSales) {
-      router.replace("/app/member");
-    }
-  }, [ready, session, router]);
-
-  useEffect(() => {
     let cancelled = false;
-    fetchLhsSummary(dealerCode)
+    fetchLhsSummary(dealerCode, repCode)
       .then((s) => {
         if (!cancelled) setSummary(s);
       })
@@ -256,10 +253,9 @@ export function LhsCommissionScreen() {
     return () => {
       cancelled = true;
     };
-  }, [dealerCode]);
+  }, [dealerCode, repCode]);
 
   if (!ready || !session) return null;
-  if (session.isSales) return null;
 
   const allMonths = summary?.months ?? [];
   const totalCommission = summary?.totalCommission ?? 0;
@@ -275,7 +271,7 @@ export function LhsCommissionScreen() {
     try {
       const all = await Promise.all(
         chosenPeriods.map((period) =>
-          fetchLhsMonthLines(dealerCode, period).then((lines) =>
+          fetchLhsMonthLines(dealerCode, period, repCode).then((lines) =>
             lines.map((l) => ({ ...l, period }) as LhsExportRow)
           )
         )
@@ -441,7 +437,7 @@ LHS Commission รายเดือน
       </div>
 
       {detail && (
-        <MonthDetailModal dealerCode={dealerCode} month={detail} onClose={() => setDetail(null)} />
+        <MonthDetailModal dealerCode={dealerCode} repCode={repCode} month={detail} onClose={() => setDetail(null)} />
       )}
 
       {showDownload && (

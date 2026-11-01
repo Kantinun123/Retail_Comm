@@ -128,9 +128,13 @@ function mapLine(r: RawLine): CommissionLine {
 /* ---------------- API calls ---------------- */
 
 export async function fetchCommissionSummary(
-  dealerCode: string | null
+  dealerCode: string | null,
+  repCode?: string | null
 ): Promise<CommissionSummary> {
-  const q = dealerCode ? `?dealerCode=${encodeURIComponent(dealerCode)}` : "";
+  const p = new URLSearchParams();
+  if (repCode) p.set("repCode", repCode);
+  else if (dealerCode) p.set("dealerCode", dealerCode);
+  const q = p.toString() ? `?${p.toString()}` : "";
   const res = await fetch(`/api/commission-product${q}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as {
     ok?: boolean;
@@ -155,10 +159,12 @@ export async function fetchCommissionSummary(
 
 export async function fetchCommissionMonthLines(
   dealerCode: string | null,
-  period: string
+  period: string,
+  repCode?: string | null
 ): Promise<CommissionLine[]> {
   const params = new URLSearchParams({ period });
-  if (dealerCode) params.set("dealerCode", dealerCode);
+  if (repCode) params.set("repCode", repCode);
+  else if (dealerCode) params.set("dealerCode", dealerCode);
   const res = await fetch(`/api/commission-product?${params.toString()}`, {
     method: "GET",
     cache: "no-store",

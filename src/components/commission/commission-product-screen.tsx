@@ -79,10 +79,12 @@ function groupBy(
 /* ---------------- modal drill-down 3 ชั้น: ผู้รับเงิน -> พนักงานขาย -> รายการ ---------------- */
 function MonthDetailModal({
   dealerCode,
+  repCode,
   month,
   onClose,
 }: {
   dealerCode: string | null;
+  repCode: string | null;
   month: CommissionMonth;
   onClose: () => void;
 }) {
@@ -93,7 +95,7 @@ function MonthDetailModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetchCommissionMonthLines(dealerCode, month.period)
+    fetchCommissionMonthLines(dealerCode, month.period, repCode)
       .then((l) => {
         if (!cancelled) setLines(l);
       })
@@ -104,7 +106,7 @@ function MonthDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [dealerCode, month.period]);
+  }, [dealerCode, repCode, month.period]);
 
   const vendors = groupBy(lines, (l) => l.vendorCode ?? "", (l) => l.vendorName ?? "ไม่ระบุผู้รับเงิน");
   const curVendor = vendorKey ? vendors.find((v) => v.key === vendorKey) ?? null : null;
@@ -260,7 +262,8 @@ export function CommissionProductScreen() {
   const [downloading, setDownloading] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
 
-  // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales ไม่เกี่ยว
+  // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales -> scope ด้วย repCode
+  const repCode = session?.isSales ? session.repCode : null;
   const dealerCode = session
     ? session.isAdmin
       ? session.storeFilter
@@ -276,7 +279,7 @@ export function CommissionProductScreen() {
     try {
       const all = await Promise.all(
         chosenPeriods.map((period) =>
-          fetchCommissionMonthLines(dealerCode, period).then((lines) =>
+          fetchCommissionMonthLines(dealerCode, period, repCode).then((lines) =>
             lines.map((l) => ({ ...l, period }) as CpExportRow)
           )
         )
@@ -290,14 +293,8 @@ export function CommissionProductScreen() {
   }
 
   useEffect(() => {
-    if (ready && session && session.isSales) {
-      router.replace("/app/member");
-    }
-  }, [ready, session, router]);
-
-  useEffect(() => {
     let cancelled = false;
-    fetchCommissionSummary(dealerCode)
+    fetchCommissionSummary(dealerCode, repCode)
       .then((s) => {
         if (!cancelled) setSummary(s);
       })
@@ -308,10 +305,9 @@ export function CommissionProductScreen() {
     return () => {
       cancelled = true;
     };
-  }, [dealerCode]);
+  }, [dealerCode, repCode]);
 
   if (!ready || !session) return null;
-  if (session.isSales) return null;
 
   const allMonths = summary?.months ?? [];
   const totalNet = summary?.totalNet ?? 0;
@@ -474,7 +470,7 @@ Product Commission รายเดือน
       </div>
 
       {detail && (
-        <MonthDetailModal dealerCode={dealerCode} month={detail} onClose={() => setDetail(null)} />
+        <MonthDetailModal dealerCode={dealerCode} repCode={repCode} month={detail} onClose={() => setDetail(null)} />
       )}
 
       {showDownload && (
