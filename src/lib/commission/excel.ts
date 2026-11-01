@@ -820,3 +820,56 @@ export function downloadProfitShare(rows: PsExportRow[], filename = "ผลป�
   XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ผลประโยชน์BA");
   download(wb, filename);
 }
+
+/* ---------- ดาวน์โหลดข้อมูลหน้า LHS Commission (ระบบ Rudy) ---------- */
+
+export interface LhsExportRow {
+  period: string;
+  dealerCode: string;
+  dealerName: string | null;
+  shopName: string | null;
+  vendorName: string | null;
+  vendorCode: string | null;
+  orderNumber: string | null;
+  subSolutionName: string | null;
+  customerName: string | null;
+  projectName: string | null;
+  status: string | null;
+  soCreatedDate: string | null;
+  transferDate: string | null;
+  soAmount: number;
+  commission: number;
+  whTax: number;
+  payment: number;
+}
+
+export function downloadLhsCommission(rows: LhsExportRow[], filename = "ค่าคอมมิชชั่นLHS_Rudy.xlsx") {
+  const COLS = [
+    "เดือน", "รหัสร้าน", "ชื่อร้าน", "ชื่อร้าน (ต้นทาง)", "พนักงานขาย", "รหัสพนักงาน",
+    "เลขที่ออเดอร์", "บริการ", "ลูกค้า", "โครงการ", "สถานะ",
+    "วันที่สร้าง SO", "วันที่โอนเงิน", "ยอดขาย", "ผลประโยชน์", "หัก ณ ที่จ่าย", "ยอดจ่ายจริง",
+  ];
+  const MONEY = ["ยอดขาย", "ผลประโยชน์", "หัก ณ ที่จ่าย", "ยอดจ่ายจริง"];
+  const built: Row[] = rows.map((r) => ({
+    "เดือน": r.period,
+    "รหัสร้าน": r.dealerCode,
+    "ชื่อร้าน": r.dealerName ?? "",
+    "ชื่อร้าน (ต้นทาง)": r.shopName ?? "",
+    "พนักงานขาย": r.vendorName ?? "",
+    "รหัสพนักงาน": r.vendorCode ?? "",
+    "เลขที่ออเดอร์": r.orderNumber ?? "",
+    "บริการ": r.subSolutionName ?? "",
+    "ลูกค้า": r.customerName ?? "",
+    "โครงการ": r.projectName ?? "",
+    "สถานะ": r.status ?? "",
+    "วันที่สร้าง SO": r.soCreatedDate ?? "",
+    "วันที่โอนเงิน": r.transferDate ?? "",
+    "ยอดขาย": r.soAmount,
+    "ผลประโยชน์": r.commission,
+    "หัก ณ ที่จ่าย": r.whTax,
+    "ยอดจ่ายจริง": r.payment,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ค่าคอมฯ LHS");
+  download(wb, filename);
+}

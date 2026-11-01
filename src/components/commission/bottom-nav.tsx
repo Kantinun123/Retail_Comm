@@ -13,6 +13,7 @@ type NavKey =
   | "commissionProduct"
   | "baIncentive"
   | "baProfitShare"
+  | "lhsCommission"
   | "analysis"
   | "points"
   | "database"
@@ -95,6 +96,14 @@ const BA_PROFIT_SHARE_ITEM = {
   label: "Profit BA",
 };
 
+/** เมนูค่าคอมฯ LHS (ระบบ Rudy — Housing Expert) — dealer + admin */
+const LHS_COMMISSION_ITEM = {
+  key: "lhsCommission" as NavKey,
+  href: "/app/lhs-commission",
+  icon: "roofing",
+  label: "ค่าคอมฯ LHS",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -116,6 +125,7 @@ export function BottomNav({ active }: { active: NavKey }) {
         COMMISSION_PRODUCT_ITEM, // ค่าคอมฯ สินค้า ฝั่งพนักงาน (dealer/admin)
         BA_INCENTIVE_ITEM, // ค่าคอมฯ งานบริการ Q-CHANG (dealer/admin)
         BA_PROFIT_SHARE_ITEM, // ผลประโยชน์ร้านค้า BA (dealer/admin)
+        LHS_COMMISSION_ITEM, // ค่าคอมฯ LHS ระบบ Rudy (dealer/admin)
         ...baseItems.slice(1),
         ...(isAdmin ? [DATABASE_ITEM] : []), // ฐานข้อมูลเฉพาะผู้ดูแลระบบ
         CHAT_ITEM,
