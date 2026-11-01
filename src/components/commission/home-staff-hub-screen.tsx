@@ -29,6 +29,7 @@ interface CardData {
   sub: string;
   total: number | null;
   loading: boolean;
+  pct?: number | null;
 }
 
 function HubCard({ c }: { c: CardData }) {
@@ -47,9 +48,19 @@ function HubCard({ c }: { c: CardData }) {
         <p className="text-[12.5px] font-bold leading-tight text-slate-900">{c.label}</p>
         <p className="text-[9.5px] leading-tight mt-0.5 text-slate-400">{c.sub}</p>
         {c.total !== null && (
-          <p className="tnum text-[15px] font-bold mt-1 text-[#a11119]">
-            {c.loading ? "…" : baht(c.total)}
-          </p>
+          <>
+            <p className="tnum text-[15px] font-bold mt-1 text-[#a11119]">
+              {c.loading ? "…" : baht(c.total)}
+            </p>
+            {!c.loading && c.pct != null && (
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex-1 h-1.5 rounded-full bg-[#f0e3e4] overflow-hidden">
+                  <div className="h-full rounded-full bg-[#d32029]" style={{ width: `${Math.max(2, Math.round(c.pct))}%` }} />
+                </div>
+                <span className="tnum text-[10px] font-bold text-[#d32029] shrink-0">{Math.round(c.pct)}%</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Link>
@@ -101,10 +112,13 @@ export function HomeStaffHubScreen() {
       ? null
       : (commProduct ?? 0) + (baInc ?? 0) + (lhs ?? 0);
 
+  const pctOf = (v: number | null) =>
+    v == null || myTotal == null || myTotal <= 0 ? null : (v / myTotal) * 100;
+
   const cards: CardData[] = [
-    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading },
-    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง", total: baInc, loading },
-    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex", total: lhs, loading },
+    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading, pct: pctOf(commProduct) },
+    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง", total: baInc, loading, pct: pctOf(baInc) },
+    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex", total: lhs, loading, pct: pctOf(lhs) },
     { key: "points", href: "/app/points", icon: "emoji_events", label: "แต้มกิจกรรม", sub: "แต้มสะสม", total: null, loading: false },
   ];
 

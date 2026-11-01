@@ -34,6 +34,8 @@ interface CardData {
   total: number | null;
   loading: boolean;
   accent?: boolean; // การ์ด "รวม" เน้นพิเศษ
+  /** สัดส่วน % เทียบยอดรวมในกลุ่ม (null = ไม่โชว์ เช่น แต้ม) */
+  pct?: number | null;
 }
 
 function HubCard({ c }: { c: CardData }) {
@@ -70,9 +72,19 @@ function HubCard({ c }: { c: CardData }) {
           {c.sub}
         </p>
         {c.total !== null && (
-          <p className={"tnum text-[15px] font-bold mt-1 " + (c.accent ? "text-white" : "text-[#a11119]")}>
-            {c.loading ? "…" : baht(c.total)}
-          </p>
+          <>
+            <p className={"tnum text-[15px] font-bold mt-1 " + (c.accent ? "text-white" : "text-[#a11119]")}>
+              {c.loading ? "…" : baht(c.total)}
+            </p>
+            {!c.loading && c.pct != null && (
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex-1 h-1.5 rounded-full bg-[#f0e3e4] overflow-hidden">
+                  <div className="h-full rounded-full bg-[#d32029]" style={{ width: `${Math.max(2, Math.round(c.pct))}%` }} />
+                </div>
+                <span className="tnum text-[10px] font-bold text-[#d32029] shrink-0">{Math.round(c.pct)}%</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Link>
@@ -173,17 +185,20 @@ export function HomeHubScreen() {
       ? null
       : (commProduct ?? 0) + (baInc ?? 0) + (lhs ?? 0);
 
+  const pctOf = (v: number | null, base: number | null) =>
+    v == null || base == null || base <= 0 ? null : (v / base) * 100;
+
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
-    { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading },
-    { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading },
+    { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading, pct: pctOf(backMargin, storeTotal) },
+    { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading, pct: pctOf(profitBa, storeTotal) },
   ];
 
   // กลุ่มพนักงาน (หน้า "รวมผลประโยชน์พนักงาน" ย้ายไปอยู่ bottom-nav แล้ว)
   const empCards: CardData[] = [
-    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading },
-    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง", total: baInc, loading },
-    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex", total: lhs, loading },
+    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading, pct: pctOf(commProduct, empTotal) },
+    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง", total: baInc, loading, pct: pctOf(baInc, empTotal) },
+    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex", total: lhs, loading, pct: pctOf(lhs, empTotal) },
     { key: "points", href: "/app/points", icon: "emoji_events", label: "แต้มกิจกรรม", sub: "แต้มสะสม", total: null, loading: false },
   ];
 
