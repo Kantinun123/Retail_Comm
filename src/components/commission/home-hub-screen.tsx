@@ -124,23 +124,14 @@ export function HomeHubScreen() {
 
   if (!ready || !session) return null;
 
-  const storeTotal =
-    backMargin === null && profitBa === null ? null : (backMargin ?? 0) + (profitBa ?? 0);
-  const empTotal =
-    commProduct === null && baInc === null && lhs === null
-      ? null
-      : (commProduct ?? 0) + (baInc ?? 0) + (lhs ?? 0);
-
-  // กลุ่มร้านค้า
+  // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
-    { key: "store-sum", href: "/app/dashboard", icon: "store", label: "รวมผลประโยชน์ร้านค้า", sub: "ภาพรวมร้านค้า", total: storeTotal, loading, accent: true },
     { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "แบ็คมาร์จิน", total: backMargin, loading },
     { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit BA", sub: "ผลประโยชน์ร้าน Q-CHANG", total: profitBa, loading },
   ];
 
-  // กลุ่มพนักงาน
+  // กลุ่มพนักงาน (หน้า "รวมผลประโยชน์พนักงาน" ย้ายไปอยู่ bottom-nav แล้ว)
   const empCards: CardData[] = [
-    { key: "emp-sum", href: "/app/staff-incentive", icon: "groups", label: "รวมผลประโยชน์พนักงาน", sub: "ภาพรวมพนักงานในร้าน", total: empTotal, loading, accent: true },
     { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "ค่าคอมฯ สินค้า", sub: "คอมมิชชั่นสินค้า", total: commProduct, loading },
     { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "ค่าคอมฯ BA", sub: "งานบริการ Q-CHANG", total: baInc, loading },
     { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "ค่าคอมฯ LHS", sub: "ระบบ Rudy", total: lhs, loading },

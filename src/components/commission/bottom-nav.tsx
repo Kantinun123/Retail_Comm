@@ -128,8 +128,13 @@ export function BottomNav({ active }: { active: NavKey }) {
 
   let items: { key: NavKey; href: string; icon: string; label: string }[];
   if (isDealer) {
-    // ร้านค้าตัวแทน: ใช้หน้าหลัก (Hub) รวมเมนูผลประโยชน์ -> เหลือ หน้าหลัก + สอบถาม (+ กระดิ่ง + ฉัน)
-    items = [HOME_ITEM, CHAT_ITEM];
+    // ร้านค้าตัวแทน: หน้าหลัก (Hub) + ผลประโยชน์ร้านค้า + ผลประโยชน์พนักงาน + สอบถาม (+ กระดิ่ง + ฉัน)
+    items = [
+      HOME_ITEM,
+      { key: "dashboard", href: "/app/dashboard", icon: "storefront", label: "ผลประโยชน์ร้านค้า" },
+      { key: "staffIncentive", href: "/app/staff-incentive", icon: "groups", label: "ผลประโยชน์พนักงาน" },
+      CHAT_ITEM,
+    ];
   } else if (isAdmin) {
     // ผู้ดูแลระบบ: เมนูเต็มเหมือนเดิม
     items = [
