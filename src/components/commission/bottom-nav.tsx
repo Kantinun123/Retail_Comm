@@ -12,6 +12,7 @@ type NavKey =
   | "backMargin"
   | "commissionProduct"
   | "baIncentive"
+  | "baProfitShare"
   | "analysis"
   | "points"
   | "database"
@@ -86,6 +87,14 @@ const BA_INCENTIVE_ITEM = {
   label: "ค่าคอมฯ BA",
 };
 
+/** เมนูผลประโยชน์ร้านค้า BA (Profit Share Q-CHANG) — dealer + admin */
+const BA_PROFIT_SHARE_ITEM = {
+  key: "baProfitShare" as NavKey,
+  href: "/app/ba-profit-share",
+  icon: "storefront",
+  label: "ผลประโยชน์BA",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -106,6 +115,7 @@ export function BottomNav({ active }: { active: NavKey }) {
         BACK_MARGIN_ITEM, // ผลประโยชน์ร้านค้า rebate (dealer/admin)
         COMMISSION_PRODUCT_ITEM, // ค่าคอมฯ สินค้า ฝั่งพนักงาน (dealer/admin)
         BA_INCENTIVE_ITEM, // ค่าคอมฯ งานบริการ Q-CHANG (dealer/admin)
+        BA_PROFIT_SHARE_ITEM, // ผลประโยชน์ร้านค้า BA (dealer/admin)
         ...baseItems.slice(1),
         ...(isAdmin ? [DATABASE_ITEM] : []), // ฐานข้อมูลเฉพาะผู้ดูแลระบบ
         CHAT_ITEM,

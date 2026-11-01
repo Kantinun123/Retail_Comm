@@ -757,3 +757,62 @@ export function downloadBaIncentive(rows: BaExportRow[], filename = "ค่า�
   XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ค่าคอมฯ BA");
   download(wb, filename);
 }
+
+/* ---------- ดาวน์โหลดข้อมูลหน้า BA Profit Share (ร้านค้า) ---------- */
+
+export interface PsExportRow {
+  period: string;
+  dealerCode: string;
+  dealerName: string | null;
+  channelName: string | null;
+  storeName: string | null;
+  storeModel: string | null;
+  saleOrderNo: string | null;
+  customerName: string | null;
+  jobCode: string | null;
+  jobType: string | null;
+  worktypeName: string | null;
+  productName: string | null;
+  skuName: string | null;
+  jobStatus: string | null;
+  paymentDate: string | null;
+  customerAcceptedDate: string | null;
+  actualPaid: number | null;
+  joAmount: number | null;
+  margin: number | null;
+  profitShareRate: number | null;
+  profitShareAmount: number;
+}
+
+export function downloadProfitShare(rows: PsExportRow[], filename = "ผลประโยชน์ร้านค้าBA.xlsx") {
+  const COLS = [
+    "เดือน", "รหัสร้าน", "ชื่อร้าน", "ชื่อร้าน (ต้นทาง)", "โมเดลร้าน", "เลขที่สั่งขาย",
+    "ลูกค้า", "เลขที่งาน", "ประเภทงาน", "รายละเอียดงาน", "สินค้า", "สถานะงาน",
+    "วันที่จ่าย", "วันที่รับงาน", "ยอดจ่ายจริง", "ยอดงาน", "Margin", "อัตราแบ่ง", "ผลประโยชน์ร้านค้า",
+  ];
+  const MONEY = ["ยอดจ่ายจริง", "ยอดงาน", "Margin", "ผลประโยชน์ร้านค้า"];
+  const built: Row[] = rows.map((r) => ({
+    "เดือน": r.period,
+    "รหัสร้าน": r.dealerCode,
+    "ชื่อร้าน": r.dealerName ?? "",
+    "ชื่อร้าน (ต้นทาง)": r.channelName ?? r.storeName ?? "",
+    "โมเดลร้าน": r.storeModel ?? "",
+    "เลขที่สั่งขาย": r.saleOrderNo ?? "",
+    "ลูกค้า": r.customerName ?? "",
+    "เลขที่งาน": r.jobCode ?? "",
+    "ประเภทงาน": r.jobType ?? "",
+    "รายละเอียดงาน": r.worktypeName ?? r.productName ?? r.skuName ?? "",
+    "สินค้า": r.productName ?? "",
+    "สถานะงาน": r.jobStatus ?? "",
+    "วันที่จ่าย": r.paymentDate ?? "",
+    "วันที่รับงาน": r.customerAcceptedDate ?? "",
+    "ยอดจ่ายจริง": r.actualPaid ?? "",
+    "ยอดงาน": r.joAmount ?? "",
+    "Margin": r.margin ?? "",
+    "อัตราแบ่ง": r.profitShareRate ?? "",
+    "ผลประโยชน์ร้านค้า": r.profitShareAmount,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ผลประโยชน์BA");
+  download(wb, filename);
+}
