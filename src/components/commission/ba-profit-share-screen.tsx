@@ -233,7 +233,7 @@ export function BaProfitShareScreen() {
           >
             <Icon name="arrow_back" className="text-xl" />
           </Link>
-          <span className="font-bold text-[16px] text-[#231313]">ผลประโยชน์ร้านค้า ระบบ BA</span>
+          <span className="font-bold text-[16px] text-[#231313]">Profit Share BA (ร้านค้า)</span>
         </div>
         <button
           onClick={() => {
@@ -258,7 +258,7 @@ export function BaProfitShareScreen() {
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
                 <Icon name="storefront" style={{ fontSize: 16 }} />
-                ผลประโยชน์ร้านค้าสะสม (Q-CHANG BA)
+Profit Share BA สะสม (จากงานบริการคิวช่าง)
                 {session.isAdmin && !session.storeFilter ? " · ทุกร้าน" : ""}
               </p>
               <button
@@ -296,7 +296,7 @@ export function BaProfitShareScreen() {
         <section>
           <h3 className="text-[15px] font-bold text-slate-900 mb-2.5 flex items-center gap-1.5">
             <Icon name="calendar_month" className="text-lg text-[#d32029]" />
-            ผลประโยชน์ร้านค้า ระบบBA รายเดือน
+Profit Share BA รายเดือน
             {yf.multiYear && yf.activeYear && (
               <span className="text-[12px] font-semibold text-slate-400">
                 · ปี {Number(yf.activeYear) + 543}

@@ -86,7 +86,7 @@ const COMMISSION_PRODUCT_ITEM = {
   key: "commissionProduct" as NavKey,
   href: "/app/commission-product",
   icon: "payments",
-  label: "ค่าคอมฯ สินค้า",
+  label: "Product Commission",
 };
 
 /** เมนูค่าคอมฯ งานบริการ (BA Incentive Q-CHANG) — dealer + admin */
@@ -94,7 +94,7 @@ const BA_INCENTIVE_ITEM = {
   key: "baIncentive" as NavKey,
   href: "/app/ba-incentive",
   icon: "home_repair_service",
-  label: "ค่าคอมฯ BA",
+  label: "BA Commission",
 };
 
 /** เมนูผลประโยชน์ร้านค้า BA (Profit Share Q-CHANG) — dealer + admin */
@@ -102,7 +102,7 @@ const BA_PROFIT_SHARE_ITEM = {
   key: "baProfitShare" as NavKey,
   href: "/app/ba-profit-share",
   icon: "storefront",
-  label: "Profit BA",
+  label: "Profit Share BA",
 };
 
 /** เมนูค่าคอมฯ LHS (ระบบ Rudy — Housing Expert) — dealer + admin */
@@ -110,7 +110,7 @@ const LHS_COMMISSION_ITEM = {
   key: "lhsCommission" as NavKey,
   href: "/app/lhs-commission",
   icon: "roofing",
-  label: "ค่าคอมฯ LHS",
+  label: "LHS Commission",
 };
 
 export function BottomNav({ active }: { active: NavKey }) {

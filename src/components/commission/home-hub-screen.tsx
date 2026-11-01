@@ -41,7 +41,7 @@ function HubCard({ c }: { c: CardData }) {
     <Link
       href={c.href}
       className={
-        "rounded-2xl border shadow-sm p-3.5 flex flex-col justify-between min-h-[104px] active:scale-[0.98] transition " +
+        "rounded-2xl border shadow-sm p-3.5 flex flex-col justify-between min-h-[118px] active:scale-[0.98] transition " +
         (c.accent
           ? "bg-gradient-to-br from-[#8f1114] to-[#d32029] text-white border-transparent shadow-[#d32029]/25 hover:shadow-lg"
           : "bg-white border-slate-100 hover:border-red-200")
@@ -66,12 +66,13 @@ function HubCard({ c }: { c: CardData }) {
         <p className={"text-[12.5px] font-bold leading-tight " + (c.accent ? "text-white" : "text-slate-900")}>
           {c.label}
         </p>
-        {c.total !== null ? (
-          <p className={"tnum text-[15px] font-bold mt-0.5 " + (c.accent ? "text-white" : "text-[#a11119]")}>
+        <p className={"text-[9.5px] leading-tight mt-0.5 " + (c.accent ? "text-red-100/80" : "text-slate-400")}>
+          {c.sub}
+        </p>
+        {c.total !== null && (
+          <p className={"tnum text-[15px] font-bold mt-1 " + (c.accent ? "text-white" : "text-[#a11119]")}>
             {c.loading ? "…" : baht(c.total)}
           </p>
-        ) : (
-          <p className={"text-[10px] mt-0.5 " + (c.accent ? "text-red-100/80" : "text-slate-400")}>{c.sub}</p>
         )}
       </div>
     </Link>
@@ -175,15 +176,15 @@ export function HomeHubScreen() {
 
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
-    { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "แบ็คมาร์จิน", total: backMargin, loading },
-    { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit BA", sub: "ผลประโยชน์ร้าน Q-CHANG", total: profitBa, loading },
+    { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading },
+    { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading },
   ];
 
   // กลุ่มพนักงาน (หน้า "รวมผลประโยชน์พนักงาน" ย้ายไปอยู่ bottom-nav แล้ว)
   const empCards: CardData[] = [
-    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "ค่าคอมฯ สินค้า", sub: "คอมมิชชั่นสินค้า", total: commProduct, loading },
-    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "ค่าคอมฯ BA", sub: "งานบริการ Q-CHANG", total: baInc, loading },
-    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "ค่าคอมฯ LHS", sub: "ระบบ Rudy", total: lhs, loading },
+    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading },
+    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง", total: baInc, loading },
+    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex", total: lhs, loading },
     { key: "points", href: "/app/points", icon: "emoji_events", label: "แต้มกิจกรรม", sub: "แต้มสะสม", total: null, loading: false },
   ];
 

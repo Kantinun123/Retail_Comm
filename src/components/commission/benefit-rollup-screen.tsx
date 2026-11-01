@@ -84,7 +84,7 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
           total: bm.totalPayout,
         });
         out.push({
-          key: "profit-ba", label: "Profit BA", icon: "storefront", href: "/app/ba-profit-share",
+          key: "profit-ba", label: "Profit Share BA", icon: "storefront", href: "/app/ba-profit-share",
           byPeriod: new Map(ps.months.map((m) => [m.period, m.profitShare])),
           total: ps.totalProfitShare,
         });
@@ -95,17 +95,17 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
           fetchLhsSummary(dealerCode),
         ]);
         out.push({
-          key: "comm-product", label: "ค่าคอมฯ สินค้า", icon: "payments", href: "/app/commission-product",
+          key: "comm-product", label: "Product Commission", icon: "payments", href: "/app/commission-product",
           byPeriod: new Map(cp.months.map((m) => [m.period, m.net])),
           total: cp.totalNet,
         });
         out.push({
-          key: "ba-inc", label: "ค่าคอมฯ BA", icon: "home_repair_service", href: "/app/ba-incentive",
+          key: "ba-inc", label: "BA Commission", icon: "home_repair_service", href: "/app/ba-incentive",
           byPeriod: new Map(ba.months.map((m) => [m.period, m.incentive])),
           total: ba.totalIncentive,
         });
         out.push({
-          key: "lhs", label: "ค่าคอมฯ LHS", icon: "roofing", href: "/app/lhs-commission",
+          key: "lhs", label: "LHS Commission", icon: "roofing", href: "/app/lhs-commission",
           byPeriod: new Map(lhs.months.map((m) => [m.period, m.payment])),
           total: lhs.totalPayment,
         });
