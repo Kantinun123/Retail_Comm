@@ -8,6 +8,7 @@ export interface SaleRep {
   name: string;
   dealerCode: string | null;
   dealerName: string | null;
+  dealerModel: string | null;
 }
 
 type RawRep = {
@@ -16,6 +17,7 @@ type RawRep = {
   name: string;
   dealer_code: string | null;
   dealer_name: string | null;
+  dealer_model: string | null;
 };
 
 function mapRep(r: RawRep): SaleRep {
@@ -25,6 +27,7 @@ function mapRep(r: RawRep): SaleRep {
     name: r.name,
     dealerCode: r.dealer_code,
     dealerName: r.dealer_name,
+    dealerModel: r.dealer_model,
   };
 }
 

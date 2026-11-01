@@ -279,6 +279,9 @@ function DemoLoginScreen() {
         empId: effectiveRep, // ใช้ rep_code (SR####) เป็น empId สำหรับ scope + session
         repCode: effectiveRep,
         repName: rep?.name,
+        repCr: rep?.crCode ?? undefined,
+        repDealerName: rep?.dealerName ?? undefined,
+        repModel: rep?.dealerModel ?? undefined,
       });
       router.push("/app/home-staff");
       return;

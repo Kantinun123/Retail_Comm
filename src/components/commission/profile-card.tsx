@@ -24,12 +24,11 @@ export function ProfileCard() {
       : `dealer:${session.dealer.code}`;
   const photo = profileKey ? getProfileOverride(profileKey).photoUrl ?? "" : "";
 
-  const name =
-    session.isSales && session.me
-      ? session.me.name
-      : session.isAdmin
-        ? "ผู้ดูแลระบบ"
-        : session.dealer.name;
+  const name = session.isSales
+    ? session.repName ?? session.me?.name ?? "พนักงานขาย"
+    : session.isAdmin
+      ? "ผู้ดูแลระบบ"
+      : session.dealer.name;
 
   return (
     <Link
@@ -46,22 +45,43 @@ export function ProfileCard() {
       </div>
       <div className="flex flex-col min-w-0 flex-1">
         <span className="font-bold text-[15px] text-[#231313] leading-tight truncate">{name}</span>
-        <span className="text-[11px] font-semibold text-[#b21e1e] flex items-center gap-1 mt-0.5">
-          {session.isSales && session.me ? (
-            <>
-              <Icon name="badge" style={{ fontSize: 13 }} /> พนักงานขาย · {session.me.id}
-            </>
-          ) : session.isAdmin ? (
-            <>
-              <Icon name="admin_panel_settings" style={{ fontSize: 13 }} /> Admin ·{" "}
-              {session.storeFilter ? session.dealer.name : "ทุกร้าน"}
-            </>
-          ) : (
-            <>
-              <Icon name="storefront" style={{ fontSize: 13 }} /> ร้านค้าตัวแทน · {session.dealer.code}
-            </>
-          )}
-        </span>
+        {session.isSales ? (
+          <>
+            <span className="text-[11px] font-semibold text-[#b21e1e] flex items-center gap-1 mt-0.5 flex-wrap">
+              <Icon name="badge" style={{ fontSize: 13 }} /> พนักงานขาย
+              {session.repCr && <span className="text-slate-400">· {session.repCr}</span>}
+              {session.repDealerName && (
+                <>
+                  <span className="text-slate-300">·</span>
+                  <Icon name="storefront" style={{ fontSize: 12 }} className="text-slate-400" />
+                  <span className="text-slate-500 font-medium truncate max-w-[150px]">{session.repDealerName}</span>
+                </>
+              )}
+            </span>
+            {session.repModel && (
+              <span className="flex items-center gap-1.5 mt-1">
+                <span className="text-[10px] text-slate-400">Model ร้านค้า:</span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#a66b00] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  <Icon name="workspace_premium" style={{ fontSize: 12 }} />
+                  {session.repModel}
+                </span>
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-[11px] font-semibold text-[#b21e1e] flex items-center gap-1 mt-0.5">
+            {session.isAdmin ? (
+              <>
+                <Icon name="admin_panel_settings" style={{ fontSize: 13 }} /> Admin ·{" "}
+                {session.storeFilter ? session.dealer.name : "ทุกร้าน"}
+              </>
+            ) : (
+              <>
+                <Icon name="storefront" style={{ fontSize: 13 }} /> ร้านค้าตัวแทน · {session.dealer.code}
+              </>
+            )}
+          </span>
+        )}
       </div>
       <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
     </Link>

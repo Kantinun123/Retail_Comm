@@ -33,6 +33,9 @@ const KEYS = {
   storeFilter: "adminStoreFilter",
   repCode: "repCode",
   repName: "repName",
+  repCr: "repCr",
+  repDealerName: "repDealerName",
+  repModel: "repModel",
 } as const;
 
 export interface SessionData {
@@ -48,6 +51,12 @@ export interface SessionData {
   repCode: string | null;
   /** ชื่อพนักงานขาย (จาก sale_reps) — เฉพาะ sales */
   repName: string | null;
+  /** CR# ของพนักงาน — เฉพาะ sales */
+  repCr: string | null;
+  /** ชื่อร้านที่สังกัด — เฉพาะ sales */
+  repDealerName: string | null;
+  /** model/ประเภทร้าน (Housing Expert / SCG Home) — เฉพาะ sales */
+  repModel: string | null;
   /** ผู้ดูแลระบบ: เห็นทุกร้านทุกข้อมูล */
   isAdmin: boolean;
   /**
@@ -92,6 +101,9 @@ function readSession(): SessionData {
     EMPTY_DEALER;
   const repCode = sessionStorage.getItem(KEYS.repCode) || null;
   const repName = sessionStorage.getItem(KEYS.repName) || null;
+  const repCr = sessionStorage.getItem(KEYS.repCr) || null;
+  const repDealerName = sessionStorage.getItem(KEYS.repDealerName) || null;
+  const repModel = sessionStorage.getItem(KEYS.repModel) || null;
   return {
     loggedIn: sessionStorage.getItem(KEYS.loggedIn) === "true",
     role,
@@ -102,6 +114,9 @@ function readSession(): SessionData {
     isSales: role === "sales" && !!empId,
     repCode,
     repName,
+    repCr,
+    repDealerName,
+    repModel,
     isAdmin,
     storeFilter,
     filter: readFilter(),
@@ -116,9 +131,12 @@ export interface LoginInput {
   /** sales: รหัส/ชื่อพนักงานขายจาก sale_reps (ใช้ scope commission รายคน) */
   repCode?: string;
   repName?: string;
+  repCr?: string;
+  repDealerName?: string;
+  repModel?: string;
 }
 
-export function doLogin({ dealerCode, role, empId, repCode, repName }: LoginInput) {
+export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repDealerName, repModel }: LoginInput) {
   sessionStorage.setItem(KEYS.loggedIn, "true");
   if (dealerCode) sessionStorage.setItem(KEYS.dealerCode, dealerCode);
   else sessionStorage.removeItem(KEYS.dealerCode);
@@ -129,6 +147,12 @@ export function doLogin({ dealerCode, role, empId, repCode, repName }: LoginInpu
   else sessionStorage.removeItem(KEYS.repCode);
   if (role === "sales" && repName) sessionStorage.setItem(KEYS.repName, repName);
   else sessionStorage.removeItem(KEYS.repName);
+  if (role === "sales" && repCr) sessionStorage.setItem(KEYS.repCr, repCr);
+  else sessionStorage.removeItem(KEYS.repCr);
+  if (role === "sales" && repDealerName) sessionStorage.setItem(KEYS.repDealerName, repDealerName);
+  else sessionStorage.removeItem(KEYS.repDealerName);
+  if (role === "sales" && repModel) sessionStorage.setItem(KEYS.repModel, repModel);
+  else sessionStorage.removeItem(KEYS.repModel);
   // admin เริ่มต้นที่ "ทุกร้าน"
   sessionStorage.removeItem(KEYS.storeFilter);
   sessionStorage.setItem(KEYS.filter, JSON.stringify(defaultFilterState()));
@@ -152,6 +176,9 @@ export function doLogout() {
   sessionStorage.removeItem(KEYS.storeFilter);
   sessionStorage.removeItem(KEYS.repCode);
   sessionStorage.removeItem(KEYS.repName);
+  sessionStorage.removeItem(KEYS.repCr);
+  sessionStorage.removeItem(KEYS.repDealerName);
+  sessionStorage.removeItem(KEYS.repModel);
   emit();
 }
 

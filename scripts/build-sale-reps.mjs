@@ -23,9 +23,9 @@ const str=(v)=>{const s=String(v??"").trim();return s===""?null:s;};
 /* Master_Dealer: Dealer Code -> Dealer Name */
 const md = parseCsv(readFileSync(join(DIR,"Master_Dealer.csv"),"utf8"));
 const mdh = md[0].map(c=>String(c).trim());
-const iDC=mdh.findIndex(h=>/^Dealer Code$/i.test(h)), iDN=mdh.findIndex(h=>/^Dealer Name$/i.test(h));
-const dealerName=new Map();
-for(let r=1;r<md.length;r++){const c=String(md[r][iDC]??"").trim();if(c)dealerName.set(c,String(md[r][iDN]??"").trim());}
+const iDC=mdh.findIndex(h=>/^Dealer Code$/i.test(h)), iDN=mdh.findIndex(h=>/^Dealer Name$/i.test(h)), iDType=mdh.findIndex(h=>/^Dealer Type$/i.test(h));
+const dealerName=new Map(), dealerModel=new Map();
+for(let r=1;r<md.length;r++){const c=String(md[r][iDC]??"").trim();if(c){dealerName.set(c,String(md[r][iDN]??"").trim());dealerModel.set(c,String(md[r][iDType]??"").trim());}}
 
 /* Master_Member */
 const mm = parseCsv(readFileSync(join(DIR,"Master_Member.csv"),"utf8"));
@@ -57,7 +57,7 @@ for(let r=1;r<mm.length;r++){
 }
 emps.sort((a,b)=>a.cr_code.localeCompare(b.cr_code,undefined,{numeric:true}));
 /* generate SR#### */
-const reps=emps.map((e,i)=>({ rep_code:`SR${String(i+1).padStart(4,"0")}`, ...e, dealer_name: e.dealer_code?dealerName.get(e.dealer_code)??null:null }));
+const reps=emps.map((e,i)=>({ rep_code:`SR${String(i+1).padStart(4,"0")}`, ...e, dealer_name: e.dealer_code?dealerName.get(e.dealer_code)??null:null, dealer_model: e.dealer_code?dealerModel.get(e.dealer_code)??null:null }));
 
 console.log(`สร้าง sale_reps = ${reps.length} คน (จาก Master_Member CR#)`);
 console.log(`  มี netsuite_id ${reps.filter(r=>r.netsuite_id).length} | ba_app ${reps.filter(r=>r.ba_app_id_1||r.ba_app_id_2).length} | di ${reps.filter(r=>r.di_id).length}`);

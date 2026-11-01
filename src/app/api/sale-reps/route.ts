@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const dealerCode = req.nextUrl.searchParams.get("dealerCode")?.trim() || null;
   try {
     const sb = createServiceClient();
-    let q = sb.from("sale_reps").select("rep_code, cr_code, name, dealer_code, dealer_name").order("name");
+    let q = sb.from("sale_reps").select("rep_code, cr_code, name, dealer_code, dealer_name, dealer_model").order("name");
     if (dealerCode) q = q.eq("dealer_code", dealerCode);
     const { data, error } = await q;
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
