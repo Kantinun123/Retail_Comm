@@ -92,7 +92,7 @@ const BA_PROFIT_SHARE_ITEM = {
   key: "baProfitShare" as NavKey,
   href: "/app/ba-profit-share",
   icon: "storefront",
-  label: "ผลประโยชน์BA",
+  label: "Profit BA",
 };
 
 export function BottomNav({ active }: { active: NavKey }) {

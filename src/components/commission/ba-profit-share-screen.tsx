@@ -120,15 +120,25 @@ function MonthDetailModal({
                       {baht(l.profitShareAmount)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                  {l.saleRepName && (
+                    <p className="flex items-center gap-1 mt-1 text-[10px] text-slate-500">
+                      <Icon name="person" style={{ fontSize: 12 }} className="text-slate-400" />
+                      พนักงานขาย: {l.saleRepName}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400">
                     <span>{l.jobCode ?? "-"}</span>
                     <span>·</span>
-                    <span>{l.customerName ?? "-"}</span>
+                    <span className="truncate">{l.customerName ?? "-"}</span>
+                    {l.invoiceNo && (
+                      <>
+                        <span>·</span>
+                        <span>INV {l.invoiceNo}</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center justify-between mt-0.5 text-[10px] text-slate-400">
-                    <span>
-                      ยอดงาน {baht(l.joAmount ?? 0)} · margin {baht(l.margin ?? 0)}
-                    </span>
+                    <span>ยอดขาย {baht(l.actualPaid ?? 0)}</span>
                     <span>จ่าย {fmtDate(l.paymentDate)}</span>
                   </div>
                 </div>
@@ -184,7 +194,7 @@ export function BaProfitShareScreen() {
 
   const allMonths = summary?.months ?? [];
   const totalPS = summary?.totalProfitShare ?? 0;
-  const totalMargin = summary?.totalMargin ?? 0;
+  const totalSales = summary?.totalSales ?? 0;
   const paidMonths = allMonths.filter((m) => m.paidDate != null).length;
   const yf = computeYearFilter(allMonths, selectedYear);
   const months = yf.filtered;
@@ -264,8 +274,8 @@ export function BaProfitShareScreen() {
             <p className="tnum text-[36px] font-bold leading-none mt-1">{baht(totalPS)}</p>
             <div className="grid grid-cols-2 gap-2 mt-4">
               <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-3 py-2">
-                <p className="text-[11px] text-red-100/80">Margin</p>
-                <p className="tnum text-[15px] font-bold">{baht(totalMargin)}</p>
+                <p className="text-[11px] text-red-100/80">ยอดขายรวม</p>
+                <p className="tnum text-[15px] font-bold">{baht(totalSales)}</p>
               </div>
               <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-3 py-2">
                 <p className="text-[11px] text-red-100/80">จ่ายแล้ว</p>
@@ -322,7 +332,7 @@ export function BaProfitShareScreen() {
                             {periodLabel(m.period)}
                           </p>
                           <p className="text-[11px] text-slate-400">
-                            {m.lineCount.toLocaleString()} งาน · margin {baht(m.margin)}
+                            {m.lineCount.toLocaleString()} งาน
                           </p>
                         </div>
                       </div>
@@ -330,7 +340,10 @@ export function BaProfitShareScreen() {
                         <p className="tnum text-[16px] font-bold text-[#a11119] leading-none">
                           {baht(m.profitShare)}
                         </p>
-                        <p className="text-[10px] mt-1">
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          ยอดขาย {baht(m.sales)}
+                        </p>
+                        <p className="text-[10px] mt-0.5">
                           {paid ? (
                             <span className="text-emerald-600 font-semibold">
                               จ่ายแล้ว {fmtDate(m.paidDate)}

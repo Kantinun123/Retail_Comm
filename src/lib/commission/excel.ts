@@ -769,6 +769,8 @@ export interface PsExportRow {
   storeModel: string | null;
   saleOrderNo: string | null;
   customerName: string | null;
+  invoiceNo: string | null;
+  saleRepName: string | null;
   jobCode: string | null;
   jobType: string | null;
   worktypeName: string | null;
@@ -787,10 +789,10 @@ export interface PsExportRow {
 export function downloadProfitShare(rows: PsExportRow[], filename = "ผลประโยชน์ร้านค้าBA.xlsx") {
   const COLS = [
     "เดือน", "รหัสร้าน", "ชื่อร้าน", "ชื่อร้าน (ต้นทาง)", "โมเดลร้าน", "เลขที่สั่งขาย",
-    "ลูกค้า", "เลขที่งาน", "ประเภทงาน", "รายละเอียดงาน", "สินค้า", "สถานะงาน",
-    "วันที่จ่าย", "วันที่รับงาน", "ยอดจ่ายจริง", "ยอดงาน", "Margin", "อัตราแบ่ง", "ผลประโยชน์ร้านค้า",
+    "ลูกค้า", "เลขที่ invoice", "พนักงานขาย", "เลขที่งาน", "ประเภทงาน", "รายละเอียดงาน", "สินค้า", "สถานะงาน",
+    "วันที่จ่าย", "วันที่รับงาน", "ยอดขาย", "ยอดงาน", "Margin", "อัตราแบ่ง", "ผลประโยชน์ร้านค้า",
   ];
-  const MONEY = ["ยอดจ่ายจริง", "ยอดงาน", "Margin", "ผลประโยชน์ร้านค้า"];
+  const MONEY = ["ยอดขาย", "ยอดงาน", "Margin", "ผลประโยชน์ร้านค้า"];
   const built: Row[] = rows.map((r) => ({
     "เดือน": r.period,
     "รหัสร้าน": r.dealerCode,
@@ -799,6 +801,8 @@ export function downloadProfitShare(rows: PsExportRow[], filename = "ผลป�
     "โมเดลร้าน": r.storeModel ?? "",
     "เลขที่สั่งขาย": r.saleOrderNo ?? "",
     "ลูกค้า": r.customerName ?? "",
+    "เลขที่ invoice": r.invoiceNo ?? "",
+    "พนักงานขาย": r.saleRepName ?? "",
     "เลขที่งาน": r.jobCode ?? "",
     "ประเภทงาน": r.jobType ?? "",
     "รายละเอียดงาน": r.worktypeName ?? r.productName ?? r.skuName ?? "",
@@ -806,7 +810,7 @@ export function downloadProfitShare(rows: PsExportRow[], filename = "ผลป�
     "สถานะงาน": r.jobStatus ?? "",
     "วันที่จ่าย": r.paymentDate ?? "",
     "วันที่รับงาน": r.customerAcceptedDate ?? "",
-    "ยอดจ่ายจริง": r.actualPaid ?? "",
+    "ยอดขาย": r.actualPaid ?? "",
     "ยอดงาน": r.joAmount ?? "",
     "Margin": r.margin ?? "",
     "อัตราแบ่ง": r.profitShareRate ?? "",

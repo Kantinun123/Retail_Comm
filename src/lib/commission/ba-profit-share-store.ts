@@ -13,6 +13,7 @@ export interface ProfitShareMonth {
   period: string;
   profitShare: number;
   margin: number;
+  sales: number;
   lineCount: number;
   paidDate: string | null;
 }
@@ -21,6 +22,7 @@ export interface ProfitShareSummary {
   ok: boolean;
   totalProfitShare: number;
   totalMargin: number;
+  totalSales: number;
   months: ProfitShareMonth[];
   error?: string;
 }
@@ -33,6 +35,8 @@ export interface ProfitShareLine {
   storeModel: string | null;
   saleOrderNo: string | null;
   customerName: string | null;
+  invoiceNo: string | null;
+  saleRepName: string | null;
   jobCode: string | null;
   jobType: string | null;
   worktypeName: string | null;
@@ -75,6 +79,7 @@ type RawMonth = {
   period: string;
   profit_share: number | string;
   margin: number | string;
+  sales: number | string;
   line_count: number | string;
   paid_date: string | null;
 };
@@ -84,6 +89,7 @@ function mapMonth(r: RawMonth): ProfitShareMonth {
     period: r.period,
     profitShare: Number(r.profit_share ?? 0),
     margin: Number(r.margin ?? 0),
+    sales: Number(r.sales ?? 0),
     lineCount: Number(r.line_count ?? 0),
     paidDate: r.paid_date,
   };
@@ -97,6 +103,8 @@ type RawLine = {
   store_model: string | null;
   sale_order_no: string | null;
   customer_name: string | null;
+  invoice_no: string | null;
+  sale_rep_name: string | null;
   job_code: string | null;
   job_type: string | null;
   worktype_name: string | null;
@@ -121,6 +129,8 @@ function mapLine(r: RawLine): ProfitShareLine {
     storeModel: r.store_model,
     saleOrderNo: r.sale_order_no,
     customerName: r.customer_name,
+    invoiceNo: r.invoice_no,
+    saleRepName: r.sale_rep_name,
     jobCode: r.job_code,
     jobType: r.job_type,
     worktypeName: r.worktype_name,
@@ -146,6 +156,7 @@ export async function fetchProfitShareSummary(dealerCode: string | null): Promis
     ok?: boolean;
     total_profit_share?: number | string;
     total_margin?: number | string;
+    total_sales?: number | string;
     months?: RawMonth[];
     error?: string;
   };
@@ -153,6 +164,7 @@ export async function fetchProfitShareSummary(dealerCode: string | null): Promis
     ok: !!raw.ok,
     totalProfitShare: Number(raw.total_profit_share ?? 0),
     totalMargin: Number(raw.total_margin ?? 0),
+    totalSales: Number(raw.total_sales ?? 0),
     months: Array.isArray(raw.months) ? raw.months.map(mapMonth) : [],
     error: raw.error,
   };

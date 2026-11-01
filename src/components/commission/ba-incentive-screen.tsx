@@ -196,7 +196,7 @@ function MonthDetailModal({
                   </div>
                   <div className="text-right shrink-0">
                     <p className="tnum text-[14px] font-bold text-[#a11119]">{baht(s.incentive)}</p>
-                    <p className="text-[10px] text-slate-400">GMV {baht(s.gmv)}</p>
+                    <p className="text-[10px] text-slate-400">ยอดขาย {baht(s.gmv)}</p>
                   </div>
                 </button>
               ))}
@@ -216,7 +216,7 @@ function MonthDetailModal({
                   </div>
                   <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
                     <span>
-                      {l.jobCode ?? "-"} · {l.customerName ?? "-"} · GMV {baht(l.gmvService)}
+                      {l.jobCode ?? "-"} · {l.customerName ?? "-"} · ยอดขาย {baht(l.gmvService)}
                     </span>
                     <span>ปิดงาน {fmtDate(l.winDate)}</span>
                   </div>
@@ -360,7 +360,7 @@ export function BaIncentiveScreen() {
             <p className="tnum text-[36px] font-bold leading-none mt-1">{baht(totalIncentive)}</p>
             <div className="grid grid-cols-2 gap-2 mt-4">
               <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-3 py-2">
-                <p className="text-[11px] text-red-100/80">ยอดงาน (GMV)</p>
+                <p className="text-[11px] text-red-100/80">ยอดขาย</p>
                 <p className="tnum text-[15px] font-bold">{baht(totalGmv)}</p>
               </div>
               <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-3 py-2">
@@ -427,7 +427,7 @@ export function BaIncentiveScreen() {
                           {baht(m.incentive)}
                         </p>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          GMV {baht(m.gmv)}
+                          ยอดขาย {baht(m.gmv)}
                         </p>
                         <p className="text-[10px] mt-0.5">
                           {paid ? (
