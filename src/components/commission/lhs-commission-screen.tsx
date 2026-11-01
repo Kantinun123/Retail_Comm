@@ -54,6 +54,7 @@ interface Group {
   name: string;
   commission: number;
   sales: number;
+  payment: number;
   count: number;
   lines: LhsLine[];
 }
@@ -63,9 +64,10 @@ function groupByVendor(lines: LhsLine[]): Group[] {
     const key = l.vendorCode || l.vendorName || "-";
     const g =
       map.get(key) ??
-      { key, name: l.vendorName || "ไม่ระบุพนักงาน", commission: 0, sales: 0, count: 0, lines: [] as LhsLine[] };
+      { key, name: l.vendorName || "ไม่ระบุพนักงาน", commission: 0, sales: 0, payment: 0, count: 0, lines: [] as LhsLine[] };
     g.commission += l.commission;
     g.sales += l.soAmount;
+    g.payment += l.payment;
     g.count++;
     g.lines.push(l);
     map.set(key, g);
@@ -133,7 +135,7 @@ function MonthDetailModal({
                   {periodLabel(month.period)} · {title}
                 </p>
                 <p className="text-[11px] text-slate-400 truncate">
-                  {level === 2 && `พนักงานขาย ${vendors.length} คน · รวม ${baht(month.commission)}`}
+                  {level === 2 && `พนักงานขาย ${vendors.length} คน · จ่ายจริง ${baht(month.payment)}`}
                   {level === 3 && curVendor && `${curVendor.name} · ${curVendor.count} งาน`}
                 </p>
               </div>
@@ -173,7 +175,8 @@ function MonthDetailModal({
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="tnum text-[14px] font-bold text-[#a11119]">{baht(v.commission)}</p>
+                    <p className="tnum text-[14px] font-bold text-[#a11119]">{baht(v.payment)}</p>
+                    <p className="text-[10px] text-slate-400">ก่อนหัก {baht(v.commission)}</p>
                     <p className="text-[10px] text-slate-400">ยอดขาย {baht(v.sales)}</p>
                   </div>
                 </button>
@@ -189,16 +192,19 @@ function MonthDetailModal({
                       {l.subSolutionName ?? l.projectName ?? "-"}
                     </p>
                     <span className="tnum text-[12px] font-bold text-[#a11119] shrink-0">
-                      {baht(l.commission)}
+                      {baht(l.payment)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400">
                     <span>{l.orderNumber ?? "-"}</span>
                     <span>·</span>
-                    <span className="truncate">{l.customerName ?? "-"}</span>
+                    <span className="truncate">{l.projectName ?? "-"}</span>
                   </div>
                   <div className="flex items-center justify-between mt-0.5 text-[10px] text-slate-400">
-                    <span>ยอดขาย {baht(l.soAmount)} · จ่ายจริง {baht(l.payment)}</span>
+                    <span>ยอดขาย {baht(l.soAmount)}</span>
+                    <span>ก่อนหัก {baht(l.commission)}</span>
+                  </div>
+                  <div className="flex items-center justify-end mt-0.5 text-[10px] text-slate-400">
                     <span>โอน {fmtDate(l.transferDate)}</span>
                   </div>
                 </div>
@@ -395,7 +401,10 @@ export function LhsCommissionScreen() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="tnum text-[16px] font-bold text-[#a11119] leading-none">
-                          {baht(m.commission)}
+                          {baht(m.payment)}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          ก่อนหัก {baht(m.commission)}
                         </p>
                         <p className="text-[10px] text-slate-400 mt-0.5">
                           ยอดขาย {baht(m.sales)}
