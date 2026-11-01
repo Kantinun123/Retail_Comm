@@ -873,3 +873,30 @@ export function downloadLhsCommission(rows: LhsExportRow[], filename = "ค่�
   XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ค่าคอมฯ LHS");
   download(wb, filename);
 }
+
+/* ---------- ดาวน์โหลดหน้ารวมผลประโยชน์ (roll-up รายเดือน × ระบบ) ---------- */
+
+export interface RollupExportRow {
+  period: string;
+  /** label ระบบ -> ยอดของเดือนนั้น */
+  parts: Record<string, number>;
+  total: number;
+}
+
+/** sourceLabels = ชื่อระบบตามลำดับคอลัมน์ (เช่น ["Back Margin","Profit BA"]) */
+export function downloadBenefitRollup(
+  rows: RollupExportRow[],
+  sourceLabels: string[],
+  filename = "รวมผลประโยชน์.xlsx"
+) {
+  const COLS = ["เดือน", ...sourceLabels, "รวม"];
+  const built: Row[] = rows.map((r) => {
+    const o: Row = { "เดือน": r.period };
+    for (const label of sourceLabels) o[label] = r.parts[label] ?? 0;
+    o["รวม"] = r.total;
+    return o;
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, [...sourceLabels, "รวม"]), "รวมผลประโยชน์");
+  download(wb, filename);
+}

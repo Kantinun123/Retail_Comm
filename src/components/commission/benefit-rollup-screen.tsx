@@ -21,6 +21,7 @@ import { fetchProfitShareSummary } from "@/lib/commission/ba-profit-share-store"
 import { fetchCommissionSummary } from "@/lib/commission/commission-product-store";
 import { fetchBaSummary } from "@/lib/commission/ba-incentive-store";
 import { fetchLhsSummary } from "@/lib/commission/lhs-commission-store";
+import { downloadBenefitRollup, type RollupExportRow } from "@/lib/commission/excel";
 
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -148,6 +149,21 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
   const yf = computeYearFilter(monthRows, selectedYear);
   const months = yf.filtered as MonthRow[];
 
+  const sourceLabels = sources.map((s) => s.label);
+  function handleDownload() {
+    if (months.length === 0) return;
+    const rows: RollupExportRow[] = months.map((m) => {
+      const parts: Record<string, number> = {};
+      for (const label of sourceLabels) {
+        const found = m.parts.find((p) => p.label === label);
+        parts[label] = found ? found.amount : 0;
+      }
+      return { period: m.period, parts, total: m.total };
+    });
+    const fname = kind === "store" ? "รวมผลประโยชน์ร้านค้า.xlsx" : "รวมผลประโยชน์พนักงาน.xlsx";
+    downloadBenefitRollup(rows, sourceLabels, fname);
+  }
+
   return (
     <>
       <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
@@ -179,11 +195,22 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
         <section className="rounded-3xl bg-gradient-to-br from-[#8f1114] to-[#d32029] p-5 text-white shadow-lg shadow-[#d32029]/25 relative overflow-hidden animate-fade-up">
           <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
           <div className="relative">
-            <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
-              <Icon name={heroIcon} style={{ fontSize: 16 }} />
-              {title} · {heroNote}
-              {session.isAdmin && !session.storeFilter ? " · ทุกร้าน" : ""}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
+                <Icon name={heroIcon} style={{ fontSize: 16 }} />
+                {title} · {heroNote}
+                {session.isAdmin && !session.storeFilter ? " · ทุกร้าน" : ""}
+              </p>
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={loading || months.length === 0}
+                className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-full border border-white/25 active:scale-95 transition disabled:opacity-50"
+              >
+                <Icon name="download" style={{ fontSize: 14 }} />
+                ดาวน์โหลดข้อมูล
+              </button>
+            </div>
             <p className="tnum text-[36px] font-bold leading-none mt-1">
               {loading ? "…" : baht(grandTotal)}
             </p>
