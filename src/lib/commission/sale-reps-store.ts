@@ -38,3 +38,14 @@ export async function fetchSaleReps(dealerCode: string | null): Promise<SaleRep[
   const raw = (await res.json()) as { ok?: boolean; reps?: RawRep[] };
   return raw.ok && Array.isArray(raw.reps) ? raw.reps.map(mapRep) : [];
 }
+
+/** หา rep คนเดียวจาก repCode (ใช้เติมข้อมูลโปรไฟล์ถ้า session ขาด) */
+export async function fetchSaleRep(repCode: string): Promise<SaleRep | null> {
+  const res = await fetch(`/api/sale-reps?repCode=${encodeURIComponent(repCode)}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  const raw = (await res.json()) as { ok?: boolean; reps?: RawRep[] };
+  const list = raw.ok && Array.isArray(raw.reps) ? raw.reps.map(mapRep) : [];
+  return list.find((r) => r.repCode === repCode) ?? list[0] ?? null;
+}

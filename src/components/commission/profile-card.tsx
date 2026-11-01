@@ -7,12 +7,32 @@
    ============================================================= */
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Icon } from "./icon";
 import { useSession } from "@/lib/commission/session";
 import { getProfileOverride } from "@/lib/commission/profile";
+import { fetchSaleRep, type SaleRep } from "@/lib/commission/sale-reps-store";
 
 export function ProfileCard() {
   const { session, ready } = useSession();
+  // เติมข้อมูล rep ถ้า session ขาด (เช่น login ค้างจาก session เก่าก่อนมีฟิลด์นี้)
+  const [repFallback, setRepFallback] = useState<SaleRep | null>(null);
+  const repCode = session?.repCode ?? null;
+  const needFallback =
+    !!session?.isSales && !!repCode && (!session.repCr || !session.repDealerName || !session.repModel);
+  useEffect(() => {
+    if (!needFallback || !repCode) return;
+    let cancelled = false;
+    fetchSaleRep(repCode)
+      .then((r) => {
+        if (!cancelled) setRepFallback(r);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [needFallback, repCode]);
+
   if (!ready || !session) return null;
 
   const profileKey = session.isSales
@@ -24,8 +44,13 @@ export function ProfileCard() {
       : `dealer:${session.dealer.code}`;
   const photo = profileKey ? getProfileOverride(profileKey).photoUrl ?? "" : "";
 
+  // sales: ใช้ session ก่อน ถ้าขาดใช้ repFallback
+  const repCr = session.repCr ?? repFallback?.crCode ?? null;
+  const repDealerName = session.repDealerName ?? repFallback?.dealerName ?? null;
+  const repModel = session.repModel ?? repFallback?.dealerModel ?? null;
+
   const name = session.isSales
-    ? session.repName ?? session.me?.name ?? "พนักงานขาย"
+    ? session.repName ?? repFallback?.name ?? session.me?.name ?? "พนักงานขาย"
     : session.isAdmin
       ? "ผู้ดูแลระบบ"
       : session.dealer.name;
@@ -49,21 +74,21 @@ export function ProfileCard() {
           <>
             <span className="text-[11px] font-semibold text-[#b21e1e] flex items-center gap-1 mt-0.5 flex-wrap">
               <Icon name="badge" style={{ fontSize: 13 }} /> พนักงานขาย
-              {session.repCr && <span className="text-slate-400">· {session.repCr}</span>}
-              {session.repDealerName && (
+              {repCr && <span className="text-slate-400">· {repCr}</span>}
+              {repDealerName && (
                 <>
                   <span className="text-slate-300">·</span>
                   <Icon name="storefront" style={{ fontSize: 12 }} className="text-slate-400" />
-                  <span className="text-slate-500 font-medium truncate max-w-[150px]">{session.repDealerName}</span>
+                  <span className="text-slate-500 font-medium truncate max-w-[150px]">{repDealerName}</span>
                 </>
               )}
             </span>
-            {session.repModel && (
+            {repModel && (
               <span className="flex items-center gap-1.5 mt-1">
                 <span className="text-[10px] text-slate-400">Model ร้านค้า:</span>
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#a66b00] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
                   <Icon name="workspace_premium" style={{ fontSize: 12 }} />
-                  {session.repModel}
+                  {repModel}
                 </span>
               </span>
             )}
