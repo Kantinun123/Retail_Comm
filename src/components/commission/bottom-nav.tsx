@@ -129,12 +129,9 @@ export function BottomNav({ active }: { active: NavKey }) {
   let items: { key: NavKey; href: string; icon: string; label: string }[];
   if (isDealer) {
     // ร้านค้าตัวแทน: หน้าหลัก (Hub) + ผลประโยชน์ร้านค้า + ผลประโยชน์พนักงาน + สอบถาม (+ กระดิ่ง + ฉัน)
-    items = [
-      HOME_ITEM,
-      { key: "dashboard", href: "/app/benefit-store", icon: "storefront", label: "ผลประโยชน์ร้านค้า" },
-      { key: "staffIncentive", href: "/app/benefit-staff", icon: "groups", label: "ผลประโยชน์พนักงาน" },
-      CHAT_ITEM,
-    ];
+    // ร้านค้าตัวแทน: หน้าหลัก (Hub) รวมทุกเมนูผลประโยชน์ -> bottom-nav เหลือ หน้าหลัก + สอบถาม (+ กระดิ่ง + ฉัน)
+    // ทางเข้า "รวมผลประโยชน์ร้านค้า/พนักงาน" อยู่ที่แถบในหน้าหลักแล้ว
+    items = [HOME_ITEM, CHAT_ITEM];
   } else if (isAdmin) {
     // ผู้ดูแลระบบ: เมนูเต็มเหมือนเดิม
     items = [
