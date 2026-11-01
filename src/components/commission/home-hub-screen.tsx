@@ -78,22 +78,27 @@ function HubCard({ c }: { c: CardData }) {
   );
 }
 
-/** แถบสรุปยอดรวมของกลุ่ม (hero เล็ก) */
+/** แถบสรุปยอดรวมของกลุ่ม (hero เล็ก) — กดเข้าหน้ารวมรายเดือน */
 function SummaryBar({
   icon,
   label,
   total,
   loading,
   note,
+  href,
 }: {
   icon: string;
   label: string;
   total: number | null;
   loading: boolean;
   note?: string;
+  href: string;
 }) {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-[#8f1114] to-[#d32029] text-white p-4 shadow-md shadow-[#d32029]/20 relative overflow-hidden">
+    <Link
+      href={href}
+      className="block rounded-2xl bg-gradient-to-br from-[#8f1114] to-[#d32029] text-white p-4 shadow-md shadow-[#d32029]/20 relative overflow-hidden active:scale-[0.99] hover:shadow-lg transition"
+    >
       <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-2xl" />
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -105,11 +110,12 @@ function SummaryBar({
             {note && <p className="text-[9.5px] text-red-100/70 leading-tight">{note}</p>}
           </div>
         </div>
-        <p className="tnum text-[22px] font-bold leading-none shrink-0">
-          {loading ? "…" : baht(total)}
-        </p>
+        <div className="flex items-center gap-1 shrink-0">
+          <p className="tnum text-[22px] font-bold leading-none">{loading ? "…" : baht(total)}</p>
+          <Icon name="chevron_right" className="text-white/70" style={{ fontSize: 20 }} />
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -207,7 +213,7 @@ export function HomeHubScreen() {
             <Icon name="storefront" style={{ fontSize: 16 }} />
             ผลประโยชน์ร้านค้า
           </h3>
-          <SummaryBar icon="store" label="รวมผลประโยชน์ร้านค้า" total={storeTotal} loading={loading} />
+          <SummaryBar icon="store" label="รวมผลประโยชน์ร้านค้า" total={storeTotal} loading={loading} href="/app/benefit-store" />
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {storeCards.map((c) => (
               <HubCard key={c.key} c={c} />
@@ -221,7 +227,7 @@ export function HomeHubScreen() {
             <Icon name="groups" style={{ fontSize: 16 }} />
             ผลประโยชน์พนักงานของร้าน
           </h3>
-          <SummaryBar icon="groups" label="รวมผลประโยชน์พนักงาน" total={empTotal} loading={loading} note="จ่ายจริง (หลังหักภาษี)" />
+          <SummaryBar icon="groups" label="รวมผลประโยชน์พนักงาน" total={empTotal} loading={loading} note="จ่ายจริง (หลังหักภาษี)" href="/app/benefit-staff" />
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {empCards.map((c) => (
               <HubCard key={c.key} c={c} />
