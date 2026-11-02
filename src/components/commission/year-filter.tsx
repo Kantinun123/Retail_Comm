@@ -32,6 +32,64 @@ export function computeYearFilter<T extends { period: string }>(
   return { years, activeYear, multiYear, filtered };
 }
 
+/** รวมยอดของ months ตามปีที่เลือก (year=null -> ทุกปี). getVal ดึงค่าจากแต่ละ month */
+export function sumByYear<T extends { period: string }>(
+  months: T[] | undefined | null,
+  year: string | null,
+  getVal: (m: T) => number
+): number {
+  if (!months) return 0;
+  return months.reduce((acc, m) => {
+    if (year && !m.period.startsWith(year + "-")) return acc;
+    return acc + (getVal(m) || 0);
+  }, 0);
+}
+
+/** แถบปุ่มเลือกปีแบบกะทัดรัด (มี "ทุกปี") สำหรับหน้าหลัก — render เสมอถ้ามี >=1 ปี */
+export function YearChips({
+  years,
+  activeYear,
+  onSelect,
+}: {
+  years: string[];
+  /** null = ทุกปี */
+  activeYear: string | null;
+  onSelect: (y: string | null) => void;
+}) {
+  if (years.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      <span className="text-[11px] text-slate-500 shrink-0 mr-0.5">เลือกปี:</span>
+      {years.map((y) => {
+        const active = y === activeYear;
+        return (
+          <button
+            key={y}
+            type="button"
+            onClick={() => onSelect(y)}
+            className={
+              "px-3 py-1 rounded-full text-[11px] font-bold shrink-0 transition active:scale-95 " +
+              (active ? "bg-[#d32029] text-white" : "bg-white border border-slate-200 text-slate-600")
+            }
+          >
+            {Number(y) + 543}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => onSelect(null)}
+        className={
+          "px-3 py-1 rounded-full text-[11px] font-bold shrink-0 transition active:scale-95 " +
+          (activeYear === null ? "bg-[#d32029] text-white" : "bg-white border border-slate-200 text-slate-600")
+        }
+      >
+        ทุกปี
+      </button>
+    </div>
+  );
+}
+
 /** แถบปุ่มเลือกปี (render เฉพาะเมื่อ multiYear) */
 export function YearFilter({
   years,

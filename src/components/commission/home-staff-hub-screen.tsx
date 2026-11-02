@@ -12,9 +12,10 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { doLogout, useSession } from "@/lib/commission/session";
 import { ProfileCard } from "./profile-card";
-import { fetchCommissionSummary } from "@/lib/commission/commission-product-store";
-import { fetchBaSummary } from "@/lib/commission/ba-incentive-store";
-import { fetchLhsSummary } from "@/lib/commission/lhs-commission-store";
+import { fetchCommissionSummary, type CommissionSummary } from "@/lib/commission/commission-product-store";
+import { fetchBaSummary, type BaSummary } from "@/lib/commission/ba-incentive-store";
+import { fetchLhsSummary, type LhsSummary } from "@/lib/commission/lhs-commission-store";
+import { YearChips, yearsOf, sumByYear } from "./year-filter";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -49,10 +50,10 @@ function HubCard({ c }: { c: CardData }) {
         <p className="text-[9.5px] leading-tight mt-0.5 text-slate-400">{c.sub}</p>
         {c.total !== null && (
           <>
-            <p className="tnum text-[15px] font-bold mt-1 text-[#a11119]">
+            <p className={"tnum text-[15px] font-bold mt-1 " + (!c.loading && c.total === 0 ? "text-slate-300" : "text-[#a11119]")}>
               {c.loading ? "…" : baht(c.total)}
             </p>
-            {!c.loading && c.pct != null && (
+            {!c.loading && c.total !== 0 && c.pct != null && (
               <div className="flex items-center gap-1.5 mt-1">
                 <div className="flex-1 h-1.5 rounded-full bg-[#f0e3e4] overflow-hidden">
                   <div className="h-full rounded-full bg-[#d32029]" style={{ width: `${Math.max(2, Math.round(c.pct))}%` }} />
@@ -72,10 +73,11 @@ export function HomeStaffHubScreen() {
   const router = useRouter();
   const repCode = session?.repCode ?? null;
 
-  const [commProduct, setCommProduct] = useState<number | null>(null);
-  const [baInc, setBaInc] = useState<number | null>(null);
-  const [lhs, setLhs] = useState<number | null>(null);
+  const [cp, setCp] = useState<CommissionSummary | null>(null);
+  const [ba, setBa] = useState<BaSummary | null>(null);
+  const [lhsSum, setLhsSum] = useState<LhsSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [year, setYear] = useState<string | null | undefined>(undefined);
 
   // หน้านี้เฉพาะพนักงานขาย; role อื่นกลับหน้าของตัวเอง
   useEffect(() => {
@@ -94,9 +96,9 @@ export function HomeStaffHubScreen() {
       fetchLhsSummary(null, repCode),
     ]).then((res) => {
       if (cancelled) return;
-      if (res[0].status === "fulfilled") setCommProduct(res[0].value.totalNet ?? 0);
-      if (res[1].status === "fulfilled") setBaInc(res[1].value.totalIncentive ?? 0);
-      if (res[2].status === "fulfilled") setLhs(res[2].value.totalPayment ?? 0);
+      if (res[0].status === "fulfilled") setCp(res[0].value);
+      if (res[1].status === "fulfilled") setBa(res[1].value);
+      if (res[2].status === "fulfilled") setLhsSum(res[2].value);
       setLoading(false);
     });
     return () => {
@@ -106,6 +108,19 @@ export function HomeStaffHubScreen() {
 
   if (!ready || !session) return null;
   if (!session.isSales) return null;
+
+  const years = yearsOf([
+    ...(cp?.months ?? []),
+    ...(ba?.months ?? []),
+    ...(lhsSum?.months ?? []),
+  ].map((m) => m.period));
+  const curYear = String(new Date().getFullYear());
+  const activeYear = year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
+  const yearLabel = activeYear ? `ปี ${Number(activeYear) + 543}` : "ทุกปี";
+
+  const commProduct = cp ? sumByYear(cp.months, activeYear, (m) => m.net) : null;
+  const baInc = ba ? sumByYear(ba.months, activeYear, (m) => m.incentive) : null;
+  const lhs = lhsSum ? sumByYear(lhsSum.months, activeYear, (m) => m.payment) : null;
 
   const myTotal =
     commProduct === null && baInc === null && lhs === null
@@ -141,6 +156,10 @@ export function HomeStaffHubScreen() {
       <div className="space-y-5 pb-4">
         <ProfileCard />
 
+        {years.length > 0 && (
+          <YearChips years={years} activeYear={activeYear} onSelect={(y) => setYear(y)} />
+        )}
+
         <section>
           <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
             <Icon name="account_circle" style={{ fontSize: 16 }} />
@@ -153,7 +172,7 @@ export function HomeStaffHubScreen() {
             <div className="relative flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-[11px] text-red-100/90 leading-tight">รวมผลประโยชน์ของฉัน</p>
-                <p className="text-[9.5px] text-red-100/70 leading-tight">จ่ายจริง (หลังหักภาษี)</p>
+                <p className="text-[9.5px] text-red-100/70 leading-tight">ยอดสะสม {yearLabel} · จ่ายจริง</p>
               </div>
               <p className="tnum text-[22px] font-bold leading-none shrink-0">
                 {loading ? "…" : baht(myTotal)}
