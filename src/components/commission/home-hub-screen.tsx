@@ -19,6 +19,7 @@ import { fetchCommissionSummary, type CommissionSummary } from "@/lib/commission
 import { fetchBaSummary, type BaSummary } from "@/lib/commission/ba-incentive-store";
 import { fetchLhsSummary, type LhsSummary } from "@/lib/commission/lhs-commission-store";
 import { fetchPdSummary, type PdSummary } from "@/lib/commission/lhs-purchase-discount-store";
+import { fetchEvalSummary, type EvalSummary } from "@/lib/commission/store-eval-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
 
 function baht(n: number | null): string {
@@ -38,6 +39,10 @@ interface CardData {
   accent?: boolean; // การ์ด "รวม" เน้นพิเศษ
   /** สัดส่วน % เทียบยอดรวมในกลุ่ม (null = ไม่โชว์ เช่น แต้ม) */
   pct?: number | null;
+  /** ข้อความแสดงแทนยอดเงิน (เช่น "95%") — ถ้าตั้งไว้จะไม่โชว์ progress bar */
+  display?: string | null;
+  /** ป้ายสถานะ เช่น ผ่าน/ไม่ผ่าน */
+  badge?: { text: string; pass: boolean } | null;
 }
 
 function HubCard({ c }: { c: CardData }) {
@@ -73,7 +78,21 @@ function HubCard({ c }: { c: CardData }) {
         <p className={"text-[9.5px] leading-tight mt-0.5 " + (c.accent ? "text-red-100/80" : "text-slate-400")}>
           {c.sub}
         </p>
-        {c.total !== null && (
+        {c.display !== undefined && c.display !== null ? (
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+            <p className={"tnum text-[15px] font-bold " + (c.accent ? "text-white" : "text-[#a11119]")}>
+              {c.loading ? "…" : c.display}
+            </p>
+            {!c.loading && c.badge && (
+              <span className={
+                "px-1.5 py-0.5 rounded-full text-[9px] font-bold " +
+                (c.badge.pass ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-[#d32029]")
+              }>
+                {c.badge.text}
+              </span>
+            )}
+          </div>
+        ) : c.total !== null ? (
           <>
             <p
               className={
@@ -96,7 +115,7 @@ function HubCard({ c }: { c: CardData }) {
               </div>
             )}
           </>
-        )}
+        ) : null}
       </div>
     </Link>
   );
@@ -162,6 +181,7 @@ export function HomeHubScreen() {
   const [cp, setCp] = useState<CommissionSummary | null>(null);
   const [ba, setBa] = useState<BaSummary | null>(null);
   const [lhsSum, setLhsSum] = useState<LhsSummary | null>(null);
+  const [evalSum, setEvalSum] = useState<EvalSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
 
@@ -175,6 +195,7 @@ export function HomeHubScreen() {
       fetchBaSummary(dealerCode),
       fetchLhsSummary(dealerCode),
       fetchPdSummary(dealerCode),
+      fetchEvalSummary(dealerCode),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setBm(res[0].value);
@@ -183,6 +204,7 @@ export function HomeHubScreen() {
       if (res[3].status === "fulfilled") setBa(res[3].value);
       if (res[4].status === "fulfilled") setLhsSum(res[4].value);
       if (res[5].status === "fulfilled") setPd(res[5].value);
+      if (res[6].status === "fulfilled") setEvalSum(res[6].value);
       setLoading(false);
     });
     return () => {
@@ -235,6 +257,10 @@ export function HomeHubScreen() {
   const pctOf = (v: number | null, base: number | null) =>
     v == null || base == null || base <= 0 ? null : (v / base) * 100;
 
+  // ผลตรวจประเมินร้าน (แสดงเฉพาะร้านที่มีผลตรวจ)
+  const evalLatest = evalSum?.latest ?? null;
+  const showEval = (evalSum?.count ?? 0) > 0;
+
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
     ...(showBackMargin
@@ -243,6 +269,19 @@ export function HomeHubScreen() {
     { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading, pct: pctOf(profitBa, storeTotal) },
     ...(showLhsDiscount
       ? [{ key: "lhs-pd", href: "/app/lhs-purchase-discount", icon: "sell", label: "LHS Channel Discount", sub: "ส่วนลดช่องทาง 7% งานหลังคา (HE)", total: purchaseDiscount, loading, pct: pctOf(purchaseDiscount, storeTotal) } as CardData]
+      : []),
+    ...(showEval
+      ? [{
+          key: "store-eval",
+          href: "/app/store-eval",
+          icon: "fact_check",
+          label: "ผลตรวจประเมินร้านค้า",
+          sub: "มาตรฐานการให้บริการ (ล่าสุด)",
+          total: null,
+          loading,
+          display: evalLatest ? `${Math.round(evalLatest.pct * 100)}%` : "—",
+          badge: evalLatest?.result ? { text: evalLatest.result, pass: evalLatest.result === "ผ่าน" } : null,
+        } as CardData]
       : []),
   ];
 

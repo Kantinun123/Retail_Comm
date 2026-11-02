@@ -16,6 +16,7 @@ type NavKey =
   | "baProfitShare"
   | "lhsCommission"
   | "lhsPurchaseDiscount"
+  | "storeEval"
   | "analysis"
   | "points"
   | "database"
@@ -122,6 +123,14 @@ const LHS_PURCHASE_DISCOUNT_ITEM = {
   label: "LHS Ch.Discount",
 };
 
+/** เมนูผลตรวจประเมินร้านค้า — dealer เข้าผ่าน hub card; admin เห็นในเมนู */
+const STORE_EVAL_ITEM = {
+  key: "storeEval" as NavKey,
+  href: "/app/store-eval",
+  icon: "fact_check",
+  label: "ผลตรวจร้าน",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -152,6 +161,7 @@ export function BottomNav({ active }: { active: NavKey }) {
       BA_PROFIT_SHARE_ITEM,
       LHS_COMMISSION_ITEM,
       LHS_PURCHASE_DISCOUNT_ITEM,
+      STORE_EVAL_ITEM,
       ...baseItems.slice(1),
       DATABASE_ITEM,
       CHAT_ITEM,
