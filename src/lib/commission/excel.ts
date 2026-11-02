@@ -900,3 +900,54 @@ export function downloadBenefitRollup(
   XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, [...sourceLabels, "รวม"]), "รวมผลประโยชน์");
   download(wb, filename);
 }
+
+/* ---------- ดาวน์โหลดหน้า LHS Purchase Discount (ส่วนลดซื้อ 7%) ---------- */
+
+export interface PdExportRow {
+  period: string;
+  dealerCode: string;
+  dealerName: string | null;
+  shopGroup: string | null;
+  orderNumber: string | null;
+  projectName: string | null;
+  solutionName: string | null;
+  subSolutionName: string | null;
+  subMerCate: string | null;
+  serviceTypeName: string | null;
+  customerName: string | null;
+  provinceName: string | null;
+  projectCloseDate: string | null;
+  planAmountInclVat: number;
+  salesExclVat: number;
+  discountAmount: number;
+}
+
+export function downloadPurchaseDiscount(rows: PdExportRow[], filename = "ส่วนลดซื้อLHS.xlsx") {
+  const COLS = [
+    "เดือน", "รหัสร้าน", "ชื่อร้าน", "ร้าน (ต้นทาง)", "เลขที่ออเดอร์", "โครงการ",
+    "Solution", "บริการย่อย", "กลุ่มงาน", "ประเภทงาน", "ลูกค้า", "จังหวัด",
+    "วันปิดการขาย", "ยอดรวม VAT", "ยอดขายก่อน VAT", "ส่วนลด 7%",
+  ];
+  const MONEY = ["ยอดรวม VAT", "ยอดขายก่อน VAT", "ส่วนลด 7%"];
+  const built: Row[] = rows.map((r) => ({
+    "เดือน": r.period,
+    "รหัสร้าน": r.dealerCode,
+    "ชื่อร้าน": r.dealerName ?? "",
+    "ร้าน (ต้นทาง)": r.shopGroup ?? "",
+    "เลขที่ออเดอร์": r.orderNumber ?? "",
+    "โครงการ": r.projectName ?? "",
+    "Solution": r.solutionName ?? "",
+    "บริการย่อย": r.subSolutionName ?? "",
+    "กลุ่มงาน": r.subMerCate ?? "",
+    "ประเภทงาน": r.serviceTypeName ?? "",
+    "ลูกค้า": r.customerName ?? "",
+    "จังหวัด": r.provinceName ?? "",
+    "วันปิดการขาย": r.projectCloseDate ?? "",
+    "ยอดรวม VAT": r.planAmountInclVat,
+    "ยอดขายก่อน VAT": r.salesExclVat,
+    "ส่วนลด 7%": r.discountAmount,
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ส่วนลดซื้อ LHS");
+  download(wb, filename);
+}

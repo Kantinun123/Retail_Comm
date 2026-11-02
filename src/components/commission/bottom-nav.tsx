@@ -15,6 +15,7 @@ type NavKey =
   | "baIncentive"
   | "baProfitShare"
   | "lhsCommission"
+  | "lhsPurchaseDiscount"
   | "analysis"
   | "points"
   | "database"
@@ -113,6 +114,14 @@ const LHS_COMMISSION_ITEM = {
   label: "LHS Commission",
 };
 
+/** เมนู LHS Purchase Discount (ส่วนลดซื้อ 7% Housing Expert) — admin */
+const LHS_PURCHASE_DISCOUNT_ITEM = {
+  key: "lhsPurchaseDiscount" as NavKey,
+  href: "/app/lhs-purchase-discount",
+  icon: "sell",
+  label: "LHS Discount",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -142,6 +151,7 @@ export function BottomNav({ active }: { active: NavKey }) {
       BA_INCENTIVE_ITEM,
       BA_PROFIT_SHARE_ITEM,
       LHS_COMMISSION_ITEM,
+      LHS_PURCHASE_DISCOUNT_ITEM,
       ...baseItems.slice(1),
       DATABASE_ITEM,
       CHAT_ITEM,

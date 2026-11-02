@@ -18,6 +18,7 @@ import { fetchProfitShareSummary } from "@/lib/commission/ba-profit-share-store"
 import { fetchCommissionSummary } from "@/lib/commission/commission-product-store";
 import { fetchBaSummary } from "@/lib/commission/ba-incentive-store";
 import { fetchLhsSummary } from "@/lib/commission/lhs-commission-store";
+import { fetchPdSummary } from "@/lib/commission/lhs-purchase-discount-store";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -147,6 +148,7 @@ export function HomeHubScreen() {
   // ยอดสรุปแต่ละระบบ
   const [backMargin, setBackMargin] = useState<number | null>(null);
   const [profitBa, setProfitBa] = useState<number | null>(null);
+  const [purchaseDiscount, setPurchaseDiscount] = useState<number | null>(null);
   const [commProduct, setCommProduct] = useState<number | null>(null);
   const [baInc, setBaInc] = useState<number | null>(null);
   const [lhs, setLhs] = useState<number | null>(null);
@@ -161,6 +163,7 @@ export function HomeHubScreen() {
       fetchCommissionSummary(dealerCode),
       fetchBaSummary(dealerCode),
       fetchLhsSummary(dealerCode),
+      fetchPdSummary(dealerCode),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setBackMargin(res[0].value.totalPayout ?? 0);
@@ -168,6 +171,7 @@ export function HomeHubScreen() {
       if (res[2].status === "fulfilled") setCommProduct(res[2].value.totalNet ?? 0);
       if (res[3].status === "fulfilled") setBaInc(res[3].value.totalIncentive ?? 0);
       if (res[4].status === "fulfilled") setLhs(res[4].value.totalPayment ?? 0);
+      if (res[5].status === "fulfilled") setPurchaseDiscount(res[5].value.totalDiscount ?? 0);
       setLoading(false);
     });
     return () => {
@@ -179,7 +183,9 @@ export function HomeHubScreen() {
 
   // ยอดรวมแต่ละกลุ่ม (จ่ายจริง) — null ถ้ายังโหลดไม่เสร็จทั้งกลุ่ม
   const storeTotal =
-    backMargin === null && profitBa === null ? null : (backMargin ?? 0) + (profitBa ?? 0);
+    backMargin === null && profitBa === null && purchaseDiscount === null
+      ? null
+      : (backMargin ?? 0) + (profitBa ?? 0) + (purchaseDiscount ?? 0);
   const empTotal =
     commProduct === null && baInc === null && lhs === null
       ? null
@@ -192,6 +198,7 @@ export function HomeHubScreen() {
   const storeCards: CardData[] = [
     { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading, pct: pctOf(backMargin, storeTotal) },
     { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading, pct: pctOf(profitBa, storeTotal) },
+    { key: "lhs-pd", href: "/app/lhs-purchase-discount", icon: "sell", label: "LHS Purchase Discount", sub: "ส่วนลดซื้อ 7% งานหลังคา (HE)", total: purchaseDiscount, loading, pct: pctOf(purchaseDiscount, storeTotal) },
   ];
 
   // กลุ่มพนักงาน (หน้า "รวมผลประโยชน์พนักงาน" ย้ายไปอยู่ bottom-nav แล้ว)

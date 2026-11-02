@@ -21,6 +21,7 @@ import { fetchProfitShareSummary } from "@/lib/commission/ba-profit-share-store"
 import { fetchCommissionSummary } from "@/lib/commission/commission-product-store";
 import { fetchBaSummary } from "@/lib/commission/ba-incentive-store";
 import { fetchLhsSummary } from "@/lib/commission/lhs-commission-store";
+import { fetchPdSummary } from "@/lib/commission/lhs-purchase-discount-store";
 import { downloadBenefitRollup, type RollupExportRow } from "@/lib/commission/excel";
 import { DownloadMonthSheet } from "./download-month-sheet";
 
@@ -74,9 +75,10 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
     async function load() {
       const out: SourceRow[] = [];
       if (kind === "store") {
-        const [bm, ps] = await Promise.all([
+        const [bm, ps, pd] = await Promise.all([
           fetchBackMarginSummary(dealerCode),
           fetchProfitShareSummary(dealerCode),
+          fetchPdSummary(dealerCode),
         ]);
         out.push({
           key: "back-margin", label: "Back Margin", icon: "savings", href: "/app/back-margin",
@@ -87,6 +89,11 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
           key: "profit-ba", label: "Profit Share BA", icon: "storefront", href: "/app/ba-profit-share",
           byPeriod: new Map(ps.months.map((m) => [m.period, m.profitShare])),
           total: ps.totalProfitShare,
+        });
+        out.push({
+          key: "lhs-pd", label: "LHS Purchase Discount", icon: "sell", href: "/app/lhs-purchase-discount",
+          byPeriod: new Map(pd.months.map((m) => [m.period, m.discount])),
+          total: pd.totalDiscount,
         });
       } else {
         const [cp, ba, lhs] = await Promise.all([
