@@ -192,8 +192,10 @@ export function HomeHubScreen() {
 
   if (!ready || !session) return null;
 
-  // LHS Channel Discount แสดงเฉพาะร้าน Housing Expert เท่านั้น
-  const showLhsDiscount = session.dealer?.model === "Housing Expert";
+  // Back Margin + LHS Channel Discount แสดงเฉพาะร้าน Housing Expert เท่านั้น (SCG Home ซ่อน)
+  const isHousingExpert = session.dealer?.model === "Housing Expert";
+  const showLhsDiscount = isHousingExpert;
+  const showBackMargin = isHousingExpert;
 
   // รวมทุก period จากทุกระบบ -> รายการปีที่มีข้อมูล
   const allPeriods = [
@@ -212,7 +214,8 @@ export function HomeHubScreen() {
   const yearLabel = activeYear ? `ปี ${Number(activeYear) + 543}` : "ทุกปี";
 
   // ยอดแต่ละระบบ ตามปีที่เลือก (จ่ายจริง)
-  const backMargin = bm ? sumByYear(bm.months, activeYear, (m) => m.payoutTotal ?? m.lineTotal) : null;
+  const backMarginRaw = bm ? sumByYear(bm.months, activeYear, (m) => m.payoutTotal ?? m.lineTotal) : null;
+  const backMargin = showBackMargin ? backMarginRaw : null;
   const profitBa = ps ? sumByYear(ps.months, activeYear, (m) => m.profitShare) : null;
   const commProduct = cp ? sumByYear(cp.months, activeYear, (m) => m.net) : null;
   const baInc = ba ? sumByYear(ba.months, activeYear, (m) => m.incentive) : null;
@@ -234,7 +237,9 @@ export function HomeHubScreen() {
 
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
-    { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading, pct: pctOf(backMargin, storeTotal) },
+    ...(showBackMargin
+      ? [{ key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading, pct: pctOf(backMargin, storeTotal) } as CardData]
+      : []),
     { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading, pct: pctOf(profitBa, storeTotal) },
     ...(showLhsDiscount
       ? [{ key: "lhs-pd", href: "/app/lhs-purchase-discount", icon: "sell", label: "LHS Channel Discount", sub: "ส่วนลดช่องทาง 7% งานหลังคา (HE)", total: purchaseDiscount, loading, pct: pctOf(purchaseDiscount, storeTotal) } as CardData]

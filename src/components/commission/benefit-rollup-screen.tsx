@@ -80,11 +80,14 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
           fetchProfitShareSummary(dealerCode),
           fetchPdSummary(dealerCode),
         ]);
-        out.push({
-          key: "back-margin", label: "Back Margin", icon: "savings", href: "/app/back-margin",
-          byPeriod: new Map(bm.months.map((m) => [m.period, m.payoutTotal ?? m.lineTotal])),
-          total: bm.totalPayout,
-        });
+        // Back Margin เฉพาะร้าน Housing Expert (admin เห็นทุกร้าน) — SCG Home ซ่อน
+        if (session?.isAdmin || session?.dealer?.model === "Housing Expert") {
+          out.push({
+            key: "back-margin", label: "Back Margin", icon: "savings", href: "/app/back-margin",
+            byPeriod: new Map(bm.months.map((m) => [m.period, m.payoutTotal ?? m.lineTotal])),
+            total: bm.totalPayout,
+          });
+        }
         out.push({
           key: "profit-ba", label: "Profit Share BA", icon: "storefront", href: "/app/ba-profit-share",
           byPeriod: new Map(ps.months.map((m) => [m.period, m.profitShare])),
@@ -155,11 +158,21 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
     })
     .filter((r) => r.total !== 0);
 
-  const grandTotal = sources.reduce((a, s) => a + s.total, 0);
-
   // ตัวกรองปี (auto-show)
   const yf = computeYearFilter(monthRows, selectedYear);
   const months = yf.filtered as MonthRow[];
+
+  // ยอดรวม hero + แยกต่อระบบ คิดเฉพาะปีที่เลือก (ขยับตามปีที่เลือก)
+  const inYear = (p: string) =>
+    !yf.multiYear || !yf.activeYear || p.startsWith(yf.activeYear + "-");
+  const grandTotal = months.reduce((a, m) => a + m.total, 0);
+  const sourceTotals = sources.map((s) => {
+    let sum = 0;
+    s.byPeriod.forEach((v, p) => {
+      if (inYear(p)) sum += v;
+    });
+    return { ...s, yearTotal: sum };
+  });
 
   const sourceLabels = sources.map((s) => s.label);
   // ดาวน์โหลดเฉพาะเดือนที่เลือกจาก sheet (ใช้ monthRows ทั้งหมด ไม่ติดตัวกรองปีบนจอ)
@@ -232,7 +245,7 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
             </p>
             {/* แยกยอดต่อระบบ */}
             <div className="grid grid-cols-2 gap-2 mt-4">
-              {sources.map((s) => (
+              {sourceTotals.map((s) => (
                 <Link
                   key={s.key}
                   href={s.href}
@@ -241,7 +254,7 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
                   <p className="text-[11px] text-red-100/80 flex items-center gap-1">
                     <Icon name={s.icon} style={{ fontSize: 13 }} /> {s.label}
                   </p>
-                  <p className="tnum text-[15px] font-bold">{loading ? "…" : baht(s.total)}</p>
+                  <p className="tnum text-[15px] font-bold">{loading ? "…" : baht(s.yearTotal)}</p>
                 </Link>
               ))}
             </div>

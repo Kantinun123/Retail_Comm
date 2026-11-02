@@ -180,9 +180,12 @@ export function BackMarginScreen() {
   }
 
   // sales ไม่มี back margin -> พาออก
+  // Back Margin เฉพาะร้าน Housing Expert (admin ดูได้ทุกร้าน) — SCG Home ซ่อน
   useEffect(() => {
     if (ready && session && session.isSales) {
       router.replace("/app/member");
+    } else if (ready && session && !session.isAdmin && session.dealer?.model !== "Housing Expert") {
+      router.replace("/app/home");
     }
   }, [ready, session, router]);
 
@@ -203,13 +206,16 @@ export function BackMarginScreen() {
 
   if (!ready || !session) return null;
   if (session.isSales) return null;
+  // SCG Home ไม่มี Back Margin (กำลัง redirect) — กัน content แฟลช
+  if (!session.isAdmin && session.dealer?.model !== "Housing Expert") return null;
 
   const allMonths = summary?.months ?? [];
-  const totalPayout = summary?.totalPayout ?? 0;
-  const paidMonths = allMonths.filter((m) => m.payoutTotal != null).length;
   // กรองปี (auto-show เมื่อ >1 ปี) — รายการเดือนแสดงเฉพาะปีที่เลือก
   const yf = computeYearFilter(allMonths, selectedYear);
   const months = yf.filtered;
+  // ยอดรวม hero คิดจากเดือนที่กรองปีแล้ว (ขยับตามปีที่เลือก)
+  const totalPayout = months.reduce((s, m) => s + (m.payoutTotal ?? m.lineTotal), 0);
+  const paidMonths = months.filter((m) => m.payoutTotal != null).length;
 
   return (
     <>
