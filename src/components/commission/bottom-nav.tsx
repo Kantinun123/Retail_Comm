@@ -119,7 +119,7 @@ const LHS_PURCHASE_DISCOUNT_ITEM = {
   key: "lhsPurchaseDiscount" as NavKey,
   href: "/app/lhs-purchase-discount",
   icon: "sell",
-  label: "LHS Discount",
+  label: "LHS Ch.Discount",
 };
 
 export function BottomNav({ active }: { active: NavKey }) {

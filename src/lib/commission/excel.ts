@@ -922,7 +922,7 @@ export interface PdExportRow {
   discountAmount: number;
 }
 
-export function downloadPurchaseDiscount(rows: PdExportRow[], filename = "ส่วนลดซื้อLHS.xlsx") {
+export function downloadPurchaseDiscount(rows: PdExportRow[], filename = "LHS_Channel_Discount.xlsx") {
   const COLS = [
     "เดือน", "รหัสร้าน", "ชื่อร้าน", "ร้าน (ต้นทาง)", "เลขที่ออเดอร์", "โครงการ",
     "Solution", "บริการย่อย", "กลุ่มงาน", "ประเภทงาน", "ลูกค้า", "จังหวัด",
@@ -948,6 +948,6 @@ export function downloadPurchaseDiscount(rows: PdExportRow[], filename = "ส่
     "ส่วนลด 7%": r.discountAmount,
   }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "ส่วนลดซื้อ LHS");
+  XLSX.utils.book_append_sheet(wb, moneySheet(built, COLS, MONEY), "LHS Channel Discount");
   download(wb, filename);
 }

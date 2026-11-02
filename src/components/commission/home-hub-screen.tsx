@@ -182,10 +182,14 @@ export function HomeHubScreen() {
   if (!ready || !session) return null;
 
   // ยอดรวมแต่ละกลุ่ม (จ่ายจริง) — null ถ้ายังโหลดไม่เสร็จทั้งกลุ่ม
+  // LHS Channel Discount แสดงเฉพาะร้าน Housing Expert เท่านั้น
+  const showLhsDiscount = session.dealer?.model === "Housing Expert";
+  const pdValue = showLhsDiscount ? purchaseDiscount : null;
+
   const storeTotal =
-    backMargin === null && profitBa === null && purchaseDiscount === null
+    backMargin === null && profitBa === null && pdValue === null
       ? null
-      : (backMargin ?? 0) + (profitBa ?? 0) + (purchaseDiscount ?? 0);
+      : (backMargin ?? 0) + (profitBa ?? 0) + (pdValue ?? 0);
   const empTotal =
     commProduct === null && baInc === null && lhs === null
       ? null
@@ -198,7 +202,9 @@ export function HomeHubScreen() {
   const storeCards: CardData[] = [
     { key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading, pct: pctOf(backMargin, storeTotal) },
     { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading, pct: pctOf(profitBa, storeTotal) },
-    { key: "lhs-pd", href: "/app/lhs-purchase-discount", icon: "sell", label: "LHS Purchase Discount", sub: "ส่วนลดซื้อ 7% งานหลังคา (HE)", total: purchaseDiscount, loading, pct: pctOf(purchaseDiscount, storeTotal) },
+    ...(showLhsDiscount
+      ? [{ key: "lhs-pd", href: "/app/lhs-purchase-discount", icon: "sell", label: "LHS Channel Discount", sub: "ส่วนลดช่องทาง 7% งานหลังคา (HE)", total: purchaseDiscount, loading, pct: pctOf(purchaseDiscount, storeTotal) } as CardData]
+      : []),
   ];
 
   // กลุ่มพนักงาน (หน้า "รวมผลประโยชน์พนักงาน" ย้ายไปอยู่ bottom-nav แล้ว)

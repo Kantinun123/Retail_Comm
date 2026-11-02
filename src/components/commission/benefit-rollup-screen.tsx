@@ -90,11 +90,14 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
           byPeriod: new Map(ps.months.map((m) => [m.period, m.profitShare])),
           total: ps.totalProfitShare,
         });
-        out.push({
-          key: "lhs-pd", label: "LHS Purchase Discount", icon: "sell", href: "/app/lhs-purchase-discount",
-          byPeriod: new Map(pd.months.map((m) => [m.period, m.discount])),
-          total: pd.totalDiscount,
-        });
+        // LHS Channel Discount เฉพาะร้าน Housing Expert (admin เห็นทุกร้าน)
+        if (session?.isAdmin || session?.dealer?.model === "Housing Expert") {
+          out.push({
+            key: "lhs-pd", label: "LHS Channel Discount", icon: "sell", href: "/app/lhs-purchase-discount",
+            byPeriod: new Map(pd.months.map((m) => [m.period, m.discount])),
+            total: pd.totalDiscount,
+          });
+        }
       } else {
         const [cp, ba, lhs] = await Promise.all([
           fetchCommissionSummary(dealerCode),
@@ -128,7 +131,7 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
     return () => {
       cancelled = true;
     };
-  }, [dealerCode, kind]);
+  }, [dealerCode, kind, session?.isAdmin, session?.dealer?.model]);
 
   if (!ready || !session) return null;
   if (session.isSales) return null;

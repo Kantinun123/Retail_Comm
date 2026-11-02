@@ -134,6 +134,10 @@ export function LhsPurchaseDiscountScreen() {
 
   useEffect(() => {
     if (ready && session && session.isSales) router.replace("/app/member");
+    // LHS Channel Discount เฉพาะร้าน Housing Expert (admin ดูได้ทุกร้าน)
+    else if (ready && session && !session.isAdmin && session.dealer?.model !== "Housing Expert") {
+      router.replace("/app/home");
+    }
   }, [ready, session, router]);
 
   useEffect(() => {
@@ -182,7 +186,7 @@ export function LhsPurchaseDiscountScreen() {
           <Link href={homeHref} className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#a11119] active:scale-95 transition">
             <Icon name="arrow_back" className="text-xl" />
           </Link>
-          <span className="font-bold text-[16px] text-[#231313]">LHS Purchase Discount (ร้านค้า)</span>
+          <span className="font-bold text-[16px] text-[#231313]">LHS Channel Discount (ร้านค้า)</span>
         </div>
         <button
           onClick={() => {
@@ -205,7 +209,7 @@ export function LhsPurchaseDiscountScreen() {
             <div className="flex items-start justify-between gap-2">
               <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
                 <Icon name="sell" style={{ fontSize: 16 }} />
-                ส่วนลดซื้อสะสม 7% (Housing Expert · Roof)
+ส่วนลดช่องทางสะสม 7% (Housing Expert · Roof)
                 {session.isAdmin && !session.storeFilter ? " · ทุกร้าน" : ""}
               </p>
               <button
@@ -237,7 +241,7 @@ export function LhsPurchaseDiscountScreen() {
         <section>
           <h3 className="text-[15px] font-bold text-slate-900 mb-2.5 flex items-center gap-1.5">
             <Icon name="calendar_month" className="text-lg text-[#d32029]" />
-            ส่วนลดซื้อ รายเดือน
+LHS Channel Discount รายเดือน
             {yf.multiYear && yf.activeYear && (
               <span className="text-[12px] font-semibold text-slate-400">· ปี {Number(yf.activeYear) + 543}</span>
             )}
@@ -252,7 +256,7 @@ export function LhsPurchaseDiscountScreen() {
               <div className="w-12 h-12 mx-auto rounded-2xl bg-red-50 text-[#d32029] flex items-center justify-center">
                 <Icon name="sell" className="text-2xl" />
               </div>
-              <p className="mt-2 text-[13px] text-slate-500">ยังไม่มีข้อมูลส่วนลดซื้อสำหรับร้านนี้</p>
+              <p className="mt-2 text-[13px] text-slate-500">ยังไม่มีข้อมูล LHS Channel Discount สำหรับร้านนี้</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -289,7 +293,7 @@ export function LhsPurchaseDiscountScreen() {
         </section>
 
         <p className="text-[11px] text-slate-400 text-center">
-          ส่วนลดซื้อ 7% สำหรับร้าน Housing Expert กลุ่มงานหลังคา (Roof) · คิดจากยอดขายก่อน VAT
+ส่วนลดช่องทาง 7% สำหรับร้าน Housing Expert กลุ่มงานหลังคา (Roof) · คิดจากยอดขายก่อน VAT
         </p>
       </div>
 
