@@ -297,12 +297,13 @@ export function BaIncentiveScreen() {
   if (!ready || !session) return null;
 
   const allMonths = summary?.months ?? [];
-  const totalIncentive = summary?.totalIncentive ?? 0;
-  const totalGmv = allMonths.reduce((s, m) => s + m.gmv, 0);
-  const paidMonths = allMonths.filter((m) => m.paidDate != null).length;
   // กรองปี (auto-show เมื่อ >1 ปี)
   const yf = computeYearFilter(allMonths, selectedYear);
   const months = yf.filtered;
+  // ยอดรวม hero คิดจากเดือนที่กรองปีแล้ว (ขยับตามปีที่เลือก)
+  const totalIncentive = months.reduce((s, m) => s + m.incentive, 0);
+  const totalGmv = months.reduce((s, m) => s + m.gmv, 0);
+  const paidMonths = months.filter((m) => m.paidDate != null).length;
 
   return (
     <>

@@ -310,12 +310,13 @@ export function CommissionProductScreen() {
   if (!ready || !session) return null;
 
   const allMonths = summary?.months ?? [];
-  const totalNet = summary?.totalNet ?? 0;
-  const totalGross = summary?.totalGross ?? 0;
-  const paidMonths = allMonths.filter((m) => m.paidDate != null).length;
   // กรองปี (auto-show เมื่อ >1 ปี)
   const yf = computeYearFilter(allMonths, selectedYear);
   const months = yf.filtered;
+  // ยอดรวม hero คิดจากเดือนที่กรองปีแล้ว (ขยับตามปีที่เลือก)
+  const totalNet = months.reduce((s, m) => s + m.net, 0);
+  const totalGross = months.reduce((s, m) => s + m.gross, 0);
+  const paidMonths = months.filter((m) => m.paidDate != null).length;
 
   return (
     <>

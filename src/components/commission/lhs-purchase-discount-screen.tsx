@@ -159,10 +159,11 @@ export function LhsPurchaseDiscountScreen() {
   if (session.isSales) return null;
 
   const allMonths = summary?.months ?? [];
-  const totalDiscount = summary?.totalDiscount ?? 0;
-  const totalSales = summary?.totalSales ?? 0;
   const yf = computeYearFilter(allMonths, selectedYear);
   const months = yf.filtered as PdMonth[];
+  // ยอดรวม hero คิดจากเดือนที่กรองปีแล้ว (ขยับตามปีที่เลือก)
+  const totalDiscount = months.reduce((s, m) => s + m.discount, 0);
+  const totalSales = months.reduce((s, m) => s + m.sales, 0);
 
   async function handleDownload(chosenPeriods: string[]) {
     const chosen = new Set(chosenPeriods);

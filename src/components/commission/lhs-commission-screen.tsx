@@ -258,11 +258,12 @@ export function LhsCommissionScreen() {
   if (!ready || !session) return null;
 
   const allMonths = summary?.months ?? [];
-  const totalCommission = summary?.totalCommission ?? 0;
-  const totalSales = summary?.totalSales ?? 0;
-  const paidMonths = allMonths.filter((m) => m.paidDate != null).length;
   const yf = computeYearFilter(allMonths, selectedYear);
   const months = yf.filtered;
+  // ยอดรวม hero คิดจากเดือนที่กรองปีแล้ว (ขยับตามปีที่เลือก)
+  const totalCommission = months.reduce((s, m) => s + m.commission, 0);
+  const totalSales = months.reduce((s, m) => s + m.sales, 0);
+  const paidMonths = months.filter((m) => m.paidDate != null).length;
 
   async function handleDownload(chosenPeriods: string[]) {
     if (downloading || chosenPeriods.length === 0) return;
