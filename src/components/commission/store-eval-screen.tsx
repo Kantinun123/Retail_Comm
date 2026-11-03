@@ -17,9 +17,13 @@ import { YearFilter, computeYearFilter } from "./year-filter";
 import {
   fetchEvalSummary,
   fetchEvalMonthLines,
+  fetchEvalItems,
+  fetchEvalFailSummary,
   type EvalSummary,
   type EvalMonth,
   type EvalLine,
+  type EvalItem,
+  type EvalFail,
 } from "@/lib/commission/store-eval-store";
 
 const MONTH_TH = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -37,6 +41,107 @@ function fmtDate(iso: string | null): string {
 }
 const pctText = (p: number) => `${Math.round(p * 100)}%`;
 const isPass = (r: string | null) => r === "ผ่าน";
+
+/* ---------------- แถวหมวด + ขยายข้อย่อย (เฉพาะหมวดไม่เต็ม) ---------------- */
+function CategoryRow({
+  categoryKey,
+  label,
+  score,
+  max,
+  submissionId,
+}: {
+  categoryKey: string;
+  label: string;
+  score: number;
+  max: number;
+  submissionId: string | null;
+}) {
+  const ratio = max > 0 ? score / max : 0;
+  const full = ratio >= 1;
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<EvalItem[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && items === null && submissionId) {
+      setLoading(true);
+      try {
+        const all = await fetchEvalItems(submissionId);
+        setItems(all.filter((it) => it.categoryKey === categoryKey));
+      } catch {
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  // หมวดเต็ม = การ์ดปกติ (กดไม่ได้)
+  if (full) {
+    return (
+      <div className="rounded-xl border border-slate-100 p-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-[12px] font-semibold text-slate-700 flex-1 min-w-0">{label}</p>
+          <span className="tnum text-[12px] font-bold shrink-0 text-emerald-600">{score} / {max}</span>
+        </div>
+        <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-full rounded-full bg-emerald-500" style={{ width: "100%" }} />
+        </div>
+      </div>
+    );
+  }
+
+  // หมวดไม่เต็ม = เหลืองเด่น + กดดูข้อย่อย
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5">
+      <button type="button" onClick={toggle} className="w-full text-left">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-[12px] font-bold text-amber-800 flex-1 min-w-0">{label}</p>
+          <span className="tnum text-[12px] font-bold shrink-0 text-amber-700">{score} / {max}</span>
+        </div>
+        <div className="mt-1.5 h-1.5 rounded-full bg-amber-200/60 overflow-hidden">
+          <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+        </div>
+        <div className="flex items-center justify-end gap-1 mt-1.5 text-[10px] font-semibold text-amber-700">
+          {open ? "ซ่อนข้อย่อย" : "ดูข้อที่ตก"}
+          <Icon name={open ? "expand_less" : "expand_more"} style={{ fontSize: 14 }} />
+        </div>
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5 border-t border-amber-200 pt-2">
+          {loading ? (
+            <p className="text-[11px] text-amber-600 text-center py-2">กำลังโหลด...</p>
+          ) : !items || items.length === 0 ? (
+            <p className="text-[11px] text-amber-600 text-center py-2">ไม่มีข้อมูลข้อย่อย</p>
+          ) : (
+            items.map((it) => (
+              <div
+                key={it.itemNo}
+                className={
+                  "flex items-start gap-2 rounded-lg p-2 " +
+                  (it.passed ? "bg-white/60" : "bg-red-50 border border-red-200")
+                }
+              >
+                <span className={
+                  "w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 " +
+                  (it.passed ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-[#dc2626]")
+                }>
+                  <Icon name={it.passed ? "check" : "close"} style={{ fontSize: 11 }} />
+                </span>
+                <p className={"text-[11px] leading-snug " + (it.passed ? "text-slate-600" : "text-[#b91c1c] font-semibold")}>
+                  {it.itemNo}. {it.itemLabel}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ---------------- modal drill-down 6 หมวด ---------------- */
 function MonthDetailModal({
@@ -99,27 +204,17 @@ function MonthDetailModal({
                     {l.result ?? "-"} · {pctText(l.pct)}
                   </span>
                 </div>
-                {/* 6 หมวด */}
-                {l.categories.map((c) => {
-                  const ratio = c.max > 0 ? c.score / c.max : 0;
-                  const full = ratio >= 1;
-                  return (
-                    <div key={c.key} className="rounded-xl border border-slate-100 p-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-[12px] font-semibold text-slate-700 flex-1 min-w-0">{c.label}</p>
-                        <span className={"tnum text-[12px] font-bold shrink-0 " + (full ? "text-emerald-600" : "text-amber-600")}>
-                          {c.score} / {c.max}
-                        </span>
-                      </div>
-                      <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className={"h-full rounded-full " + (full ? "bg-emerald-500" : "bg-amber-500")}
-                          style={{ width: `${Math.min(100, ratio * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                {/* 6 หมวด (หมวดไม่เต็มกดดูข้อย่อยได้) */}
+                {l.categories.map((c) => (
+                  <CategoryRow
+                    key={c.key}
+                    categoryKey={c.key}
+                    label={c.label}
+                    score={c.score}
+                    max={c.max}
+                    submissionId={l.submissionId}
+                  />
+                ))}
               </div>
             ))
           )}
@@ -136,6 +231,7 @@ export function StoreEvalScreen() {
   const [summary, setSummary] = useState<EvalSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<EvalMonth | null>(null);
+  const [fails, setFails] = useState<EvalFail[]>([]);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
   const dealerCode = session
@@ -161,6 +257,11 @@ export function StoreEvalScreen() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    fetchEvalFailSummary(dealerCode)
+      .then((f) => {
+        if (!cancelled) setFails(f);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -246,6 +347,31 @@ export function StoreEvalScreen() {
             </div>
           </div>
         </section>
+
+        {/* แถบสรุปข้อที่ร้านตกบ่อยสุด */}
+        {!loading && fails.length > 0 && (
+          <section className="rounded-2xl bg-orange-50 border border-orange-200 p-3.5">
+            <p className="text-[12px] font-bold text-orange-700 flex items-center gap-1.5">
+              <Icon name="warning" style={{ fontSize: 15 }} />
+              ข้อที่ร้านคุณตกบ่อยสุด (รวมทุกครั้งที่ตรวจ)
+            </p>
+            <div className="mt-2 space-y-1.5">
+              {fails.slice(0, 5).map((f, i) => {
+                const ratio = fails[0].failCount > 0 ? f.failCount / fails[0].failCount : 0;
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[10.5px] text-orange-900 flex-1 min-w-0 truncate">{f.itemLabel}</span>
+                    <div className="w-16 h-2 rounded-full bg-orange-100 overflow-hidden shrink-0">
+                      <div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.max(8, ratio * 100)}%` }} />
+                    </div>
+                    <span className="tnum text-[10.5px] font-bold text-orange-700 shrink-0 w-7 text-right">{f.failCount}×</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[9px] text-orange-400 mt-2">* นับจำนวนครั้งที่ข้อนั้น &quot;ไม่ผ่าน&quot; · ข้อที่ตกซ้ำควรแก้เป็นอันดับแรก</p>
+          </section>
+        )}
 
         <YearFilter years={yf.years} activeYear={yf.activeYear} onSelect={setSelectedYear} />
 

@@ -5,12 +5,26 @@ import { createServiceClient } from "@/lib/supabase/service";
  * Store Evaluation API (ผลตรวจประเมินร้านค้า — ฝั่งร้านค้า)
  * - GET /api/store-eval?dealerCode=XXX                 -> สรุปรายเดือน + ผลล่าสุด
  * - GET /api/store-eval?dealerCode=XXX&period=YYYY-MM   -> รายละเอียดการตรวจเดือนนั้น
+ * - GET /api/store-eval?submission=XXX                  -> ข้อย่อยของการตรวจครั้งนั้น
+ * - GET /api/store-eval?mode=fails&dealerCode=XXX       -> สรุปข้อที่ตกบ่อย
  */
 export async function GET(req: NextRequest) {
   const dealerCode = req.nextUrl.searchParams.get("dealerCode")?.trim() || null;
   const period = req.nextUrl.searchParams.get("period")?.trim() || null;
+  const submission = req.nextUrl.searchParams.get("submission")?.trim() || null;
+  const mode = req.nextUrl.searchParams.get("mode")?.trim() || null;
   try {
     const sb = createServiceClient();
+    if (submission) {
+      const { data, error } = await sb.rpc("store_eval_items", { p_submission: submission });
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json(data);
+    }
+    if (mode === "fails") {
+      const { data, error } = await sb.rpc("store_eval_fail_summary", { p_dealer: dealerCode });
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json(data);
+    }
     if (period) {
       const { data, error } = await sb.rpc("store_eval_month_lines", {
         p_period: period,
