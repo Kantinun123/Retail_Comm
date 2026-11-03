@@ -29,6 +29,8 @@ const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_
 
 /* ---- helpers ---- */
 const str = (v) => { if (v === undefined || v === null) return null; const s = String(v).trim(); return s === "" ? null : s; };
+/* คอมเมนต์: คืน null ถ้าว่าง/ไม่มีสาระ ("ไม่มี", "-", "ไม่ม") */
+const comment = (v) => { const s = str(v); if (!s) return null; if (/^(ไม่มี|ไม่ม|-| no|none|n\/a)\.?$/i.test(s)) return null; return s; };
 const num = (v) => { if (v === undefined || v === null || v === "") return null; const n = Number(String(v).replace(/,/g, "")); return Number.isFinite(n) ? n : null; };
 const serialToDate = (v) => {
   const n = Number(v);
@@ -92,6 +94,7 @@ const missStores = new Map();
       overall, pct: overall != null ? overall / 10 : null,
       q_welcome: num(row[10]), q_recommend: num(row[11]), q_inform: num(row[12]),
       q_ontime: num(row[13]), q_estimate: num(row[15]), q_refer: num(row[17]),
+      use_estimate: str(row[14]), impress_text: comment(row[18]), improve_text: comment(row[19]),
       source_sheet: "DATA", source_file: FILE,
     });
   }
@@ -114,6 +117,7 @@ const missStores = new Map();
       overall, pct: overall != null ? overall / 10 : null,
       q_welcome: num(row[6]), q_recommend: num(row[7]), q_inform: num(row[8]),
       q_ontime: num(row[9]), q_estimate: num(row[11]), q_refer: num(row[13]),
+      use_estimate: str(row[10]), impress_text: comment(row[14]), improve_text: comment(row[15]),
       source_sheet: "Cus Sat - New", source_file: FILE,
     });
   }
@@ -125,6 +129,9 @@ for (const r of rows) {
 }
 const scored = rows.filter((r) => r.overall != null);
 const avg = scored.reduce((s, r) => s + r.overall, 0) / (scored.length || 1);
+const nImprove = rows.filter((r) => r.improve_text).length;
+const nImpress = rows.filter((r) => r.impress_text).length;
+console.log(`มีคอมเมนต์ปรับปรุง = ${nImprove} | ประทับใจ = ${nImpress}`);
 
 console.log(`\nแถวทั้งหมด = ${rows.length} | map dealer เจอ ${mapped} / ไม่เจอ ${unmapped}`);
 console.log(`overall เฉลี่ย = ${avg.toFixed(3)} (${(avg * 10).toFixed(1)}%) | n=${scored.length}`);

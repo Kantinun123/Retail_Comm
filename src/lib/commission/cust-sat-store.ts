@@ -10,14 +10,34 @@ export interface CsMonth {
   pct: number;           // 0..1 (เฉลี่ยเดือนนั้น)
   overall: number;       // เฉลี่ย 0-10
   reviewCount: number;
+  improveCount: number;  // จำนวนรีวิวที่มีข้อเสนอให้แก้ไขในเดือนนั้น
+}
+
+export interface CsInsight {
+  label: string;
+  n: number;
 }
 
 export interface CsSummary {
   ok: boolean;
   count: number;         // จำนวนรีวิวทั้งหมด
   avgPct: number;        // 0..1
+  improveTotal: number;  // จำนวนคอมเมนต์ที่ขอให้ปรับปรุง
+  insight: CsInsight[];  // จัดกลุ่มประเด็นปรับปรุงที่พบบ่อย
   months: CsMonth[];
   error?: string;
+}
+
+/** รีวิวรายรายการ (ตัด PII แล้ว) */
+export interface CsReview {
+  evalDate: string | null;
+  overall: number;
+  pct: number;
+  product: string | null;
+  purpose: string | null;
+  useEstimate: string | null;
+  impress: string | null;
+  improve: string | null;
 }
 
 /** คะแนนย่อย 6 ด้าน (เฉลี่ยของเดือน) */
@@ -55,13 +75,14 @@ export function getCachedCustSatSummary(dealerCode: string | null): CsSummary | 
 }
 
 /* ---------------- map helpers ---------------- */
-type RawMonth = { period: string; pct: number | string; overall: number | string; review_count: number | string };
+type RawMonth = { period: string; pct: number | string; overall: number | string; review_count: number | string; improve_count?: number | string };
 function mapMonth(r: RawMonth): CsMonth {
   return {
     period: r.period,
     pct: Number(r.pct ?? 0),
     overall: Number(r.overall ?? 0),
     reviewCount: Number(r.review_count ?? 0),
+    improveCount: Number(r.improve_count ?? 0),
   };
 }
 
@@ -104,6 +125,8 @@ export async function fetchCustSatSummary(dealerCode: string | null): Promise<Cs
     ok?: boolean;
     count?: number | string;
     avg_pct?: number | string;
+    improve_total?: number | string;
+    insight?: { label: string; n: number | string }[];
     months?: RawMonth[];
     error?: string;
   };
@@ -111,6 +134,8 @@ export async function fetchCustSatSummary(dealerCode: string | null): Promise<Cs
     ok: !!raw.ok,
     count: Number(raw.count ?? 0),
     avgPct: Number(raw.avg_pct ?? 0),
+    improveTotal: Number(raw.improve_total ?? 0),
+    insight: Array.isArray(raw.insight) ? raw.insight.map((i) => ({ label: i.label, n: Number(i.n ?? 0) })) : [],
     months: Array.isArray(raw.months) ? raw.months.map(mapMonth) : [],
     error: raw.error,
   };
@@ -127,4 +152,35 @@ export async function fetchCustSatMonthAgg(dealerCode: string | null, period: st
   const res = await fetch(`/api/cust-sat?${params.toString()}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as { ok?: boolean; agg?: RawAgg };
   return raw.ok ? mapAgg(raw.agg ?? null) : null;
+}
+
+type RawReview = {
+  eval_date: string | null;
+  overall: number | string;
+  pct: number | string;
+  product: string | null;
+  purpose: string | null;
+  use_estimate: string | null;
+  impress_text: string | null;
+  improve_text: string | null;
+};
+function mapReview(r: RawReview): CsReview {
+  return {
+    evalDate: r.eval_date,
+    overall: Number(r.overall ?? 0),
+    pct: Number(r.pct ?? 0),
+    product: r.product,
+    purpose: r.purpose,
+    useEstimate: r.use_estimate,
+    impress: r.impress_text,
+    improve: r.improve_text,
+  };
+}
+
+export async function fetchCustSatReviews(dealerCode: string | null, period: string): Promise<CsReview[]> {
+  const params = new URLSearchParams({ period, mode: "reviews" });
+  if (dealerCode) params.set("dealerCode", dealerCode);
+  const res = await fetch(`/api/cust-sat?${params.toString()}`, { method: "GET", cache: "no-store" });
+  const raw = (await res.json()) as { ok?: boolean; reviews?: RawReview[] };
+  return raw.ok && Array.isArray(raw.reviews) ? raw.reviews.map(mapReview) : [];
 }
