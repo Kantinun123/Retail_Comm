@@ -34,6 +34,33 @@ export interface SsGroup {
   subs: SsSubGroup[];
 }
 
+/** กลุ่มย่อยใต้เดือน (ไม่มี subs ลึก — ใช้ drill ไป job) */
+export interface SsMonthGroup {
+  group3: string;
+  amount: number;
+  jobCount: number;
+}
+
+/** เดือน + 3 กลุ่มใต้เดือน */
+export interface SsMonthDetail {
+  period: string;
+  amount: number;
+  jobCount: number;
+  groups: SsMonthGroup[];
+}
+
+/** 1 job (ตัด PII ชื่อลูกค้า) */
+export interface SsJob {
+  closeDate: string | null;
+  group3: string;
+  subGroup: string | null;
+  subSolutionName: string | null;
+  solutionName: string | null;
+  provinceName: string | null;
+  projectNumber: string | null;
+  amount: number;
+}
+
 /* ---------------- cache + pub/sub ---------------- */
 const summaryCache = new Map<string, SsSummary>();
 const listeners = new Set<() => void>();
@@ -108,4 +135,66 @@ export async function fetchServiceSalesGroups(dealerCode: string | null, year: s
   const res = await fetch(`/api/service-sales?${params.toString()}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as { ok?: boolean; groups?: RawGroup[] };
   return raw.ok && Array.isArray(raw.groups) ? raw.groups.map(mapGroup) : [];
+}
+
+type RawMonthDetail = {
+  period: string;
+  amount: number | string;
+  job_count: number | string;
+  groups: { group3: string; amount: number | string; job_count: number | string }[];
+};
+function mapMonthDetail(r: RawMonthDetail): SsMonthDetail {
+  return {
+    period: r.period,
+    amount: Number(r.amount ?? 0),
+    jobCount: Number(r.job_count ?? 0),
+    groups: Array.isArray(r.groups)
+      ? r.groups.map((g) => ({ group3: g.group3, amount: Number(g.amount ?? 0), jobCount: Number(g.job_count ?? 0) }))
+      : [],
+  };
+}
+
+export async function fetchServiceSalesMonths(dealerCode: string | null, year: string | null): Promise<SsMonthDetail[]> {
+  const params = new URLSearchParams({ mode: "months" });
+  if (dealerCode) params.set("dealerCode", dealerCode);
+  if (year) params.set("year", year);
+  const res = await fetch(`/api/service-sales?${params.toString()}`, { method: "GET", cache: "no-store" });
+  const raw = (await res.json()) as { ok?: boolean; months?: RawMonthDetail[] };
+  return raw.ok && Array.isArray(raw.months) ? raw.months.map(mapMonthDetail) : [];
+}
+
+type RawJob = {
+  close_date: string | null;
+  group3: string;
+  sub_group: string | null;
+  sub_solution_name: string | null;
+  solution_name: string | null;
+  province_name: string | null;
+  project_number: string | null;
+  amount_incl_vat: number | string;
+};
+function mapJob(r: RawJob): SsJob {
+  return {
+    closeDate: r.close_date,
+    group3: r.group3,
+    subGroup: r.sub_group,
+    subSolutionName: r.sub_solution_name,
+    solutionName: r.solution_name,
+    provinceName: r.province_name,
+    projectNumber: r.project_number,
+    amount: Number(r.amount_incl_vat ?? 0),
+  };
+}
+
+export async function fetchServiceSalesJobs(
+  dealerCode: string | null,
+  period: string,
+  group: string | null
+): Promise<SsJob[]> {
+  const params = new URLSearchParams({ mode: "jobs", period });
+  if (dealerCode) params.set("dealerCode", dealerCode);
+  if (group) params.set("group", group);
+  const res = await fetch(`/api/service-sales?${params.toString()}`, { method: "GET", cache: "no-store" });
+  const raw = (await res.json()) as { ok?: boolean; jobs?: RawJob[] };
+  return raw.ok && Array.isArray(raw.jobs) ? raw.jobs.map(mapJob) : [];
 }

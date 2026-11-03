@@ -2,9 +2,10 @@
 
 /* =============================================================
    หน้ายอดขายงานบริการ (Service Sales)
-   - hero: ยอดรวมของปีที่เลือก + จำนวนงาน
+   - hero: ยอดรวมของปีที่เลือก + จำนวนงาน + 3 กลุ่ม (สรุปปี)
    - เลือกปีได้ (default = ปีล่าสุด)
-   - 3 กลุ่มใหญ่ (ROOF SERVICE / SMART SOLUTION / Qchang) กดขยายดูหมวดย่อย
+   - รายเดือนของปีนั้น -> ใต้แต่ละเดือนมี 3 กลุ่มงานบริการ
+   - กดกลุ่มในเดือน -> เปิด modal ดูราย job (ตัด PII ชื่อลูกค้า)
    - dealer เห็นเฉพาะร้านตัวเอง ; admin เห็นรวมทุกร้าน + ยอดไม่ระบุร้าน
    ============================================================= */
 import Link from "next/link";
@@ -18,12 +19,29 @@ import { YearChips, yearsOf } from "./year-filter";
 import {
   fetchServiceSalesSummary,
   fetchServiceSalesGroups,
+  fetchServiceSalesMonths,
+  fetchServiceSalesJobs,
   type SsSummary,
   type SsGroup,
+  type SsMonthDetail,
+  type SsJob,
 } from "@/lib/commission/service-sales-store";
 
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 0 });
+}
+const MONTH_TH = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+function periodLabel(period: string): string {
+  const [y, m] = period.split("-");
+  return `${MONTH_TH[Number(m)] ?? m} ${Number(y) + 543}`;
+}
+function fmtDate(iso: string | null): string {
+  if (!iso) return "-";
+  try {
+    return new Date(iso + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+  } catch {
+    return iso;
+  }
 }
 
 /* สีประจำกลุ่ม */
@@ -36,53 +54,145 @@ function groupMeta(k: string) {
   return GROUP_META[k] ?? { icon: "category", color: "text-slate-600", bar: "bg-slate-400", soft: "bg-slate-50" };
 }
 
-/* ---------------- การ์ดกลุ่มใหญ่ + ขยายหมวดย่อย ---------------- */
-function GroupRow({ group, grandTotal }: { group: SsGroup; grandTotal: number }) {
-  const [open, setOpen] = useState(false);
-  const meta = groupMeta(group.group3);
-  const ratio = grandTotal > 0 ? group.amount / grandTotal : 0;
-  const maxSub = group.subs.reduce((mx, s) => Math.max(mx, s.amount), 0);
+/* ---------------- modal ราย job ของเดือน+กลุ่ม ---------------- */
+function JobsModal({
+  dealerCode,
+  period,
+  group,
+  onClose,
+}: {
+  dealerCode: string | null;
+  period: string;
+  group: string;
+  onClose: () => void;
+}) {
+  const [jobs, setJobs] = useState<SsJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const meta = groupMeta(group);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchServiceSalesJobs(dealerCode, period, group)
+      .then((j) => { if (!cancelled) setJobs(j); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [dealerCode, period, group]);
+
+  const total = jobs.reduce((s, j) => s + j.amount, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between z-10">
+          <div className="min-w-0 flex items-center gap-2">
+            <div className={"w-8 h-8 rounded-lg flex items-center justify-center shrink-0 " + meta.soft + " " + meta.color}>
+              <Icon name={meta.icon} style={{ fontSize: 17 }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[14px] font-bold text-slate-900 truncate">{group}</p>
+              <p className="text-[11px] text-slate-400">{periodLabel(period)} · {jobs.length} งาน · {baht(total)}</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 shrink-0">
+            <Icon name="close" style={{ fontSize: 18 }} />
+          </button>
+        </div>
+        <div className="p-3 space-y-2">
+          {loading ? (
+            <p className="text-[12px] text-slate-400 text-center py-6">กำลังโหลด...</p>
+          ) : jobs.length === 0 ? (
+            <p className="text-[12px] text-slate-400 text-center py-6">ไม่มีงานในกลุ่มนี้</p>
+          ) : (
+            jobs.map((j, i) => (
+              <div key={i} className="rounded-xl border border-slate-100 p-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[12px] font-semibold text-slate-700 flex-1 min-w-0">
+                    {j.subSolutionName || j.solutionName || j.subGroup || "-"}
+                  </p>
+                  <span className="tnum text-[13px] font-bold text-[#a11119] shrink-0">{baht(j.amount)}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-slate-400">
+                  {j.subGroup && (
+                    <span className={"inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold " + meta.soft + " " + meta.color}>
+                      {j.subGroup}
+                    </span>
+                  )}
+                  {j.provinceName && <span className="inline-flex items-center gap-0.5"><Icon name="location_on" style={{ fontSize: 11 }} />{j.provinceName}</span>}
+                  <span className="inline-flex items-center gap-0.5"><Icon name="event" style={{ fontSize: 11 }} />{fmtDate(j.closeDate)}</span>
+                  {j.projectNumber && <span className="text-slate-300">{j.projectNumber}</span>}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- การ์ดเดือน + 3 กลุ่มใต้เดือน ---------------- */
+function MonthCard({
+  month,
+  onOpenJobs,
+}: {
+  month: SsMonthDetail;
+  onOpenJobs: (period: string, group: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <button type="button" onClick={() => setOpen((v) => !v)} className="w-full text-left p-3.5 active:scale-[0.99] transition">
-        <div className="flex items-center gap-2.5">
-          <div className={"w-10 h-10 rounded-xl flex items-center justify-center shrink-0 " + meta.soft + " " + meta.color}>
-            <Icon name={meta.icon} className="text-xl" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-bold text-slate-900">{group.group3}</p>
-            <p className="text-[11px] text-slate-400">{group.jobCount.toLocaleString("th-TH")} งาน · {group.subs.length} หมวดย่อย</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center shrink-0">
+              <Icon name="calendar_month" className="text-xl" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[14px] font-bold text-slate-900">{periodLabel(month.period)}</p>
+              <p className="text-[11px] text-slate-400">{month.jobCount.toLocaleString("th-TH")} งาน · {month.groups.length} กลุ่ม</p>
+            </div>
           </div>
           <div className="text-right shrink-0">
-            <p className="tnum text-[15px] font-bold text-slate-900 leading-none">{baht(group.amount)}</p>
-            <p className="text-[10.5px] text-slate-400 mt-0.5">{Math.round(ratio * 100)}% ของยอดรวม</p>
+            <p className="tnum text-[16px] font-bold text-slate-900 leading-none">{baht(month.amount)}</p>
+            <div className="flex items-center justify-end gap-0.5 mt-1 text-[10px] font-semibold text-slate-400">
+              {open ? "ซ่อนกลุ่มงาน" : "ดูกลุ่มงาน"}
+              <Icon name={open ? "expand_less" : "expand_more"} style={{ fontSize: 14 }} />
+            </div>
           </div>
-        </div>
-        <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-          <div className={"h-full rounded-full " + meta.bar} style={{ width: `${Math.max(3, ratio * 100)}%` }} />
-        </div>
-        <div className="flex items-center justify-end gap-1 mt-1.5 text-[10px] font-semibold text-slate-400">
-          {open ? "ซ่อนหมวดย่อย" : "ดูหมวดย่อย"}
-          <Icon name={open ? "expand_less" : "expand_more"} style={{ fontSize: 14 }} />
         </div>
       </button>
 
       {open && (
-        <div className="border-t border-slate-100 px-3.5 py-2.5 space-y-2 bg-slate-50/50">
-          {group.subs.length === 0 ? (
-            <p className="text-[11px] text-slate-400 text-center py-2">ไม่มีหมวดย่อย</p>
+        <div className="border-t border-slate-100 px-3 py-2.5 space-y-2 bg-slate-50/50">
+          {month.groups.length === 0 ? (
+            <p className="text-[11px] text-slate-400 text-center py-2">ไม่มีกลุ่มงาน</p>
           ) : (
-            group.subs.map((s) => {
-              const r = maxSub > 0 ? s.amount / maxSub : 0;
+            month.groups.map((g) => {
+              const meta = groupMeta(g.group3);
+              const ratio = month.amount > 0 ? g.amount / month.amount : 0;
               return (
-                <div key={s.label} className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-600 w-[150px] shrink-0 truncate">{s.label}</span>
-                  <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div className={"h-full rounded-full " + meta.bar} style={{ width: `${Math.max(4, r * 100)}%` }} />
+                <button
+                  key={g.group3}
+                  type="button"
+                  onClick={() => onOpenJobs(month.period, g.group3)}
+                  className="w-full text-left rounded-xl bg-white border border-slate-100 p-2.5 active:scale-[0.99] hover:border-red-200 transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={"w-7 h-7 rounded-lg flex items-center justify-center shrink-0 " + meta.soft + " " + meta.color}>
+                      <Icon name={meta.icon} style={{ fontSize: 15 }} />
+                    </div>
+                    <p className="text-[12px] font-bold text-slate-800 flex-1 min-w-0 truncate">{g.group3}</p>
+                    <span className="tnum text-[12.5px] font-bold text-slate-900 shrink-0">{baht(g.amount)}</span>
+                    <Icon name="chevron_right" className="text-slate-300 shrink-0" style={{ fontSize: 16 }} />
                   </div>
-                  <span className="tnum text-[11px] font-bold text-slate-700 shrink-0 w-[90px] text-right">{baht(s.amount)}</span>
-                </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className={"h-full rounded-full " + meta.bar} style={{ width: `${Math.max(3, ratio * 100)}%` }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400 shrink-0">{g.jobCount.toLocaleString("th-TH")} งาน</span>
+                  </div>
+                </button>
               );
             })
           )}
@@ -98,9 +208,11 @@ export function ServiceSalesScreen() {
   const router = useRouter();
   const [summary, setSummary] = useState<SsSummary | null>(null);
   const [groups, setGroups] = useState<SsGroup[]>([]);
+  const [months, setMonths] = useState<SsMonthDetail[]>([]);
   const [loading, setLoading] = useState(true);
-  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
+  const [jobsView, setJobsView] = useState<{ period: string; group: string } | null>(null);
 
   const dealerCode = session
     ? session.isAdmin
@@ -115,7 +227,7 @@ export function ServiceSalesScreen() {
     if (ready && session && session.isSales) router.replace("/app/member");
   }, [ready, session, router]);
 
-  // สรุปรวม + รายเดือน
+  // สรุปรวม + รายเดือน (ทุกปี) สำหรับคำนวณปี
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -131,15 +243,20 @@ export function ServiceSalesScreen() {
   const activeYear =
     year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
 
-  // 3 กลุ่มใหญ่ ตามปีที่เลือก
+  // 3 กลุ่มใหญ่ (สรุปปี) + รายเดือน+กลุ่ม ตามปีที่เลือก
   useEffect(() => {
     if (!ready || !session || session.isSales) return;
     let cancelled = false;
-    setGroupsLoading(true);
-    fetchServiceSalesGroups(dealerCode, activeYear)
-      .then((g) => { if (!cancelled) setGroups(g); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setGroupsLoading(false); });
+    setDetailLoading(true);
+    Promise.allSettled([
+      fetchServiceSalesGroups(dealerCode, activeYear),
+      fetchServiceSalesMonths(dealerCode, activeYear),
+    ]).then((res) => {
+      if (cancelled) return;
+      if (res[0].status === "fulfilled") setGroups(res[0].value);
+      if (res[1].status === "fulfilled") setMonths(res[1].value);
+      setDetailLoading(false);
+    });
     return () => { cancelled = true; };
   }, [dealerCode, activeYear, ready, session]);
 
@@ -181,10 +298,10 @@ export function ServiceSalesScreen() {
               {isAdminAll ? " · ทุกร้าน" : ""}
             </p>
             <p className="tnum text-[32px] font-bold leading-none mt-1">
-              {groupsLoading ? "…" : baht(yearTotal)}
+              {detailLoading ? "…" : baht(yearTotal)}
             </p>
             <p className="text-[11px] text-red-100/80 mt-1">
-              {groupsLoading ? "" : `${yearJobs.toLocaleString("th-TH")} งาน · รวม VAT`}
+              {detailLoading ? "" : `${yearJobs.toLocaleString("th-TH")} งาน · รวม VAT`}
             </p>
             <div className="grid grid-cols-3 gap-2 mt-4">
               {["ROOF SERVICE", "SMART SOLUTION", "Qchang"].map((k) => {
@@ -192,7 +309,7 @@ export function ServiceSalesScreen() {
                 return (
                   <div key={k} className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2">
                     <p className="text-[10px] text-red-100/80 truncate">{k === "SMART SOLUTION" ? "SMART" : k === "ROOF SERVICE" ? "ROOF" : "Qchang"}</p>
-                    <p className="tnum text-[12.5px] font-bold">{groupsLoading ? "…" : baht(g?.amount ?? 0)}</p>
+                    <p className="tnum text-[12.5px] font-bold">{detailLoading ? "…" : baht(g?.amount ?? 0)}</p>
                   </div>
                 );
               })}
@@ -212,37 +329,51 @@ export function ServiceSalesScreen() {
           <YearChips years={years} activeYear={activeYear} onSelect={(y) => setYear(y)} />
         )}
 
-        {/* 3 กลุ่มใหญ่ */}
+        {/* รายเดือน -> 3 กลุ่มใต้เดือน -> ราย job */}
         <section>
           <h3 className="text-[15px] font-bold text-slate-900 mb-2.5 flex items-center gap-1.5">
-            <Icon name="category" className="text-lg text-[#d32029]" />
-            ยอดขายตามกลุ่มงานบริการ
+            <Icon name="calendar_month" className="text-lg text-[#d32029]" />
+            ยอดขายรายเดือน
+            {activeYear && <span className="text-[12px] font-semibold text-slate-400">· ปี {Number(activeYear) + 543}</span>}
           </h3>
 
-          {groupsLoading ? (
+          {detailLoading ? (
             <div className="py-8 text-center text-slate-300">
               <Icon name="progress_activity" className="animate-spin text-3xl" />
             </div>
-          ) : groups.length === 0 ? (
+          ) : months.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
               <div className="w-12 h-12 mx-auto rounded-2xl bg-red-50 text-[#d32029] flex items-center justify-center">
                 <Icon name="construction" className="text-2xl" />
               </div>
-              <p className="mt-2 text-[13px] text-slate-500">ยังไม่มียอดขายงานบริการสำหรับร้านนี้</p>
+              <p className="mt-2 text-[13px] text-slate-500">ยังไม่มียอดขายงานบริการในปีนี้</p>
             </div>
           ) : (
             <div className="space-y-2.5">
-              {groups.map((g) => (
-                <GroupRow key={g.group3} group={g} grandTotal={yearTotal} />
+              {months.map((m) => (
+                <MonthCard
+                  key={m.period}
+                  month={m}
+                  onOpenJobs={(period, group) => setJobsView({ period, group })}
+                />
               ))}
             </div>
           )}
         </section>
 
         <p className="text-[11px] text-slate-400 text-center">
-          ยอดขายงานบริการ (รวม VAT) · แบ่ง 3 กลุ่มใหญ่ · เลือกปีได้
+          ยอดขายงานบริการ (รวม VAT) · รายเดือน แบ่ง 3 กลุ่มงาน · กดกลุ่มเพื่อดูราย job
         </p>
       </div>
+
+      {jobsView && (
+        <JobsModal
+          dealerCode={dealerCode}
+          period={jobsView.period}
+          group={jobsView.group}
+          onClose={() => setJobsView(null)}
+        />
+      )}
 
       <BottomNav active="serviceSales" />
     </>
