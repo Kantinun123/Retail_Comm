@@ -22,8 +22,9 @@ export interface CsSummary {
   ok: boolean;
   count: number;         // จำนวนรีวิวทั้งหมด
   avgPct: number;        // 0..1
-  improveTotal: number;  // จำนวนคอมเมนต์ที่ขอให้ปรับปรุง
-  insight: CsInsight[];  // จัดกลุ่มประเด็นปรับปรุงที่พบบ่อย
+  improveTotal: number;  // จำนวนคอมเมนต์ที่ขอให้ปรับปรุงทั้งหมด
+  insightTotal: number;  // คอมเมนต์ปรับปรุงเฉพาะรีวิวที่มีด้านใด < 7 (ฐานของ insight)
+  insight: CsInsight[];  // จัดกลุ่มประเด็นปรับปรุงที่พบบ่อย (จากรีวิวที่มีด้าน < 7)
   months: CsMonth[];
   error?: string;
 }
@@ -38,7 +39,18 @@ export interface CsReview {
   useEstimate: string | null;
   impress: string | null;
   improve: string | null;
+  lowCats: string[];   // ด้านที่คะแนน < 7 (label)
 }
+
+/** label 6 ด้าน (ใช้ร่วมกันทั้ง agg และ review) */
+export const CS_CATEGORY_LABELS: { key: string; label: string }[] = [
+  { key: "welcome", label: "ต้อนรับดูแล เอาใจใส่" },
+  { key: "recommend", label: "แนะนำสินค้า/บริการ ตรงความต้องการ" },
+  { key: "inform", label: "แจ้งระยะเวลา/ขั้นตอนชัดเจน" },
+  { key: "ontime", label: "ได้รับบริการตรงเวลาที่แจ้ง" },
+  { key: "estimate", label: "ระยะเวลาถอดแบบ/ประมาณการ" },
+  { key: "refer", label: "พร้อมแนะนำบอกต่อ" },
+];
 
 /** คะแนนย่อย 6 ด้าน (เฉลี่ยของเดือน) */
 export interface CsCategory {
@@ -107,12 +119,12 @@ function mapAgg(r: RawAgg): CsAgg | null {
     pct: n(r.pct),
     overall: n(r.overall),
     categories: [
-      { key: "welcome", label: "ต้อนรับดูแล เอาใจใส่", score: n(r.q_welcome) },
-      { key: "recommend", label: "แนะนำสินค้า/บริการ ตรงความต้องการ", score: n(r.q_recommend) },
-      { key: "inform", label: "แจ้งระยะเวลา/ขั้นตอนชัดเจน", score: n(r.q_inform) },
-      { key: "ontime", label: "ได้รับบริการตรงเวลาที่แจ้ง", score: n(r.q_ontime) },
-      { key: "estimate", label: "ระยะเวลาถอดแบบ/ประมาณการ", score: n(r.q_estimate) },
-      { key: "refer", label: "พร้อมแนะนำบอกต่อ", score: n(r.q_refer) },
+      { key: "welcome", label: CS_CATEGORY_LABELS[0].label, score: n(r.q_welcome) },
+      { key: "recommend", label: CS_CATEGORY_LABELS[1].label, score: n(r.q_recommend) },
+      { key: "inform", label: CS_CATEGORY_LABELS[2].label, score: n(r.q_inform) },
+      { key: "ontime", label: CS_CATEGORY_LABELS[3].label, score: n(r.q_ontime) },
+      { key: "estimate", label: CS_CATEGORY_LABELS[4].label, score: n(r.q_estimate) },
+      { key: "refer", label: CS_CATEGORY_LABELS[5].label, score: n(r.q_refer) },
     ],
   };
 }
@@ -126,6 +138,7 @@ export async function fetchCustSatSummary(dealerCode: string | null): Promise<Cs
     count?: number | string;
     avg_pct?: number | string;
     improve_total?: number | string;
+    insight_total?: number | string;
     insight?: { label: string; n: number | string }[];
     months?: RawMonth[];
     error?: string;
@@ -135,6 +148,7 @@ export async function fetchCustSatSummary(dealerCode: string | null): Promise<Cs
     count: Number(raw.count ?? 0),
     avgPct: Number(raw.avg_pct ?? 0),
     improveTotal: Number(raw.improve_total ?? 0),
+    insightTotal: Number(raw.insight_total ?? 0),
     insight: Array.isArray(raw.insight) ? raw.insight.map((i) => ({ label: i.label, n: Number(i.n ?? 0) })) : [],
     months: Array.isArray(raw.months) ? raw.months.map(mapMonth) : [],
     error: raw.error,
@@ -163,8 +177,21 @@ type RawReview = {
   use_estimate: string | null;
   impress_text: string | null;
   improve_text: string | null;
+  q_welcome?: number | string | null;
+  q_recommend?: number | string | null;
+  q_inform?: number | string | null;
+  q_ontime?: number | string | null;
+  q_estimate?: number | string | null;
+  q_refer?: number | string | null;
 };
 function mapReview(r: RawReview): CsReview {
+  const cats: (number | string | null | undefined)[] = [
+    r.q_welcome, r.q_recommend, r.q_inform, r.q_ontime, r.q_estimate, r.q_refer,
+  ];
+  const lowCats: string[] = [];
+  cats.forEach((v, i) => {
+    if (v != null && v !== "" && Number(v) < 7) lowCats.push(CS_CATEGORY_LABELS[i].label);
+  });
   return {
     evalDate: r.eval_date,
     overall: Number(r.overall ?? 0),
@@ -174,6 +201,7 @@ function mapReview(r: RawReview): CsReview {
     useEstimate: r.use_estimate,
     impress: r.impress_text,
     improve: r.improve_text,
+    lowCats,
   };
 }
 

@@ -1,8 +1,8 @@
 /* นำเข้า Cust Sat (ความพึงพอใจลูกค้า) -> cust_sat_lines
    -------------------------------------------------------------
    - ไฟล์ A: "Cus Sat - Housing Expert & SCG HOME.xlsx"
-   - รวม sheet "DATA" (ดิบ 2,536) + "Cus Sat - New" (300)
-   - ชื่อสาขา: DATA กระจาย col 24-67 (เอาค่าแรกที่ไม่ว่าง); New = col 3
+   - ใช้เฉพาะ sheet "DATA" เท่านั้น ("Cus Sat - New" เป็น subset ที่รวมอยู่ใน DATA แล้ว)
+   - ชื่อสาขา: DATA กระจาย col 24-67 (เอาค่าแรกที่ไม่ว่าง)
    - map ชื่อสาขา -> dealer_code (normalize + override 3 ร้าน)
    - overall 0-10 -> pct = overall/10
    - idempotent: ลบตารางแล้ว insert ใหม่ (มาจากไฟล์เดียว)
@@ -96,29 +96,6 @@ const missStores = new Map();
       q_ontime: num(row[13]), q_estimate: num(row[15]), q_refer: num(row[17]),
       use_estimate: str(row[14]), impress_text: comment(row[18]), improve_text: comment(row[19]),
       source_sheet: "DATA", source_file: FILE,
-    });
-  }
-}
-
-/* ---------- sheet Cus Sat - New ---------- */
-{
-  const d = XLSX.utils.sheet_to_json(wb.Sheets["Cus Sat - New"], { header: 1, blankrows: false, defval: null });
-  for (let r = 1; r < d.length; r++) {
-    const row = d[r]; if (!row) continue;
-    const date = serialToDate(row[0]);
-    if (!date) continue;
-    const store = str(row[3]);
-    if (!store) continue;
-    const overall = num(row[12]);
-    rows.push({
-      period: date.slice(0, 7), eval_date: date,
-      dealer_code: mapDealer(store), dealer_name: store,
-      region: str(row[1]), purpose: str(row[4]), product: str(row[5]),
-      overall, pct: overall != null ? overall / 10 : null,
-      q_welcome: num(row[6]), q_recommend: num(row[7]), q_inform: num(row[8]),
-      q_ontime: num(row[9]), q_estimate: num(row[11]), q_refer: num(row[13]),
-      use_estimate: str(row[10]), impress_text: comment(row[14]), improve_text: comment(row[15]),
-      source_sheet: "Cus Sat - New", source_file: FILE,
     });
   }
 }

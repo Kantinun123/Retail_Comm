@@ -44,10 +44,12 @@ function MonthDetailModal({
   dealerCode,
   month,
   onClose,
+  onViewLowReviews,
 }: {
   dealerCode: string | null;
   month: CsMonth;
   onClose: () => void;
+  onViewLowReviews: () => void;
 }) {
   const [agg, setAgg] = useState<CsAgg | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,24 +99,45 @@ function MonthDetailModal({
               </div>
               {agg.categories.map((c) => {
                 const ratio = c.score / 10;
-                const good = ratio >= 0.8;
+                const low = c.score < 7;          // ต่ำกว่า 7 = ต้องปรับปรุง (เด่นสีแดง)
+                const good = ratio >= 0.8;        // 8 ขึ้นไป = ดี (เขียว)
+                const barColor = low ? "bg-[#dc2626]" : good ? "bg-emerald-500" : "bg-amber-500";
+                const scoreColor = low ? "text-[#dc2626]" : good ? "text-emerald-600" : "text-amber-600";
                 return (
-                  <div key={c.key} className="rounded-xl border border-slate-100 p-2.5">
+                  <div
+                    key={c.key}
+                    className={"rounded-xl border p-2.5 " + (low ? "border-red-200 bg-red-50" : "border-slate-100")}
+                  >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-[12px] font-semibold text-slate-700 flex-1 min-w-0">{c.label}</p>
-                      <span className={"tnum text-[12px] font-bold shrink-0 " + (good ? "text-emerald-600" : "text-amber-600")}>
+                      <div className="flex-1 min-w-0">
+                        <p className={"text-[12px] font-semibold " + (low ? "text-[#b91c1c]" : "text-slate-700")}>{c.label}</p>
+                        {low && (
+                          <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-red-100 px-2 py-0.5 text-[9.5px] font-bold text-[#b91c1c]">
+                            <Icon name="priority_high" style={{ fontSize: 11 }} />
+                            ต้องปรับปรุง
+                          </span>
+                        )}
+                      </div>
+                      <span className={"tnum text-[12px] font-bold shrink-0 " + scoreColor}>
                         {c.score.toFixed(1)} / 10
                       </span>
                     </div>
                     <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className={"h-full rounded-full " + (good ? "bg-emerald-500" : "bg-amber-500")}
-                        style={{ width: `${Math.min(100, ratio * 100)}%` }}
-                      />
+                      <div className={"h-full rounded-full " + barColor} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
                     </div>
                   </div>
                 );
               })}
+              {agg.categories.some((c) => c.score < 7) && (
+                <button
+                  type="button"
+                  onClick={onViewLowReviews}
+                  className="w-full inline-flex items-center justify-center gap-1 text-[11px] font-bold text-[#c3161c] bg-[#fee2e2] rounded-full py-2 active:scale-95 transition"
+                >
+                  <Icon name="search" style={{ fontSize: 14 }} />
+                  ดูรีวิวของด้านที่คะแนนต่ำ
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -129,14 +152,16 @@ function ReviewsModal({
   dealerCode,
   month,
   onClose,
+  initialFilter = "all",
 }: {
   dealerCode: string | null;
   month: CsMonth;
   onClose: () => void;
+  initialFilter?: ReviewFilter;
 }) {
   const [reviews, setReviews] = useState<CsReview[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<ReviewFilter>("all");
+  const [filter, setFilter] = useState<ReviewFilter>(initialFilter);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,9 +179,10 @@ function ReviewsModal({
   }, [dealerCode, month.period]);
 
   const shown = reviews.filter((r) =>
-    filter === "improve" ? !!r.improve : filter === "low" ? r.overall <= 8 : true
+    filter === "improve" ? !!r.improve : filter === "low" ? r.lowCats.length > 0 : true
   );
   const improveCount = reviews.filter((r) => r.improve).length;
+  const lowCount = reviews.filter((r) => r.lowCats.length > 0).length;
 
   const chip = (key: ReviewFilter, label: string) => (
     <button
@@ -187,7 +213,7 @@ function ReviewsModal({
           <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar">
             {chip("all", `ทั้งหมด (${reviews.length})`)}
             {chip("improve", `มีข้อเสนอแก้ไข (${improveCount})`)}
-            {chip("low", "คะแนนต่ำ (≤8)")}
+            {chip("low", `มีด้านต่ำกว่า 7 (${lowCount})`)}
           </div>
         </div>
         <div className="p-3 space-y-2">
@@ -199,7 +225,7 @@ function ReviewsModal({
             shown.map((r, i) => {
               const hasComment = !!r.improve || !!r.impress;
               const scoreColor = r.overall <= 7 ? "bg-amber-500" : r.overall <= 9 ? "bg-emerald-500" : "bg-emerald-100 text-emerald-700";
-              const highlight = !!r.improve;
+              const highlight = !!r.improve || r.lowCats.length > 0;
               return (
                 <div
                   key={i}
@@ -224,6 +250,16 @@ function ReviewsModal({
                     <div className="mt-1 space-y-0.5">
                       {r.product && <p className="text-[9.5px] text-slate-500 truncate">🏷 {r.product}</p>}
                       {r.purpose && <p className="text-[9.5px] text-slate-500 truncate">🎯 {r.purpose}</p>}
+                    </div>
+                  )}
+                  {r.lowCats.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {r.lowCats.map((lc) => (
+                        <span key={lc} className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-bold text-[#b91c1c]">
+                          <Icon name="trending_down" style={{ fontSize: 10 }} />
+                          {lc}
+                        </span>
+                      ))}
                     </div>
                   )}
                   {r.impress && (
@@ -257,6 +293,7 @@ export function CustSatScreen() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<CsMonth | null>(null);
   const [reviewsMonth, setReviewsMonth] = useState<CsMonth | null>(null);
+  const [reviewsFilter, setReviewsFilter] = useState<"all" | "improve" | "low">("all");
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
   const dealerCode = session
@@ -297,6 +334,7 @@ export function CustSatScreen() {
   const avgPct = summary?.avgPct ?? 0;
   const insight = summary?.insight ?? [];
   const improveTotal = summary?.improveTotal ?? 0;
+  const insightTotal = summary?.insightTotal ?? 0;
 
   return (
     <>
@@ -348,16 +386,17 @@ export function CustSatScreen() {
           </div>
         </section>
 
-        {/* แถบสรุปประเด็นที่ลูกค้าอยากให้ปรับปรุง */}
-        {!loading && improveTotal > 0 && insight.length > 0 && (
+        {/* แถบสรุปประเด็นที่ลูกค้าอยากให้ปรับปรุง (เฉพาะรีวิวที่มีด้านใดได้คะแนน < 7) */}
+        {!loading && insightTotal > 0 && insight.length > 0 && (
           <section className="rounded-2xl bg-orange-50 border border-orange-200 p-3.5">
             <p className="text-[12px] font-bold text-orange-700 flex items-center gap-1.5">
               <Icon name="lightbulb" style={{ fontSize: 15 }} />
-              ประเด็นที่ลูกค้าอยากให้ปรับปรุง ({improveTotal} ความเห็น)
+              ประเด็นที่ควรปรับปรุงเร่งด่วน ({insightTotal} ความเห็น)
             </p>
+            <p className="text-[9.5px] text-orange-500 mt-0.5">คัดเฉพาะรีวิวที่มีคะแนนรายด้านต่ำกว่า 7</p>
             <div className="mt-2 space-y-1.5">
               {insight.slice(0, 5).map((it) => {
-                const ratio = improveTotal > 0 ? it.n / insight[0].n : 0;
+                const ratio = insight[0].n > 0 ? it.n / insight[0].n : 0;
                 return (
                   <div key={it.label} className="flex items-center gap-2">
                     <span className="text-[10.5px] text-orange-900 w-[160px] shrink-0 truncate">{it.label}</span>
@@ -369,7 +408,7 @@ export function CustSatScreen() {
                 );
               })}
             </div>
-            <p className="text-[9px] text-orange-400 mt-2">* จัดกลุ่มจากความเห็น &quot;สิ่งที่ต้องการให้แก้ไข&quot; · กดดูรายรีวิวในแต่ละเดือนด้านล่าง</p>
+            <p className="text-[9px] text-orange-400 mt-2">* จัดกลุ่มจากความเห็น &quot;สิ่งที่ต้องการให้แก้ไข&quot; ของรีวิวที่มีด้านใดต่ำกว่า 7 · จากข้อเสนอทั้งหมด {improveTotal} ความเห็น</p>
           </section>
         )}
 
@@ -431,7 +470,10 @@ export function CustSatScreen() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setReviewsMonth(m)}
+                      onClick={() => {
+                        setReviewsFilter("all");
+                        setReviewsMonth(m);
+                      }}
                       className="flex-1 inline-flex items-center justify-center gap-1 text-[10.5px] font-bold text-[#c3161c] bg-[#fee2e2] rounded-full py-1.5 active:scale-95 transition"
                     >
                       เจาะดูรายรีวิว
@@ -449,8 +491,27 @@ export function CustSatScreen() {
         </p>
       </div>
 
-      {detail && <MonthDetailModal dealerCode={dealerCode} month={detail} onClose={() => setDetail(null)} />}
-      {reviewsMonth && <ReviewsModal dealerCode={dealerCode} month={reviewsMonth} onClose={() => setReviewsMonth(null)} />}
+      {detail && (
+        <MonthDetailModal
+          dealerCode={dealerCode}
+          month={detail}
+          onClose={() => setDetail(null)}
+          onViewLowReviews={() => {
+            const m = detail;
+            setDetail(null);
+            setReviewsFilter("low");
+            setReviewsMonth(m);
+          }}
+        />
+      )}
+      {reviewsMonth && (
+        <ReviewsModal
+          dealerCode={dealerCode}
+          month={reviewsMonth}
+          initialFilter={reviewsFilter}
+          onClose={() => setReviewsMonth(null)}
+        />
+      )}
 
       <BottomNav active="custSat" />
     </>
