@@ -17,6 +17,7 @@ type NavKey =
   | "lhsCommission"
   | "lhsPurchaseDiscount"
   | "storeEval"
+  | "custSat"
   | "analysis"
   | "points"
   | "database"
@@ -131,6 +132,14 @@ const STORE_EVAL_ITEM = {
   label: "ผลตรวจร้าน",
 };
 
+/** เมนูความพึงพอใจของลูกค้า — dealer เข้าผ่าน hub card; admin เห็นในเมนู */
+const CUST_SAT_ITEM = {
+  key: "custSat" as NavKey,
+  href: "/app/cust-sat",
+  icon: "sentiment_satisfied",
+  label: "ความพึงพอใจ",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -162,6 +171,7 @@ export function BottomNav({ active }: { active: NavKey }) {
       LHS_COMMISSION_ITEM,
       LHS_PURCHASE_DISCOUNT_ITEM,
       STORE_EVAL_ITEM,
+      CUST_SAT_ITEM,
       ...baseItems.slice(1),
       DATABASE_ITEM,
       CHAT_ITEM,

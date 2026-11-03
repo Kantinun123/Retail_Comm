@@ -20,6 +20,7 @@ import { fetchBaSummary, type BaSummary } from "@/lib/commission/ba-incentive-st
 import { fetchLhsSummary, type LhsSummary } from "@/lib/commission/lhs-commission-store";
 import { fetchPdSummary, type PdSummary } from "@/lib/commission/lhs-purchase-discount-store";
 import { fetchEvalSummary, type EvalSummary } from "@/lib/commission/store-eval-store";
+import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
 
 function baht(n: number | null): string {
@@ -182,6 +183,7 @@ export function HomeHubScreen() {
   const [ba, setBa] = useState<BaSummary | null>(null);
   const [lhsSum, setLhsSum] = useState<LhsSummary | null>(null);
   const [evalSum, setEvalSum] = useState<EvalSummary | null>(null);
+  const [csSum, setCsSum] = useState<CsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
 
@@ -196,6 +198,7 @@ export function HomeHubScreen() {
       fetchLhsSummary(dealerCode),
       fetchPdSummary(dealerCode),
       fetchEvalSummary(dealerCode),
+      fetchCustSatSummary(dealerCode),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setBm(res[0].value);
@@ -205,6 +208,7 @@ export function HomeHubScreen() {
       if (res[4].status === "fulfilled") setLhsSum(res[4].value);
       if (res[5].status === "fulfilled") setPd(res[5].value);
       if (res[6].status === "fulfilled") setEvalSum(res[6].value);
+      if (res[7].status === "fulfilled") setCsSum(res[7].value);
       setLoading(false);
     });
     return () => {
@@ -261,6 +265,10 @@ export function HomeHubScreen() {
   const evalLatest = evalSum?.latest ?? null;
   const showEval = (evalSum?.count ?? 0) > 0;
 
+  // ความพึงพอใจของลูกค้า (แสดงเฉพาะร้านที่มีข้อมูล)
+  const showCustSat = (csSum?.count ?? 0) > 0;
+  const custSatPct = csSum?.avgPct ?? 0;
+
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
     ...(showBackMargin
@@ -281,6 +289,18 @@ export function HomeHubScreen() {
           loading,
           display: evalLatest ? `${Math.round(evalLatest.pct * 100)}%` : "—",
           badge: evalLatest?.result ? { text: evalLatest.result, pass: evalLatest.result === "ผ่าน" } : null,
+        } as CardData]
+      : []),
+    ...(showCustSat
+      ? [{
+          key: "cust-sat",
+          href: "/app/cust-sat",
+          icon: "sentiment_satisfied",
+          label: "ความพึงพอใจของลูกค้า",
+          sub: "คะแนนเฉลี่ยจากแบบประเมิน",
+          total: null,
+          loading,
+          display: `${Math.round(custSatPct * 100)}%`,
         } as CardData]
       : []),
   ];
