@@ -42,6 +42,26 @@ function fmtDate(iso: string | null): string {
 const pctText = (p: number) => `${Math.round(p * 100)}%`;
 const isPass = (r: string | null) => r === "ผ่าน";
 
+/* จัดกลุ่มข้อย่อยตามพนักงาน (staffNo); null = หมวดร้าน */
+type StaffGroup = { staffNo: number | null; items: EvalItem[]; failCount: number };
+function groupByStaff(items: EvalItem[]): StaffGroup[] {
+  const map = new Map<number | null, EvalItem[]>();
+  for (const it of items) {
+    const k = it.staffNo;
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(it);
+  }
+  const keys = [...map.keys()].sort((a, b) => {
+    if (a === null) return -1;
+    if (b === null) return 1;
+    return a - b;
+  });
+  return keys.map((k) => {
+    const arr = map.get(k)!.slice().sort((x, y) => x.itemNo - y.itemNo);
+    return { staffNo: k, items: arr, failCount: arr.filter((x) => !x.passed).length };
+  });
+}
+
 /* ---------------- แถวหมวด + ขยายข้อย่อย (เฉพาะหมวดไม่เต็ม) ---------------- */
 function CategoryRow({
   categoryKey,
@@ -111,29 +131,44 @@ function CategoryRow({
       </button>
 
       {open && (
-        <div className="mt-2 space-y-1.5 border-t border-amber-200 pt-2">
+        <div className="mt-2 space-y-2 border-t border-amber-200 pt-2">
           {loading ? (
             <p className="text-[11px] text-amber-600 text-center py-2">กำลังโหลด...</p>
           ) : !items || items.length === 0 ? (
             <p className="text-[11px] text-amber-600 text-center py-2">ไม่มีข้อมูลข้อย่อย</p>
           ) : (
-            items.map((it) => (
-              <div
-                key={it.itemNo}
-                className={
-                  "flex items-start gap-2 rounded-lg p-2 " +
-                  (it.passed ? "bg-white/60" : "bg-red-50 border border-red-200")
-                }
-              >
-                <span className={
-                  "w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 " +
-                  (it.passed ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-[#dc2626]")
-                }>
-                  <Icon name={it.passed ? "check" : "close"} style={{ fontSize: 11 }} />
-                </span>
-                <p className={"text-[11px] leading-snug " + (it.passed ? "text-slate-600" : "text-[#b91c1c] font-semibold")}>
-                  {it.itemNo}. {it.itemLabel}
-                </p>
+            groupByStaff(items).map((grp) => (
+              <div key={grp.staffNo ?? "store"} className="space-y-1.5">
+                {grp.staffNo != null && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                      <Icon name="person" style={{ fontSize: 12 }} />
+                      พนักงานคนที่ {grp.staffNo}
+                    </span>
+                    {grp.failCount > 0 && (
+                      <span className="tnum text-[10px] font-semibold text-[#b91c1c]">ตก {grp.failCount} ข้อ</span>
+                    )}
+                  </div>
+                )}
+                {grp.items.map((it) => (
+                  <div
+                    key={`${grp.staffNo ?? "s"}-${it.itemNo}`}
+                    className={
+                      "flex items-start gap-2 rounded-lg p-2 " +
+                      (it.passed ? "bg-white/60" : "bg-red-50 border border-red-200")
+                    }
+                  >
+                    <span className={
+                      "w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 " +
+                      (it.passed ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-[#dc2626]")
+                    }>
+                      <Icon name={it.passed ? "check" : "close"} style={{ fontSize: 11 }} />
+                    </span>
+                    <p className={"text-[11px] leading-snug " + (it.passed ? "text-slate-600" : "text-[#b91c1c] font-semibold")}>
+                      {it.itemNo}. {it.itemLabel}
+                    </p>
+                  </div>
+                ))}
               </div>
             ))
           )}

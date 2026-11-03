@@ -61,6 +61,7 @@ export interface EvalLine {
 /** ข้อย่อยของการตรวจ 1 ครั้ง */
 export interface EvalItem {
   categoryKey: string;
+  staffNo: number | null;   // null = หมวดร้าน (Physical); 1/2/3 = พนักงานคนที่ N
   itemNo: number;
   itemLabel: string;
   passed: boolean;
@@ -219,10 +220,11 @@ export async function fetchEvalMonthLines(dealerCode: string | null, period: str
   return raw.ok && Array.isArray(raw.lines) ? raw.lines.map(mapLine) : [];
 }
 
-type RawItem = { category_key: string; item_no: number | string; item_label: string; passed: boolean };
+type RawItem = { category_key: string; staff_no: number | string | null; item_no: number | string; item_label: string; passed: boolean };
 function mapItem(r: RawItem): EvalItem {
   return {
     categoryKey: r.category_key,
+    staffNo: r.staff_no == null ? null : Number(r.staff_no),
     itemNo: Number(r.item_no ?? 0),
     itemLabel: r.item_label,
     passed: !!r.passed,
