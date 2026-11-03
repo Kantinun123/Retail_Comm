@@ -18,6 +18,7 @@ type NavKey =
   | "lhsPurchaseDiscount"
   | "storeEval"
   | "custSat"
+  | "serviceSales"
   | "analysis"
   | "points"
   | "database"
@@ -140,6 +141,14 @@ const CUST_SAT_ITEM = {
   label: "ความพึงพอใจ",
 };
 
+/** เมนูยอดขายงานบริการ — dealer เข้าผ่าน hub card; admin เห็นในเมนู */
+const SERVICE_SALES_ITEM = {
+  key: "serviceSales" as NavKey,
+  href: "/app/service-sales",
+  icon: "construction",
+  label: "ยอดขายบริการ",
+};
+
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
 
@@ -172,6 +181,7 @@ export function BottomNav({ active }: { active: NavKey }) {
       LHS_PURCHASE_DISCOUNT_ITEM,
       STORE_EVAL_ITEM,
       CUST_SAT_ITEM,
+      SERVICE_SALES_ITEM,
       ...baseItems.slice(1),
       DATABASE_ITEM,
       CHAT_ITEM,

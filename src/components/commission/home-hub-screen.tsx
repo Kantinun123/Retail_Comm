@@ -21,6 +21,7 @@ import { fetchLhsSummary, type LhsSummary } from "@/lib/commission/lhs-commissio
 import { fetchPdSummary, type PdSummary } from "@/lib/commission/lhs-purchase-discount-store";
 import { fetchEvalSummary, type EvalSummary } from "@/lib/commission/store-eval-store";
 import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-store";
+import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
 
 function baht(n: number | null): string {
@@ -184,6 +185,7 @@ export function HomeHubScreen() {
   const [lhsSum, setLhsSum] = useState<LhsSummary | null>(null);
   const [evalSum, setEvalSum] = useState<EvalSummary | null>(null);
   const [csSum, setCsSum] = useState<CsSummary | null>(null);
+  const [ssSum, setSsSum] = useState<SsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
 
@@ -199,6 +201,7 @@ export function HomeHubScreen() {
       fetchPdSummary(dealerCode),
       fetchEvalSummary(dealerCode),
       fetchCustSatSummary(dealerCode),
+      fetchServiceSalesSummary(dealerCode),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setBm(res[0].value);
@@ -209,6 +212,7 @@ export function HomeHubScreen() {
       if (res[5].status === "fulfilled") setPd(res[5].value);
       if (res[6].status === "fulfilled") setEvalSum(res[6].value);
       if (res[7].status === "fulfilled") setCsSum(res[7].value);
+      if (res[8].status === "fulfilled") setSsSum(res[8].value);
       setLoading(false);
     });
     return () => {
@@ -231,6 +235,7 @@ export function HomeHubScreen() {
     ...(ba?.months ?? []),
     ...(lhsSum?.months ?? []),
     ...(showLhsDiscount ? pd?.months ?? [] : []),
+    ...(ssSum?.months ?? []),
   ].map((m) => m.period);
   const years = yearsOf(allPeriods);
   // ปีตั้งต้น = ปีปัจจุบัน ถ้ามีข้อมูล ไม่งั้นปีล่าสุด (null = ทุกปี เมื่อผู้ใช้เลือกเอง)
@@ -268,6 +273,10 @@ export function HomeHubScreen() {
   // ความพึงพอใจของลูกค้า (แสดงเฉพาะร้านที่มีข้อมูล)
   const showCustSat = (csSum?.count ?? 0) > 0;
   const custSatPct = csSum?.avgPct ?? 0;
+
+  // ยอดขายงานบริการ (แยกหัวข้อยอดขาย) — ยอดตามปีที่เลือก
+  const showServiceSales = (ssSum?.count ?? 0) > 0;
+  const serviceSalesTotal = ssSum ? sumByYear(ssSum.months, activeYear, (m) => m.amount) : null;
 
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
@@ -365,6 +374,24 @@ export function HomeHubScreen() {
             ))}
           </div>
         </section>
+
+        {/* กลุ่มยอดขาย (แยกหัวข้อ) */}
+        {showServiceSales && (
+          <section>
+            <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
+              <Icon name="trending_up" style={{ fontSize: 16 }} />
+              ยอดขาย
+            </h3>
+            <SummaryBar
+              icon="construction"
+              label="ยอดขายงานบริการ"
+              total={serviceSalesTotal}
+              loading={loading}
+              note={`${yearLabel} · รวม VAT · 3 กลุ่มงานบริการ`}
+              href="/app/service-sales"
+            />
+          </section>
+        )}
 
         <p className="text-[11px] text-slate-400 text-center">
           เลือกดูผลประโยชน์แต่ละระบบ · ยอดบนการ์ดคือยอดสะสมของร้านนี้
