@@ -117,6 +117,12 @@ function JobsModal({
           ) : (
             jobs.map((j, i) => (
               <div key={i} className="rounded-xl border border-slate-100 p-2.5">
+                {j.customerName && (
+                  <p className="text-[12.5px] font-bold text-slate-900 flex items-center gap-1 mb-0.5">
+                    <Icon name="person" style={{ fontSize: 14 }} className="text-slate-400" />
+                    <span className="truncate">{j.customerName}</span>
+                  </p>
+                )}
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-[12px] font-semibold text-slate-700 flex-1 min-w-0">
                     {j.subSolutionName || j.solutionName || j.subGroup || "-"}
@@ -127,6 +133,16 @@ function JobsModal({
                   {source === null && (
                     <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-500">
                       {SOURCE_META[j.source].short}
+                    </span>
+                  )}
+                  {j.typeOfJob && (
+                    <span
+                      className={
+                        "inline-flex items-center rounded-full px-1.5 py-0.5 font-semibold " +
+                        (j.typeOfJob === "I" ? "bg-emerald-50 text-emerald-600" : "bg-sky-50 text-sky-600")
+                      }
+                    >
+                      {j.typeOfJob === "I" ? "I · ติดตั้ง" : "S · สำรวจ"}
                     </span>
                   )}
                   {j.subGroup && (

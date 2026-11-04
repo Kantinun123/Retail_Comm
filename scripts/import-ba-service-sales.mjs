@@ -30,6 +30,7 @@ for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
 const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 const str = (v) => { const s = String(v ?? "").trim(); return s === "" ? null : s; };
+// หมายเหตุ: customer_name แสดงเฉพาะฝั่ง BA ตามที่ผู้ใช้ยืนยัน (ฝั่ง Rudy ยังตัดชื่อลูกค้าออก)
 const serialToDate = (v) => {
   const n = Number(v);
   if (Number.isFinite(n) && n > 0) { const dt = new Date(Math.round((n - 25569) * 86400 * 1000)); if (!Number.isNaN(dt.getTime())) return dt.toISOString().slice(0, 10); }
@@ -153,6 +154,7 @@ for (const row of byId.values()) {
     dealer_code: dealerCode,
     dealer_name: dealerName,
     store_name: storeName,
+    customer_name: str(S(row, "customer_name")),
     channel_group: S(row, "channel_group"),
     service_group: svc,
     group3,
