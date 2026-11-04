@@ -51,7 +51,7 @@ export interface SsMonthDetail {
   groups: SsMonthGroup[];
 }
 
-/** 1 job — ฝั่ง BA แสดงชื่อลูกค้า (ยืนยันจากผู้ใช้); ฝั่ง Rudy ยังตัด PII (customerName เป็น null เสมอ) */
+/** 1 job — แสดงชื่อลูกค้าทั้ง BA (customer_name) และ LHS/Rudy (project_name) ตามที่ผู้ใช้ยืนยัน */
 export interface SsJob {
   source: SsSource;
   closeDate: string | null;
@@ -64,6 +64,7 @@ export interface SsJob {
   amount: number;
   customerName: string | null;
   typeOfJob: string | null; // 'S' สำรวจ | 'I' ติดตั้ง (เฉพาะ BA)
+  salesName: string | null; // ชื่อพนักงานขาย (เฉพาะ LHS/Rudy: project_created_name_des)
 }
 
 /** ยอดแยกตามแหล่งข้อมูล (rudy/ba) */
@@ -200,6 +201,7 @@ type RawJob = {
   amount_incl_vat: number | string;
   customer_name: string | null;
   type_of_job: string | null;
+  sales_name: string | null;
 };
 function mapJob(r: RawJob): SsJob {
   return {
@@ -214,6 +216,7 @@ function mapJob(r: RawJob): SsJob {
     amount: Number(r.amount_incl_vat ?? 0),
     customerName: r.customer_name,
     typeOfJob: r.type_of_job,
+    salesName: r.sales_name,
   };
 }
 

@@ -154,6 +154,12 @@ function JobsModal({
                   <span className="inline-flex items-center gap-0.5"><Icon name="event" style={{ fontSize: 11 }} />{fmtDate(j.closeDate)}</span>
                   {j.projectNumber && <span className="text-slate-300">{j.projectNumber}</span>}
                 </div>
+                {j.salesName && (
+                  <p className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
+                    <Icon name="badge" style={{ fontSize: 12 }} />
+                    พนักงานขาย: <span className="text-slate-600 font-medium truncate">{j.salesName}</span>
+                  </p>
+                )}
               </div>
             ))
           )}

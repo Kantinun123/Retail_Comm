@@ -97,7 +97,8 @@ for (let r = 1; r < d.length; r++) {
     h3: h3 || null, h4: h4 || null, h5: h5 || null,
     solution_name: str(S(row, "solution_name_des")),
     sub_solution_name: str(S(row, "sub_solution_name_des")),
-    project_name: str(S(row, "project_name")),
+    project_name: str(S(row, "project_name")),        // ชื่อลูกค้า (ผู้ใช้ยืนยันให้แสดง)
+    sales_name: str(S(row, "project_created_name_des")), // ชื่อพนักงานขาย
     project_number: str(S(row, "project_number")),
     province_name: str(S(row, "province_name")),
     amount_incl_vat: amt,
