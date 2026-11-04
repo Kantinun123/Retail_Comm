@@ -186,6 +186,8 @@ export function HomeHubScreen() {
   const [evalSum, setEvalSum] = useState<EvalSummary | null>(null);
   const [csSum, setCsSum] = useState<CsSummary | null>(null);
   const [ssSum, setSsSum] = useState<SsSummary | null>(null);
+  const [ssRudy, setSsRudy] = useState<SsSummary | null>(null);
+  const [ssBa, setSsBa] = useState<SsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
 
@@ -202,6 +204,8 @@ export function HomeHubScreen() {
       fetchEvalSummary(dealerCode),
       fetchCustSatSummary(dealerCode),
       fetchServiceSalesSummary(dealerCode),
+      fetchServiceSalesSummary(dealerCode, "rudy"),
+      fetchServiceSalesSummary(dealerCode, "ba"),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setBm(res[0].value);
@@ -213,6 +217,8 @@ export function HomeHubScreen() {
       if (res[6].status === "fulfilled") setEvalSum(res[6].value);
       if (res[7].status === "fulfilled") setCsSum(res[7].value);
       if (res[8].status === "fulfilled") setSsSum(res[8].value);
+      if (res[9].status === "fulfilled") setSsRudy(res[9].value);
+      if (res[10].status === "fulfilled") setSsBa(res[10].value);
       setLoading(false);
     });
     return () => {
@@ -277,6 +283,19 @@ export function HomeHubScreen() {
   // ยอดขายงานบริการ (แยกหัวข้อยอดขาย) — ยอดตามปีที่เลือก
   const showServiceSales = (ssSum?.count ?? 0) > 0;
   const serviceSalesTotal = ssSum ? sumByYear(ssSum.months, activeYear, (m) => m.amount) : null;
+  const salesRudy = ssRudy ? sumByYear(ssRudy.months, activeYear, (m) => m.amount) : null;
+  const salesBa = ssBa ? sumByYear(ssBa.months, activeYear, (m) => m.amount) : null;
+  const pctOfSales = (v: number | null) =>
+    v == null || serviceSalesTotal == null || serviceSalesTotal <= 0 ? null : (v / serviceSalesTotal) * 100;
+  // การ์ดย่อยแยกตามแหล่งข้อมูล (แสดงเฉพาะแหล่งที่มีข้อมูล)
+  const salesCards: CardData[] = [
+    ...((ssRudy?.count ?? 0) > 0
+      ? [{ key: "sales-lhs", href: "/app/service-sales/lhs", icon: "roofing", label: "ยอดขาย LHS/Rudy", sub: "งานบริการหลังคาและโซลูชัน (รวม VAT)", total: salesRudy, loading, pct: pctOfSales(salesRudy) } as CardData]
+      : []),
+    ...((ssBa?.count ?? 0) > 0
+      ? [{ key: "sales-ba", href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง รายวัน (gmv)", total: salesBa, loading, pct: pctOfSales(salesBa) } as CardData]
+      : []),
+  ];
 
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
@@ -384,12 +403,19 @@ export function HomeHubScreen() {
             </h3>
             <SummaryBar
               icon="construction"
-              label="ยอดขายงานบริการ"
+              label="รวมยอดขายงานบริการ"
               total={serviceSalesTotal}
               loading={loading}
-              note={`${yearLabel} · รวม VAT · 3 กลุ่มงานบริการ`}
+              note={`${yearLabel} · LHS/Rudy + BA · 3 กลุ่มงานบริการ`}
               href="/app/service-sales"
             />
+            {salesCards.length > 0 && (
+              <div className="grid grid-cols-2 gap-2.5 mt-2.5">
+                {salesCards.map((c) => (
+                  <HubCard key={c.key} c={c} />
+                ))}
+              </div>
+            )}
           </section>
         )}
 

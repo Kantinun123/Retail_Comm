@@ -2,10 +2,12 @@
 
 /* =============================================================
    ยอดขายงานบริการ (Service Sales) — client data layer
-   อ่านผ่าน /api/service-sales
+   อ่านผ่าน /api/service-sales — รวม 2 แหล่ง: 'rudy' (LHS/Rudy) + 'ba' (BA ร้านค้า)
    - dealer: เห็นเฉพาะยอดของร้านตัวเอง
    - admin: เห็นรวมทุกร้าน + ยอด "ไม่ระบุร้าน"
    ============================================================= */
+
+export type SsSource = "rudy" | "ba";
 
 export interface SsMonth {
   period: string;    // 'YYYY-MM'
@@ -51,6 +53,7 @@ export interface SsMonthDetail {
 
 /** 1 job (ตัด PII ชื่อลูกค้า) */
 export interface SsJob {
+  source: SsSource;
   closeDate: string | null;
   group3: string;
   subGroup: string | null;
@@ -61,11 +64,18 @@ export interface SsJob {
   amount: number;
 }
 
+/** ยอดแยกตามแหล่งข้อมูล (rudy/ba) */
+export interface SsSourceAmount {
+  source: SsSource;
+  amount: number;
+  jobCount: number;
+}
+
 /* ---------------- cache + pub/sub ---------------- */
 const summaryCache = new Map<string, SsSummary>();
 const listeners = new Set<() => void>();
-function keyOf(dealerCode: string | null): string {
-  return dealerCode || "__all__";
+function keyOf(dealerCode: string | null, source: SsSource | null): string {
+  return (dealerCode || "__all__") + "|" + (source ?? "__both__");
 }
 function emit() {
   listeners.forEach((l) => l());
@@ -76,8 +86,8 @@ export function subscribeServiceSales(cb: () => void): () => void {
     listeners.delete(cb);
   };
 }
-export function getCachedServiceSalesSummary(dealerCode: string | null): SsSummary | null {
-  return summaryCache.get(keyOf(dealerCode)) ?? null;
+export function getCachedServiceSalesSummary(dealerCode: string | null, source: SsSource | null = null): SsSummary | null {
+  return summaryCache.get(keyOf(dealerCode, source)) ?? null;
 }
 
 /* ---------------- map helpers ---------------- */
@@ -104,9 +114,12 @@ function mapGroup(r: RawGroup): SsGroup {
 }
 
 /* ---------------- API calls ---------------- */
-export async function fetchServiceSalesSummary(dealerCode: string | null): Promise<SsSummary> {
-  const q = dealerCode ? `?dealerCode=${encodeURIComponent(dealerCode)}` : "";
-  const res = await fetch(`/api/service-sales${q}`, { method: "GET", cache: "no-store" });
+export async function fetchServiceSalesSummary(dealerCode: string | null, source: SsSource | null = null): Promise<SsSummary> {
+  const params = new URLSearchParams();
+  if (dealerCode) params.set("dealerCode", dealerCode);
+  if (source) params.set("source", source);
+  const qs = params.toString();
+  const res = await fetch(`/api/service-sales${qs ? `?${qs}` : ""}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as {
     ok?: boolean;
     count?: number | string;
@@ -122,16 +135,21 @@ export async function fetchServiceSalesSummary(dealerCode: string | null): Promi
     error: raw.error,
   };
   if (summary.ok) {
-    summaryCache.set(keyOf(dealerCode), summary);
+    summaryCache.set(keyOf(dealerCode, source), summary);
     emit();
   }
   return summary;
 }
 
-export async function fetchServiceSalesGroups(dealerCode: string | null, year: string | null): Promise<SsGroup[]> {
+export async function fetchServiceSalesGroups(
+  dealerCode: string | null,
+  year: string | null,
+  source: SsSource | null = null
+): Promise<SsGroup[]> {
   const params = new URLSearchParams({ mode: "groups" });
   if (dealerCode) params.set("dealerCode", dealerCode);
   if (year) params.set("year", year);
+  if (source) params.set("source", source);
   const res = await fetch(`/api/service-sales?${params.toString()}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as { ok?: boolean; groups?: RawGroup[] };
   return raw.ok && Array.isArray(raw.groups) ? raw.groups.map(mapGroup) : [];
@@ -154,16 +172,22 @@ function mapMonthDetail(r: RawMonthDetail): SsMonthDetail {
   };
 }
 
-export async function fetchServiceSalesMonths(dealerCode: string | null, year: string | null): Promise<SsMonthDetail[]> {
+export async function fetchServiceSalesMonths(
+  dealerCode: string | null,
+  year: string | null,
+  source: SsSource | null = null
+): Promise<SsMonthDetail[]> {
   const params = new URLSearchParams({ mode: "months" });
   if (dealerCode) params.set("dealerCode", dealerCode);
   if (year) params.set("year", year);
+  if (source) params.set("source", source);
   const res = await fetch(`/api/service-sales?${params.toString()}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as { ok?: boolean; months?: RawMonthDetail[] };
   return raw.ok && Array.isArray(raw.months) ? raw.months.map(mapMonthDetail) : [];
 }
 
 type RawJob = {
+  source: SsSource;
   close_date: string | null;
   group3: string;
   sub_group: string | null;
@@ -175,6 +199,7 @@ type RawJob = {
 };
 function mapJob(r: RawJob): SsJob {
   return {
+    source: r.source,
     closeDate: r.close_date,
     group3: r.group3,
     subGroup: r.sub_group,
@@ -189,12 +214,29 @@ function mapJob(r: RawJob): SsJob {
 export async function fetchServiceSalesJobs(
   dealerCode: string | null,
   period: string,
-  group: string | null
+  group: string | null,
+  source: SsSource | null = null
 ): Promise<SsJob[]> {
   const params = new URLSearchParams({ mode: "jobs", period });
   if (dealerCode) params.set("dealerCode", dealerCode);
   if (group) params.set("group", group);
+  if (source) params.set("source", source);
   const res = await fetch(`/api/service-sales?${params.toString()}`, { method: "GET", cache: "no-store" });
   const raw = (await res.json()) as { ok?: boolean; jobs?: RawJob[] };
   return raw.ok && Array.isArray(raw.jobs) ? raw.jobs.map(mapJob) : [];
+}
+
+type RawSource = { source: SsSource; amount: number | string; job_count: number | string };
+function mapSource(r: RawSource): SsSourceAmount {
+  return { source: r.source, amount: Number(r.amount ?? 0), jobCount: Number(r.job_count ?? 0) };
+}
+
+/** ยอดแยกตามแหล่ง (rudy/ba) ของปีที่เลือก — ใช้โชว์การ์ดย่อย "ยอดขาย LHS/Rudy" / "ยอดขาย BA" */
+export async function fetchServiceSalesSources(dealerCode: string | null, year: string | null): Promise<SsSourceAmount[]> {
+  const params = new URLSearchParams({ mode: "sources" });
+  if (dealerCode) params.set("dealerCode", dealerCode);
+  if (year) params.set("year", year);
+  const res = await fetch(`/api/service-sales?${params.toString()}`, { method: "GET", cache: "no-store" });
+  const raw = (await res.json()) as { ok?: boolean; sources?: RawSource[] };
+  return raw.ok && Array.isArray(raw.sources) ? raw.sources.map(mapSource) : [];
 }

@@ -21,11 +21,20 @@ import {
   fetchServiceSalesGroups,
   fetchServiceSalesMonths,
   fetchServiceSalesJobs,
+  fetchServiceSalesSources,
   type SsSummary,
   type SsGroup,
   type SsMonthDetail,
   type SsJob,
+  type SsSource,
+  type SsSourceAmount,
 } from "@/lib/commission/service-sales-store";
+
+/** ข้อมูลประจำแหล่งข้อมูล (หัวข้อ + ลิงก์หน้า detail) */
+const SOURCE_META: Record<SsSource, { label: string; short: string; icon: string; href: string }> = {
+  rudy: { label: "ยอดขาย LHS/Rudy", short: "LHS/Rudy", icon: "roofing", href: "/app/service-sales/lhs" },
+  ba: { label: "ยอดขาย BA", short: "BA", icon: "home_repair_service", href: "/app/service-sales/ba" },
+};
 
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 0 });
@@ -59,11 +68,13 @@ function JobsModal({
   dealerCode,
   period,
   group,
+  source,
   onClose,
 }: {
   dealerCode: string | null;
   period: string;
   group: string;
+  source: SsSource | null;
   onClose: () => void;
 }) {
   const [jobs, setJobs] = useState<SsJob[]>([]);
@@ -72,12 +83,12 @@ function JobsModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetchServiceSalesJobs(dealerCode, period, group)
+    fetchServiceSalesJobs(dealerCode, period, group, source)
       .then((j) => { if (!cancelled) setJobs(j); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [dealerCode, period, group]);
+  }, [dealerCode, period, group, source]);
 
   const total = jobs.reduce((s, j) => s + j.amount, 0);
 
@@ -113,6 +124,11 @@ function JobsModal({
                   <span className="tnum text-[13px] font-bold text-[#a11119] shrink-0">{baht(j.amount)}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-slate-400">
+                  {source === null && (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-500">
+                      {SOURCE_META[j.source].short}
+                    </span>
+                  )}
                   {j.subGroup && (
                     <span className={"inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold " + meta.soft + " " + meta.color}>
                       {j.subGroup}
@@ -202,13 +218,16 @@ function MonthCard({
   );
 }
 
-export function ServiceSalesScreen() {
+/** source: null = รวมทุกแหล่ง, 'rudy' = LHS/Rudy, 'ba' = BA ร้านค้า */
+export function ServiceSalesScreen({ source = null }: { source?: SsSource | null }) {
   const { session, ready } = useSession();
   const homeHref = useHomeHref();
   const router = useRouter();
   const [summary, setSummary] = useState<SsSummary | null>(null);
   const [groups, setGroups] = useState<SsGroup[]>([]);
   const [months, setMonths] = useState<SsMonthDetail[]>([]);
+  const [sources, setSources] = useState<SsSourceAmount[]>([]);
+  const pageTitle = source ? SOURCE_META[source].label : "ยอดขายงานบริการ (รวม)";
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
@@ -231,12 +250,12 @@ export function ServiceSalesScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchServiceSalesSummary(dealerCode)
+    fetchServiceSalesSummary(dealerCode, source)
       .then((s) => { if (!cancelled) setSummary(s); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [dealerCode]);
+  }, [dealerCode, source]);
 
   const years = useMemo(() => yearsOf((summary?.months ?? []).map((m) => m.period)), [summary]);
   const curYear = String(new Date().getFullYear());
@@ -249,16 +268,18 @@ export function ServiceSalesScreen() {
     let cancelled = false;
     setDetailLoading(true);
     Promise.allSettled([
-      fetchServiceSalesGroups(dealerCode, activeYear),
-      fetchServiceSalesMonths(dealerCode, activeYear),
+      fetchServiceSalesGroups(dealerCode, activeYear, source),
+      fetchServiceSalesMonths(dealerCode, activeYear, source),
+      source === null ? fetchServiceSalesSources(dealerCode, activeYear) : Promise.resolve([] as SsSourceAmount[]),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setGroups(res[0].value);
       if (res[1].status === "fulfilled") setMonths(res[1].value);
+      if (res[2].status === "fulfilled") setSources(res[2].value);
       setDetailLoading(false);
     });
     return () => { cancelled = true; };
-  }, [dealerCode, activeYear, ready, session]);
+  }, [dealerCode, activeYear, source, ready, session]);
 
   if (!ready || !session) return null;
   if (session.isSales) return null;
@@ -274,7 +295,7 @@ export function ServiceSalesScreen() {
           <Link href={homeHref} className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#a11119] active:scale-95 transition">
             <Icon name="arrow_back" className="text-xl" />
           </Link>
-          <span className="font-bold text-[16px] text-[#231313]">ยอดขายงานบริการ</span>
+          <span className="font-bold text-[16px] text-[#231313]">{pageTitle}</span>
         </div>
         <button
           onClick={() => { doLogout(); router.replace("/"); }}
@@ -294,14 +315,18 @@ export function ServiceSalesScreen() {
           <div className="relative">
             <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
               <Icon name="construction" style={{ fontSize: 16 }} />
-              ยอดขายงานบริการ {activeYear ? `ปี ${Number(activeYear) + 543}` : "ทุกปี"}
+              {source ? SOURCE_META[source].label : "ยอดขายงานบริการ (รวม)"} {activeYear ? `ปี ${Number(activeYear) + 543}` : "ทุกปี"}
               {isAdminAll ? " · ทุกร้าน" : ""}
             </p>
             <p className="tnum text-[32px] font-bold leading-none mt-1">
               {detailLoading ? "…" : baht(yearTotal)}
             </p>
             <p className="text-[11px] text-red-100/80 mt-1">
-              {detailLoading ? "" : `${yearJobs.toLocaleString("th-TH")} งาน · รวม VAT`}
+              {detailLoading
+                ? ""
+                : `${yearJobs.toLocaleString("th-TH")} งาน · ${
+                    source === "rudy" ? "รวม VAT" : source === "ba" ? "ยอด gmv" : "LHS/Rudy รวม VAT · BA ยอด gmv"
+                  }`}
             </p>
             <div className="grid grid-cols-3 gap-2 mt-4">
               {["ROOF SERVICE", "SMART SOLUTION", "Qchang"].map((k) => {
@@ -317,10 +342,37 @@ export function ServiceSalesScreen() {
           </div>
         </section>
 
+        {/* โหมดรวม: การ์ดย่อยแยกตามแหล่งข้อมูล (กดเข้าดูรายละเอียดของแต่ละแหล่ง) */}
+        {source === null && (
+          <section className="grid grid-cols-2 gap-2.5">
+            {(["rudy", "ba"] as SsSource[]).map((k) => {
+              const meta = SOURCE_META[k];
+              const s = sources.find((x) => x.source === k);
+              return (
+                <Link
+                  key={k}
+                  href={meta.href}
+                  className="rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 active:scale-[0.98] hover:border-red-200 transition"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-9 h-9 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center">
+                      <Icon name={meta.icon} style={{ fontSize: 19 }} />
+                    </div>
+                    <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
+                  </div>
+                  <p className="text-[12.5px] font-bold text-slate-900 mt-2 leading-tight">{meta.label}</p>
+                  <p className="tnum text-[15px] font-bold text-[#a11119] mt-1">{detailLoading ? "…" : baht(s?.amount ?? 0)}</p>
+                  <p className="text-[10px] text-slate-400">{detailLoading ? "" : `${(s?.jobCount ?? 0).toLocaleString("th-TH")} งาน`}</p>
+                </Link>
+              );
+            })}
+          </section>
+        )}
+
         {isAdminAll && (
           <p className="text-[10.5px] text-slate-400 flex items-center gap-1 px-1">
             <Icon name="info" style={{ fontSize: 13 }} />
-            ยอดรวมนี้รวมงานที่ยังระบุร้านไม่ได้ (เช่น Onetime / SCG Home)
+            ยอดรวมนี้รวมงานที่ยังระบุร้านไม่ได้ (เช่น Onetime / SCG Home / ร้าน Q-CHANG ที่ไม่อยู่ในระบบ)
           </p>
         )}
 
@@ -362,7 +414,11 @@ export function ServiceSalesScreen() {
         </section>
 
         <p className="text-[11px] text-slate-400 text-center">
-          ยอดขายงานบริการ (รวม VAT) · รายเดือน แบ่ง 3 กลุ่มงาน · กดกลุ่มเพื่อดูราย job
+          {source === "ba"
+            ? "ยอดขายงานบริการ BA รายวัน (gmv รวมค่าสำรวจ+ติดตั้ง) · รายเดือน แบ่ง 3 กลุ่มงาน · กดกลุ่มเพื่อดูราย job"
+            : source === "rudy"
+              ? "ยอดขายงานบริการ LHS/Rudy (รวม VAT) · รายเดือน แบ่ง 3 กลุ่มงาน · กดกลุ่มเพื่อดูราย job"
+              : "ยอดขายงานบริการรวม 2 แหล่ง (LHS/Rudy รวม VAT · BA ยอด gmv) · กดกลุ่มเพื่อดูราย job"}
         </p>
       </div>
 
@@ -371,6 +427,7 @@ export function ServiceSalesScreen() {
           dealerCode={dealerCode}
           period={jobsView.period}
           group={jobsView.group}
+          source={source}
           onClose={() => setJobsView(null)}
         />
       )}
