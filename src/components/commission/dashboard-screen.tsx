@@ -32,6 +32,7 @@ import {
 import { getDataset } from "@/lib/commission/dataset";
 import { storeTable, empTable } from "@/lib/commission/sales-table";
 import { doLogout, setStoreFilter, useSession } from "@/lib/commission/session";
+import { ViewModeBar } from "./view-mode-bar";
 import { getProfileOverride } from "@/lib/commission/profile";
 import { downloadSales } from "@/lib/commission/excel";
 import type { FilterState, GroupKey, Sale } from "@/lib/commission/types";
@@ -346,6 +347,13 @@ export function DashboardScreen({
           </div>
         )}
       </header>
+
+      {/* แถบมุมมอง admin: ดูหน้าในมุมมองร้านค้า/พนักงาน */}
+      {isAdminView && (
+        <div className="mt-3">
+          <ViewModeBar />
+        </div>
+      )}
 
       {/* Hero Commission Card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#8f1114] to-[#d32029] p-5 text-white shadow-lg shadow-[#d32029]/25 mt-3 animate-fade-up">

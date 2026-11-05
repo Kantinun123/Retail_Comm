@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { DataTable, money2, type TableDef } from "./data-table";
-import { useSession } from "@/lib/commission/session";
+import { useSession, useHomeHref } from "@/lib/commission/session";
 import {
   applyUpload,
   getDataset,
@@ -230,11 +230,12 @@ export function DatabaseScreen() {
 
 /* ---------- header ---------- */
 function SimpleHeader() {
+  const homeHref = useHomeHref();
   return (
     <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
       <div className="flex items-center space-x-2.5">
         <Link
-          href="/app/dashboard"
+          href={homeHref}
           className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
         >
           <Icon name="arrow_back" className="text-xl" />

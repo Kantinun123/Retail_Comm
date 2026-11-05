@@ -162,30 +162,22 @@ export function BottomNav({ active }: { active: NavKey }) {
       : item
   );
 
+  // admin ที่กำลัง "ดูในมุมมอง" ให้เมนูล่างเป็นแบบ role ที่กำลังดู (เหมือนร้านค้า/พนักงานจริง)
+  const adminViewMode = session?.adminViewMode ?? "admin";
+  const inStoreView = isAdmin && adminViewMode === "store";
+  const inStaffView = isAdmin && adminViewMode === "staff";
+
   let items: { key: NavKey; href: string; icon: string; label: string }[];
-  if (isDealer) {
-    // ร้านค้าตัวแทน: หน้าหลัก (Hub) + ผลประโยชน์ร้านค้า + ผลประโยชน์พนักงาน + สอบถาม (+ กระดิ่ง + ฉัน)
-    // ร้านค้าตัวแทน: หน้าหลัก (Hub) รวมทุกเมนูผลประโยชน์ -> bottom-nav เหลือ หน้าหลัก + สอบถาม (+ กระดิ่ง + ฉัน)
-    // ทางเข้า "รวมผลประโยชน์ร้านค้า/พนักงาน" อยู่ที่แถบในหน้าหลักแล้ว
-    items = [HOME_ITEM, CHAT_ITEM];
-  } else if (isAdmin) {
-    // ผู้ดูแลระบบ: เมนูเต็มเหมือนเดิม
+  if (inStaffView) {
+    // admin ดูมุมมองพนักงาน: หน้าหลักพนักงาน + สอบถาม
     items = [
-      baseItems[0],
-      STAFF_INCENTIVE_ITEM,
-      BACK_MARGIN_ITEM,
-      COMMISSION_PRODUCT_ITEM,
-      BA_INCENTIVE_ITEM,
-      BA_PROFIT_SHARE_ITEM,
-      LHS_COMMISSION_ITEM,
-      LHS_PURCHASE_DISCOUNT_ITEM,
-      STORE_EVAL_ITEM,
-      CUST_SAT_ITEM,
-      SERVICE_SALES_ITEM,
-      ...baseItems.slice(1),
-      DATABASE_ITEM,
+      { key: "home", href: "/app/home-staff", icon: "home", label: "หน้าหลัก" },
       CHAT_ITEM,
     ];
+  } else if (isDealer || inStoreView || isAdmin) {
+    // ร้านค้าตัวแทน + admin (Hub ทุกร้าน / ดูมุมมองร้านค้า): หน้าหลัก + สอบถาม (+ กระดิ่ง + ฉัน)
+    // เมนูจัดการของ admin (ฐานข้อมูล ฯลฯ) เข้าผ่านการ์ดในหน้าหลักแทน
+    items = [HOME_ITEM, CHAT_ITEM];
   } else {
     // พนักงานขาย (sales): หน้าหลัก (Hub พนักงาน) + สอบถาม (+ กระดิ่ง + ฉัน)
     items = [

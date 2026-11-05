@@ -16,6 +16,7 @@ import { fetchCommissionSummary, type CommissionSummary } from "@/lib/commission
 import { fetchBaSummary, type BaSummary } from "@/lib/commission/ba-incentive-store";
 import { fetchLhsSummary, type LhsSummary } from "@/lib/commission/lhs-commission-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
+import { ViewModeBar } from "./view-mode-bar";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -71,7 +72,9 @@ function HubCard({ c }: { c: CardData }) {
 export function HomeStaffHubScreen() {
   const { session, ready } = useSession();
   const router = useRouter();
-  const repCode = session?.repCode ?? null;
+  // sales = ตัวเอง ; admin ที่ "ดูในมุมมองพนักงาน" = rep ที่เลือก
+  const adminStaffView = !!session?.isAdmin && session.adminViewMode === "staff" && !!session.adminViewRep;
+  const repCode = adminStaffView ? session!.adminViewRep : (session?.repCode ?? null);
 
   const [cp, setCp] = useState<CommissionSummary | null>(null);
   const [ba, setBa] = useState<BaSummary | null>(null);
@@ -79,12 +82,13 @@ export function HomeStaffHubScreen() {
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined);
 
-  // หน้านี้เฉพาะพนักงานขาย; role อื่นกลับหน้าของตัวเอง
+  // หน้านี้เฉพาะพนักงานขาย (หรือ admin ที่กำลังดูมุมมองพนักงาน); role อื่นกลับหน้าของตัวเอง
+  // admin ที่ออกจากมุมมองพนักงาน -> กลับหน้าหลัก admin (/app/home = การ์ด launcher)
   useEffect(() => {
-    if (ready && session && !session.isSales) {
-      router.replace(session.isAdmin ? "/app/dashboard" : "/app/home");
+    if (ready && session && !session.isSales && !adminStaffView) {
+      router.replace("/app/home");
     }
-  }, [ready, session, router]);
+  }, [ready, session, router, adminStaffView]);
 
   useEffect(() => {
     if (!repCode) return;
@@ -107,7 +111,7 @@ export function HomeStaffHubScreen() {
   }, [repCode]);
 
   if (!ready || !session) return null;
-  if (!session.isSales) return null;
+  if (!session.isSales && !adminStaffView) return null;
 
   const years = yearsOf([
     ...(cp?.months ?? []),
@@ -154,6 +158,16 @@ export function HomeStaffHubScreen() {
       </header>
 
       <div className="space-y-5 pb-4">
+        {/* แถบมุมมอง admin (เฉพาะ admin ที่กำลังดูมุมมองพนักงาน) */}
+        {session.isAdmin && <ViewModeBar />}
+
+        {adminStaffView && session.adminViewRepName && (
+          <div className="rounded-xl bg-violet-50 border border-violet-200 px-3 py-2 text-[12px] text-violet-800 flex items-center gap-1.5">
+            <Icon name="visibility" style={{ fontSize: 15 }} />
+            กำลังดูมุมมองพนักงาน: <span className="font-bold">{session.adminViewRepName}</span>
+          </div>
+        )}
+
         <ProfileCard />
 
         {years.length > 0 && (

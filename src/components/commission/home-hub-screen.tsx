@@ -23,6 +23,7 @@ import { fetchEvalSummary, type EvalSummary } from "@/lib/commission/store-eval-
 import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-store";
 import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
+import { ViewModeBar } from "./view-mode-bar";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -168,12 +169,22 @@ export function HomeHubScreen() {
   const { session, ready } = useSession();
   const router = useRouter();
 
-  const dealerCode = session && !session.isAdmin && !session.isSales ? session.dealer.code : null;
+  // ร้านที่ดู:
+  //  - dealer      = ร้านตัวเอง
+  //  - admin       = Hub แบบ "ทุกร้าน" (dealerCode = null) หรือร้านที่เจาะผ่าน storeFilter
+  //  - admin เจาะมุมมองร้านค้า (store view) = ร้านที่เลือก
+  const adminStoreView = !!session?.isAdmin && session.adminViewMode === "store" && !!session.adminViewDealer;
+  const dealerCode = session
+    ? session.isAdmin
+      ? (adminStoreView ? session.adminViewDealer : session.storeFilter)
+      : !session.isSales
+        ? session.dealer.code
+        : null
+    : null;
 
-  // Hub (ร้านค้า) — admin -> dashboard, sales -> Hub พนักงาน
+  // Hub = หน้าแรกของ dealer + admin (admin เห็นเวอร์ชันทุกร้าน) ; sales -> Hub พนักงาน
   useEffect(() => {
-    if (ready && session && session.isAdmin) router.replace("/app/dashboard");
-    else if (ready && session && session.isSales) router.replace("/app/home-staff");
+    if (ready && session && session.isSales) router.replace("/app/home-staff");
   }, [ready, session, router]);
 
   // summary เต็มแต่ละระบบ (เก็บ months ไว้กรองปี)
@@ -228,10 +239,12 @@ export function HomeHubScreen() {
 
   if (!ready || !session) return null;
 
-  // Back Margin + LHS Channel Discount แสดงเฉพาะร้าน Housing Expert เท่านั้น (SCG Home ซ่อน)
+  // Back Margin + LHS Channel Discount = เฉพาะร้าน Housing Expert (SCG Home ซ่อน)
+  // admin ที่ดู "ทุกร้าน" (ไม่เจาะร้าน) ให้แสดงทั้งคู่ (เพราะรวมทุกประเภท)
+  const adminAllStores = session.isAdmin && !dealerCode;
   const isHousingExpert = session.dealer?.model === "Housing Expert";
-  const showLhsDiscount = isHousingExpert;
-  const showBackMargin = isHousingExpert;
+  const showLhsDiscount = adminAllStores || isHousingExpert;
+  const showBackMargin = adminAllStores || isHousingExpert;
 
   // รวมทุก period จากทุกระบบ -> รายการปีที่มีข้อมูล
   const allPeriods = [
@@ -359,6 +372,16 @@ export function HomeHubScreen() {
       </header>
 
       <div className="space-y-5 pb-4">
+        {/* แถบมุมมอง admin (เฉพาะ admin) — ดูหน้านี้ในมุมมองร้านค้า */}
+        {session.isAdmin && <ViewModeBar />}
+
+        {adminStoreView && (
+          <div className="rounded-xl bg-violet-50 border border-violet-200 px-3 py-2 text-[12px] text-violet-800 flex items-center gap-1.5">
+            <Icon name="visibility" style={{ fontSize: 15 }} />
+            กำลังดูมุมมองร้านค้า: <span className="font-bold">{session.dealer.name}</span>
+          </div>
+        )}
+
         <ProfileCard />
 
         {/* เลือกปี */}

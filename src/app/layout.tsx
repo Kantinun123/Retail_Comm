@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Prompt } from "next/font/google";
 import "./globals.css";
 
@@ -6,6 +6,18 @@ export const metadata: Metadata = {
   title: "Retail-COMM | Commission Portal",
   description:
     "ระบบดูค่าคอมมิชชั่นการขาย Solution สำหรับร้านค้าตัวแทนจำหน่ายและพนักงานขายในเครือ SCG Network",
+  // PWA: เพิ่มลงหน้าจอหลักได้ (ช่วยให้ร้านค้าเปิดแอปแล้วอยู่ในสถานะล็อกอินต่อเนื่อง)
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Retail-COMM",
+    statusBarStyle: "default",
+  },
+  icons: { apple: "/favicon.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#d32029",
 };
 
 const prompt = Prompt({

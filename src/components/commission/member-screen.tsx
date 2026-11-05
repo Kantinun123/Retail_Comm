@@ -21,7 +21,7 @@ import {
   pointsRankEmployees,
   setBenefitView,
 } from "@/lib/commission/logic";
-import { doLogout, useSession } from "@/lib/commission/session";
+import { doLogout, useSession, useHomeHref } from "@/lib/commission/session";
 import {
   getProfileOverride,
   profileKey,
@@ -80,6 +80,7 @@ function fmtPts(n: number): string {
 
 export function MemberScreen() {
   const { session, ready } = useSession();
+  const homeHref = useHomeHref();
   const router = useRouter();
   const focusId = useSearchParams().get("focus");
 
@@ -340,7 +341,7 @@ export function MemberScreen() {
       <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
         <div className="flex items-center space-x-2.5">
           <Link
-            href="/app/dashboard"
+            href={homeHref}
             className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
           >
             <Icon name="arrow_back" className="text-xl" />
@@ -627,7 +628,8 @@ export function MemberScreen() {
           </section>
         )}
 
-        {/* การ์ดผลประโยชน์ */}
+        {/* การ์ดผลประโยชน์ — ซ่อนในหน้าฉัน (ทุก role มีในหน้าหลักแล้ว) */}
+        {false && (
         <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[14px] font-bold text-slate-900 flex items-center space-x-1.5">
@@ -635,7 +637,7 @@ export function MemberScreen() {
               <span>{benefitTitle}</span>
             </h3>
             <Link
-              href="/app/dashboard"
+              href={homeHref}
               className="text-[11px] font-semibold text-[#a11119] hover:underline"
             >
               ดูทั้งหมด
@@ -684,8 +686,10 @@ export function MemberScreen() {
             </span>
           </div>
         </section>
+        )}
 
-        {/* การ์ดแต้มกิจกรรม */}
+        {/* การ์ดแต้มกิจกรรม — เฉพาะพนักงานขาย (ร้านค้า/admin ซ่อน) */}
+        {isSales && (
         <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[14px] font-bold text-slate-900 flex items-center space-x-1.5">
@@ -814,31 +818,9 @@ export function MemberScreen() {
             </div>
           )}
         </section>
-
-        {/* ผู้ดูแลระบบ: ทางลัดจัดการคำขอแลกของรางวัล */}
-        {isAdmin && (
-          <Link
-            href="/app/redemptions"
-            className="block rounded-2xl bg-white border border-slate-100 shadow-sm p-4 active:scale-[0.99] hover:border-red-200 transition"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-10 h-10 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center">
-                  <Icon name="redeem" className="text-xl" />
-                </div>
-                <div>
-                  <p className="text-[14px] font-bold text-slate-800">
-                    จัดการคำขอแลกของรางวัล
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    อนุมัติ / ไม่อนุมัติ / จัดส่ง
-                  </p>
-                </div>
-              </div>
-              <Icon name="chevron_right" className="text-xl text-slate-300" />
-            </div>
-          </Link>
         )}
+
+        {/* จัดการคำขอแลกของรางวัล — ย้ายไปหน้าหลัก admin แล้ว (ซ่อนในหน้าฉัน) */}
       </div>
 
       {/* Modal รายการของรางวัล */}

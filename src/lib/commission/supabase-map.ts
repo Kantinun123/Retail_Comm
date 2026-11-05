@@ -31,6 +31,7 @@ function optNum(v: number | null | undefined): number | undefined {
 export interface DealerRow {
   code: string; name: string; branch: string; tax_id: string;
   tier: string; model: string; point_company_code: string;
+  region: string | null; province: string | null;
 }
 export interface SolutionRow {
   id: string; group: string; name: string; category: string; rate: number; icon: string;
@@ -65,6 +66,8 @@ export function mapDealer(r: DealerRow): Dealer {
     tier: r.tier ?? "",
     model: r.model ?? "",
     pointCompanyCode: r.point_company_code ?? "",
+    region: r.region ?? "",
+    province: r.province ?? "",
   };
 }
 

@@ -24,6 +24,10 @@ export interface Dealer {
   tier: string;
   model: string;
   pointCompanyCode: string;
+  /** ภาคของร้าน (จาก Master_Dealer) — ใช้ตัวกรองของ admin ; optional เพราะ static fallback ไม่มี */
+  region?: string;
+  /** จังหวัดของร้าน (จาก Master_Dealer) */
+  province?: string;
 }
 
 export interface Solution {

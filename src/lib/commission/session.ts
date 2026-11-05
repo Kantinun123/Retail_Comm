@@ -21,6 +21,8 @@ const EMPTY_DEALER: Dealer = {
   tier: "",
   model: "",
   pointCompanyCode: "",
+  region: "",
+  province: "",
 };
 
 const KEYS = {
@@ -36,7 +38,14 @@ const KEYS = {
   repCr: "repCr",
   repDealerName: "repDealerName",
   repModel: "repModel",
+  // admin "ดูในมุมมอง": ดูหน้าเหมือนร้านค้า/พนักงานโดยไม่ต้องสลับบัญชี
+  adminViewMode: "adminViewMode",     // 'admin' (ปกติ) | 'store' | 'staff'
+  adminViewDealer: "adminViewDealer", // รหัสร้านที่กำลังดูในมุมมอง store/staff
+  adminViewRep: "adminViewRep",       // rep_code ที่กำลังดูในมุมมอง staff
+  adminViewRepName: "adminViewRepName",
 } as const;
+
+export type AdminViewMode = "admin" | "store" | "staff";
 
 export interface SessionData {
   loggedIn: boolean;
@@ -64,6 +73,14 @@ export interface SessionData {
    * สำหรับ dealer/sales ค่านี้ไม่ใช้ (scope อิง dealerCode/empId ตามเดิม)
    */
   storeFilter: string | null;
+  /** โหมด "ดูในมุมมอง" ของ admin: ดูหน้าเหมือนร้านค้า/พนักงาน (เฉพาะ admin) */
+  adminViewMode: AdminViewMode;
+  /** รหัสร้านที่ admin กำลังดูในมุมมอง store/staff */
+  adminViewDealer: string | null;
+  /** rep_code ที่ admin กำลังดูในมุมมอง staff */
+  adminViewRep: string | null;
+  /** ชื่อพนักงานที่กำลังดู (แสดงบนแถบ) */
+  adminViewRepName: string | null;
   filter: FilterState;
 }
 
@@ -93,10 +110,21 @@ function readSession(): SessionData {
   const storeFilter = isAdmin
     ? sessionStorage.getItem(KEYS.storeFilter) || null
     : null;
+  // admin "ดูในมุมมอง" (store/staff) — role อื่นไม่ใช้
+  const adminViewMode = (isAdmin
+    ? (sessionStorage.getItem(KEYS.adminViewMode) as AdminViewMode) || "admin"
+    : "admin") as AdminViewMode;
+  const adminViewDealer = isAdmin ? sessionStorage.getItem(KEYS.adminViewDealer) || null : null;
+  const adminViewRep = isAdmin ? sessionStorage.getItem(KEYS.adminViewRep) || null : null;
+  const adminViewRepName = isAdmin ? sessionStorage.getItem(KEYS.adminViewRepName) || null : null;
   // dealer ที่ใช้แสดงผล: dealer/sales ใช้ dealerCode, admin ใช้ร้านที่เจาะ (ถ้ามี) ไม่งั้น fallback ร้านแรก
   // NB: ก่อน dataset hydrate จาก Supabase เสร็จ getDealers() อาจว่าง -> ใช้ placeholder กัน undefined
+  // ร้านที่ใช้แสดงผล: ถ้า admin กำลัง "ดูในมุมมอง" ใช้ร้านที่เลือกในมุมมองก่อน
+  const effectiveDealerCode = isAdmin
+    ? (adminViewMode !== "admin" ? adminViewDealer : storeFilter)
+    : dealerCode;
   const dealer =
-    dealerByCode((isAdmin ? storeFilter : dealerCode) || "") ||
+    dealerByCode(effectiveDealerCode || "") ||
     getDealers()[0] ||
     EMPTY_DEALER;
   const repCode = sessionStorage.getItem(KEYS.repCode) || null;
@@ -119,6 +147,10 @@ function readSession(): SessionData {
     repModel,
     isAdmin,
     storeFilter,
+    adminViewMode,
+    adminViewDealer,
+    adminViewRep,
+    adminViewRepName,
     filter: readFilter(),
   };
 }
@@ -153,8 +185,12 @@ export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repD
   else sessionStorage.removeItem(KEYS.repDealerName);
   if (role === "sales" && repModel) sessionStorage.setItem(KEYS.repModel, repModel);
   else sessionStorage.removeItem(KEYS.repModel);
-  // admin เริ่มต้นที่ "ทุกร้าน"
+  // admin เริ่มต้นที่ "ทุกร้าน" + ไม่อยู่ในมุมมองใด
   sessionStorage.removeItem(KEYS.storeFilter);
+  sessionStorage.removeItem(KEYS.adminViewMode);
+  sessionStorage.removeItem(KEYS.adminViewDealer);
+  sessionStorage.removeItem(KEYS.adminViewRep);
+  sessionStorage.removeItem(KEYS.adminViewRepName);
   sessionStorage.setItem(KEYS.filter, JSON.stringify(defaultFilterState()));
   sessionStorage.setItem(KEYS.panelOpen, "0");
   // ล้าง cache แล้วแจ้ง subscriber เพื่อให้ทุกหน้าอ่าน session ใหม่ (role/empId ที่เพิ่งเปลี่ยน)
@@ -165,6 +201,34 @@ export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repD
 export function setStoreFilter(code: string | null) {
   if (code) sessionStorage.setItem(KEYS.storeFilter, code);
   else sessionStorage.removeItem(KEYS.storeFilter);
+  emit();
+}
+
+/** admin: เข้า "มุมมองร้านค้า" ของร้านที่ระบุ (ดูหน้าเหมือน dealer) */
+export function enterStoreView(dealerCode: string) {
+  sessionStorage.setItem(KEYS.adminViewMode, "store");
+  sessionStorage.setItem(KEYS.adminViewDealer, dealerCode);
+  sessionStorage.removeItem(KEYS.adminViewRep);
+  sessionStorage.removeItem(KEYS.adminViewRepName);
+  emit();
+}
+
+/** admin: เข้า "มุมมองพนักงาน" (ดูหน้าเหมือน sales รายคน) ของร้าน+rep ที่ระบุ */
+export function enterStaffView(dealerCode: string, repCode: string, repName?: string | null) {
+  sessionStorage.setItem(KEYS.adminViewMode, "staff");
+  sessionStorage.setItem(KEYS.adminViewDealer, dealerCode);
+  sessionStorage.setItem(KEYS.adminViewRep, repCode);
+  if (repName) sessionStorage.setItem(KEYS.adminViewRepName, repName);
+  else sessionStorage.removeItem(KEYS.adminViewRepName);
+  emit();
+}
+
+/** admin: ออกจากมุมมอง กลับสู่โหมดผู้ดูแลปกติ */
+export function exitAdminView() {
+  sessionStorage.removeItem(KEYS.adminViewMode);
+  sessionStorage.removeItem(KEYS.adminViewDealer);
+  sessionStorage.removeItem(KEYS.adminViewRep);
+  sessionStorage.removeItem(KEYS.adminViewRepName);
   emit();
 }
 
@@ -179,6 +243,10 @@ export function doLogout() {
   sessionStorage.removeItem(KEYS.repCr);
   sessionStorage.removeItem(KEYS.repDealerName);
   sessionStorage.removeItem(KEYS.repModel);
+  sessionStorage.removeItem(KEYS.adminViewMode);
+  sessionStorage.removeItem(KEYS.adminViewDealer);
+  sessionStorage.removeItem(KEYS.adminViewRep);
+  sessionStorage.removeItem(KEYS.adminViewRepName);
   emit();
 }
 
@@ -230,8 +298,8 @@ export function useSession(): {
 export function useHomeHref(): string {
   const { session } = useSession();
   if (session && session.isSales) return "/app/home-staff";
-  if (session && !session.isAdmin) return "/app/home";
-  return "/app/dashboard";
+  // admin ใช้ Hub ร่วมกับร้านค้า (เวอร์ชันทุกร้าน)
+  return "/app/home";
 }
 
 export function getPanelOpen(): boolean {

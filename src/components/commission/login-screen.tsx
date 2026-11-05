@@ -254,7 +254,7 @@ function DemoLoginScreen() {
         return;
       }
       doLogin({ role: "admin" });
-      router.push("/app/dashboard");
+      router.push("/app/home");
       return;
     }
 

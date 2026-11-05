@@ -116,6 +116,8 @@ function mapDealers(rows: Row[]): Dealer[] {
         tier: str(g("tier", "ระดับ")),
         model: str(g("model", "โมเดล")),
         pointCompanyCode: str(g("pointCompanyCode", "companyCode", "รหัสแต้ม")),
+        region: str(g("region", "ภาค")),
+        province: str(g("province", "จังหวัด")),
       } satisfies Dealer;
     })
     .filter((d) => d.code);
