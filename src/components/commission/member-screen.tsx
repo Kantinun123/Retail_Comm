@@ -22,6 +22,7 @@ import {
   setBenefitView,
 } from "@/lib/commission/logic";
 import { doLogout, useSession, useHomeHref } from "@/lib/commission/session";
+import { MemberTeamCards } from "./member-team-cards";
 import {
   getProfileOverride,
   profileKey,
@@ -433,6 +434,9 @@ export function MemberScreen() {
             </div>
           </Link>
         )}
+
+        {/* ข้อมูลพนักงาน/ร้าน + หัวหน้าที่ดูแล (อ่านอย่างเดียว; admin/Area ไม่แสดง) */}
+        <MemberTeamCards />
 
         {/* การ์ดตัวละคร (DiceBear) — เฉพาะผู้มี pKey = sales/dealer */}
         {canEdit && (
