@@ -576,3 +576,28 @@ export const dynamic = "force-dynamic";
 - `sharp` ติดมากับ next (0.35.x) แต่**ไม่ได้ประกาศใน package.json** ใช้ในสคริปต์ได้ แต่อย่าพึ่งมันใน API route ของแอป
 
 **ข้อจำกัดที่รู้**: การ์ดรายการใช้ไฟล์เดิมขนาด ~0.1-0.4MB เป็นรูปเล็ก (ไม่มี thumbnail แยก ; Supabase image transform เป็นฟีเจอร์เสียเงิน) พึ่ง lazy-load ; รูปพนักงาน (`uploadEmployeePhoto`) ยังไม่ได้ย่อที่เบราว์เซอร์ (ลิมิต 5MB เดิม) ใช้ `fileToResizedBlob` ได้ถ้าต้องการ
+
+---
+
+## 🔐 ตรวจระบบก่อนทำ login จริง — ช่องโหว่ที่พบ (ยังไม่ได้แก้ รอยืนยัน)
+
+**สถานะ**: โหมดเดโมยังเป็นค่าเริ่มต้น (`NEXT_PUBLIC_REAL_AUTH` ไม่มีใน .env ; ค่าบน Vercel ตรวจจากเครื่องนี้ไม่ได้). auth.users 23 (20 anonymous จาก demo bridge, 3 จริง = admin/sales/dealer ที่ approved), profiles 3 แถว, trigger `handle_new_user` สร้าง profile (status default `pending`) เฉพาะผู้สมัครจริง
+
+**ช่องโหว่ที่ยืนยันจากนโยบาย/สิทธิ์ใน DB (ยังไม่ได้ทดสอบโจมตีจริง)**:
+1. **ยกสิทธิ์ตัวเองเป็น admin ได้**: `profiles` มี policy "update own profile" (`id = auth.uid()`) + role `authenticated` มีสิทธิ์ UPDATE ทุกคอลัมน์ (role, status, dealer_code, emp_id, approved_*) + **ไม่มี trigger** กันคอลัมน์ -> ผู้ใช้ที่ล็อกอินแล้วแก้ role/status ของตัวเองได้ -> `is_admin()` เป็นจริง และ `verifyAdmin()` ใน API ผ่านด้วย. ต้องแก้ก่อนเปิด REAL_AUTH (revoke UPDATE รายคอลัมน์ เหลือแค่ full_name หรือ trigger กัน)
+2. **RPC ข้อมูลเปิดให้ anon เรียกผ่าน public key**: advisor เตือน 41 ฟังก์ชัน SECURITY DEFINER ที่ `anon` execute ได้ (ยืนยันด้วย has_function_privilege: ba_incentive_summary, lhs_commission_summary, service_sales_summary, back_margin_summary ฯลฯ) -> เรียก `/rest/v1/rpc/...` ด้วย p_dealer = null ได้ (= ทุกร้าน) โดยไม่ล็อกอิน
+3. **ความผิดพลาดของผมเอง**: `store_roster()` และ `store_list_with_counts()` ผม `grant execute ... to anon, authenticated` ไว้ -> ใครก็ได้ที่มี public key ดึง **เบอร์โทร/อีเมล/วันเกิด/Line ของพนักงานทั้งหมด** ได้ ทั้งที่ API ของแอปใช้ service-role อยู่แล้วจึงไม่จำเป็นต้อง grant. ตารางพนักงาน (`sale_reps`) ก็อยู่หลัง policy ที่มี `is_anon_demo()` (anonymous sign-in เปิดอยู่ ใครก็ขอ session แบบ anonymous ได้) ทั้งที่ผมเพิ่มคอลัมน์ข้อมูลส่วนตัวเข้าไปในตารางนั้น
+4. Anonymous sign-ins เปิดอยู่ ; Leaked password protection ปิดอยู่ ; 5 ตารางเปิด RLS แต่ไม่มี policy (ตั้งใจ — ใช้ผ่าน service-role เท่านั้น ไม่ใช่ปัญหา)
+
+**บทเรียน**: ห้าม `grant execute ... to anon/authenticated` ให้ฟังก์ชัน SECURITY DEFINER ที่คืนข้อมูลจริง — เฉพาะฟังก์ชันช่วยของ RLS (`is_admin`, `my_role`, `my_dealer_code`, `my_emp_id`, `is_anon_demo`) เท่านั้นที่ต้อง grant (ดูหัวข้อ "SECURITY DEFINER function ที่ใช้ใน RLS" ด้านบน). RPC ที่ API route เรียกผ่าน service-role ควร revoke จาก `public, anon, authenticated` (ต้อง revoke จาก `public` ด้วย เพราะ default ของ Postgres ให้ PUBLIC execute) ; อย่าอ้างว่า "WARN ยอมรับได้" ใช้กับ RPC ข้อมูลที่ไม่ใช่ helper
+
+**✅ ข้อ 0 แก้แล้ว** (migration `security_hardening_step0`, SQL เก็บที่ `scripts/sql/security-hardening-step0.sql`):
+- trigger `protect_profile_privileged_columns` : ผู้ใช้ authenticated/anon ที่ไม่ใช่ admin แก้ role/status/dealer_code/emp_id/approved_* ไม่ได้ (service_role/postgres/admin ยังแก้ได้ ; แก้ full_name/note ของตัวเองได้) + `revoke update on profiles from anon`
+- revoke execute ของ RPC ข้อมูล 36 ตัวจาก `public, anon, authenticated` แล้ว grant ให้ `service_role` ; เก็บไว้เฉพาะ `is_admin, is_anon_demo, my_dealer_code, my_emp_id, my_role, my_dealer_access, handle_new_user`
+- **พิสูจน์ก่อน-หลัง**: ยกสิทธิ์ตัวเองด้วย session ของ sales ในทรานแซกชันที่ rollback (`do $$ ... raise exception 'TEST_RESULT => ...' $$`) ก่อนแก้ = `NOT BLOCKED rows=1 is_admin=t` หลังแก้ = `BLOCKED permission denied` ; `scripts/check-anon-exposure.mjs` (ใช้ public key ล้วนๆ) ก่อน EXPOSED=10 -> หลัง DENIED=10 EXPOSED=0 ; advisor `anon_security_definer_function_executable` 41 -> 5 (เหลือเฉพาะที่ตั้งใจ)
+- ตรวจแอปไม่พัง: ยิง 27 API route ผ่าน dev server ผ่านหมด (ok=true, ได้ข้อมูลจริง เช่น service-sales count=45566) ; ฝั่งเบราว์เซอร์ไม่มีโค้ดเรียก `.rpc(` เลย (grep) จึงถอน anon ได้
+- **ยังเปิดอยู่ (ตั้งใจเลื่อนไป cutover)**: policy ของ ~20 ตารางที่ใช้ `is_anon_demo()` ยังให้ session นิรนามอ่านตารางตรงๆ ได้ รวม `sale_reps` (เบอร์/อีเมล/วันเกิด/Line) และตารางค่าคอมมิชชัน — anonymous sign-in เปิดอยู่ใครก็ขอ session ได้ด้วย public key ; โหมดเดโมพึ่งสิ่งนี้ในการ hydrate ข้อมูล (`dataset.ts`) จึงปิดทันทีไม่ได้ ; Leaked password protection ยังปิด (ตั้งใน dashboard)
+
+**บทเรียนการทดสอบ**: (1) สคริปต์ตรวจต้องแยก "ถูกปฏิเสธสิทธิ์" (รหัส 42501) ออกจาก error อื่น — รอบแรกผมป้าย PGRST203 (ชื่อฟังก์ชันกำกวมเพราะ overload) และ 57014 (statement timeout) เป็น DENIED ทั้งที่ฟังก์ชันเรียกได้ ; (2) อย่าสั่งคำสั่งเขียนกับคำสั่งตรวจผลใน tool call ชุดเดียวกัน (รันขนาน) ; (3) `service_sales_summary` แบบทุกร้านเคย statement timeout เป็นบางครั้งตอนเรียกครั้งแรก (พบทั้งก่อนและหลังแก้ ไม่เกี่ยวกับการถอนสิทธิ์) — ควรทำ index/cache ภายหลัง
+
+**ช่องว่างเชิงสถาปัตยกรรมของ login จริง**: API route อ่านขอบเขตร้านจาก query string (`?dealerCode=`) ที่ client ส่งมา แล้วเรียก RPC ด้วย service-role -> แม้ล็อกอินจริงแล้ว ผู้ใช้ก็เปลี่ยน dealerCode ดูร้านอื่นได้. ต้องย้ายการหาขอบเขตไปฝั่งเซิร์ฟเวอร์ (อ่าน session cookie -> profile -> รายการร้านที่อนุญาต) ทุก route ; Area/Coach ดูหลายร้าน -> ใช้ `profiles.emp_id` (rep_code) -> `rep_store_assignments`
