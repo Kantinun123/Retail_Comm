@@ -50,6 +50,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+function Unset() {
+  return <span className="font-normal text-slate-300">ยังไม่ระบุ</span>;
+}
+
 function SupervisorRow({ emp }: { emp: Employee }) {
   const roleLabel =
     emp.roleInStore === "manager" || emp.position === "area_mng"
@@ -166,8 +170,47 @@ export function MemberTeamCards() {
                 <LevelBadge level={me.level} />
               </Row>
             )}
+            <Row label="วันเริ่มงาน">
+              {me.startDate ? (
+                new Date(me.startDate).toLocaleDateString("th-TH", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })
+              ) : (
+                <Unset />
+              )}
+            </Row>
             {tenure && <Row label="อายุงาน">{tenure}</Row>}
             <Row label="ร้านที่สังกัด">{store?.name ?? session?.dealer.name ?? "-"}</Row>
+            <Row label="เบอร์โทร">
+              {[me.phone, me.phone2].some((p) => p && p.trim()) ? (
+                <span className="flex flex-col items-end gap-0.5">
+                  {[me.phone, me.phone2]
+                    .filter((p): p is string => !!p && !!p.trim())
+                    .map((p) => (
+                      <a key={p} href={telHref(p)} className="text-[#16a34a] hover:underline">
+                        {p}
+                      </a>
+                    ))}
+                </span>
+              ) : (
+                <Unset />
+              )}
+            </Row>
+            <Row label="อีเมล">
+              {me.email ? (
+                <a href={`mailto:${me.email}`} className="text-[#a11119] hover:underline break-all">
+                  {me.email}
+                </a>
+              ) : (
+                <Unset />
+              )}
+            </Row>
+            <Row label="ไลน์">{me.lineId ? me.lineId : <Unset />}</Row>
+            <p className="text-[10.5px] text-slate-400 mt-2">
+              ข้อมูลผิดหรือไม่ครบ แจ้งผู้ดูแลระบบเพื่อแก้ไข
+            </p>
           </section>
         )}
         <SupervisorCard list={supervisors} title="หัวหน้าที่ดูแลร้านคุณ" />

@@ -4,6 +4,7 @@
    - cache ระดับโมดูลต่อรหัสร้าน เพื่อให้หัวการ์ดโปรไฟล์และการ์ดทีมงานใช้ข้อมูลเดียวกัน (ยิง API ครั้งเดียว)
    - ล้าง cache ที่ invalidateTeamData() หรือรีเฟรชหน้า */
 import { useEffect, useState } from "react";
+import { useSession } from "./session";
 import {
   fetchStore,
   fetchStoreRoster,
@@ -39,6 +40,15 @@ export function invalidateTeamData(code?: string) {
 }
 
 /** โหลดข้อมูลทีมของร้าน (ว่าง = ไม่โหลด) ; คืน null จนกว่าจะโหลดเสร็จ */
+/** พนักงานขายที่ล็อกอินอยู่ (จากฐานข้อมูล) — null ถ้าไม่ใช่พนักงานขาย/ยังโหลดไม่เสร็จ/ไม่พบ */
+export function useMyRep(): Employee | null {
+  const { session } = useSession();
+  const code = session && session.isSales ? session.dealer.code : "";
+  const data = useTeamData(code);
+  const empId = session?.empId ?? null;
+  return (empId && data?.roster.find((e) => e.repCode === empId)) || null;
+}
+
 export function useTeamData(dealerCode: string): TeamData | null {
   const [data, setData] = useState<TeamData | null>(null);
 

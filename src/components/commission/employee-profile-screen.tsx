@@ -26,7 +26,6 @@ import {
   solutionById,
 } from "@/lib/commission/logic";
 import { useSession } from "@/lib/commission/session";
-import { getProfileOverride } from "@/lib/commission/profile";
 import type { GroupKey } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
 
@@ -86,10 +85,9 @@ export function EmployeeProfileScreen({ empId }: { empId: string }) {
   const dealer = emp.dealerCode ? dealerByCode(emp.dealerCode) : null;
   const t = lifetimeTotals(emp.id, null);
 
-  // ข้อมูลติดต่อที่พนักงานแก้ไขเอง (override) ชนะข้อมูลดิบ
-  const ov = getProfileOverride(`emp:${emp.id}`);
-  const shownPhoto = ov.photoUrl ?? emp.photoUrl ?? "";
-  const shownPhone = ov.phone ?? emp.phone ?? "";
+  // ใช้ข้อมูลจากฐานข้อมูลเท่านั้น (ไม่อ่านค่าที่เคยตั้งไว้ในเครื่องแล้ว)
+  const shownPhoto = emp.photoUrl ?? "";
+  const shownPhone = emp.phone ?? "";
 
   // สรุปตามประเภทงาน (บริการ/สินค้า) ตลอดทุกช่วงเวลา
   const empSales = getSales().filter((s) => s.empId === emp.id);

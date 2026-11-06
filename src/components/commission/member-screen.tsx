@@ -9,7 +9,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import {
@@ -24,14 +24,7 @@ import {
 import { doLogout, useSession, useHomeHref } from "@/lib/commission/session";
 import { MemberTeamCards } from "./member-team-cards";
 import { useTeamData } from "@/lib/commission/team-data";
-import {
-  getProfileOverride,
-  profileKey,
-  setProfileOverride,
-  subscribeProfile,
-  type ProfileOverride,
-} from "@/lib/commission/profile";
-import { fileToResizedDataUrl } from "@/lib/commission/image";
+import { profileKey } from "@/lib/commission/profile";
 import {
   availableBalance,
   deriveLots,
@@ -86,13 +79,6 @@ export function MemberScreen() {
   const router = useRouter();
   const focusId = useSearchParams().get("focus");
 
-  const [editing, setEditing] = useState(false);
-  const [override, setOverride] = useState<ProfileOverride>({});
-  // ค่าในฟอร์มระหว่างแก้ไข
-  const [form, setForm] = useState<ProfileOverride>({});
-  const [photoErr, setPhotoErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement | null>(null);
   // ข้อมูลพนักงานจากฐานข้อมูล (ชื่อ-นามสกุล/รูป) สำหรับหัวการ์ดของพนักงานขาย
   const teamData = useTeamData(session && session.isSales ? session.dealer.code : "");
 
@@ -125,15 +111,6 @@ export function MemberScreen() {
         dealerCode: isAdmin ? null : session.dealer.code,
       })
     : null;
-
-  // โหลด override + subscribe
-  useEffect(() => {
-    if (!pKey) return;
-    const refresh = () => setOverride(getProfileOverride(pKey));
-    refresh();
-    const unsub = subscribeProfile(refresh);
-    return unsub;
-  }, [pKey]);
 
   // โหลดประวัติการแลก + subscribe
   useEffect(() => {
@@ -291,61 +268,11 @@ export function MemberScreen() {
       : "ร้านค้าตัวแทน";
   const benefitTitle = isSales ? "ผลประโยชน์พนักงาน (อินเซนทีฟ)" : "ผลประโยชน์ร้านค้า";
 
-  // ค่าแสดงผล (override ชนะข้อมูลดิบ)
-  const basePhone = isSales ? session.me?.phone ?? "" : "";
-  const shownPhone = override.phone ?? basePhone;
-  const shownEmail = override.email ?? "";
-  const shownLine = override.line ?? "";
-  // ร้านค้าไม่ใช้รูป/ข้อมูลติดต่อที่ตั้งเองในเครื่องแล้ว (ใช้ข้อมูลจากฐานข้อมูลที่ admin ดูแล)
-  const shownPhoto = isSales ? override.photoUrl ?? "" : "";
-  // ค่าในฟอร์ม (ตอนแก้ไข) ใช้รูป preview จาก form ก่อน
-  const previewPhoto = editing ? form.photoUrl ?? "" : shownPhoto;
-  // หัวการ์ด: รูปจากฐานข้อมูล (admin ดูแล) มาก่อน ถ้าไม่มีใช้รูปที่ตั้งเองในเครื่อง
-  const heroPhoto = editing ? previewPhoto : myRep?.photoUrl || previewPhoto;
+  // รูปบนหัวการ์ด: จากฐานข้อมูล (admin ดูแล) เท่านั้น ถ้าไม่มีใช้ตัวอักษรย่อ
+  const heroPhoto = myRep?.photoUrl ?? "";
 
-  // ตัวละคร + ข้อมูลติดต่อ: เฉพาะพนักงานขาย (ร้านค้า/admin ไม่แสดง)
+  // การ์ดตัวละคร: เฉพาะพนักงานขาย (ร้านค้า/admin ไม่แสดง)
   const canEdit = !!pKey && isSales;
-
-  function startEdit() {
-    setForm({
-      phone: override.phone ?? basePhone,
-      email: override.email ?? "",
-      line: override.line ?? "",
-      photoUrl: override.photoUrl ?? "",
-    });
-    setPhotoErr(null);
-    setEditing(true);
-  }
-  function cancelEdit() {
-    setEditing(false);
-    setPhotoErr(null);
-  }
-  function save() {
-    if (!pKey) return;
-    setProfileOverride(pKey, {
-      phone: form.phone?.trim() ?? "",
-      email: form.email?.trim() ?? "",
-      line: form.line?.trim() ?? "",
-      photoUrl: form.photoUrl ?? "",
-    });
-    setEditing(false);
-  }
-
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoErr(null);
-    setBusy(true);
-    try {
-      const dataUrl = await fileToResizedDataUrl(file);
-      setForm((f) => ({ ...f, photoUrl: dataUrl }));
-    } catch (err) {
-      setPhotoErr(err instanceof Error ? err.message : "อัปโหลดรูปไม่สำเร็จ");
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
 
   return (
     <>
@@ -494,154 +421,6 @@ export function MemberScreen() {
                 )}
               </div>
             </div>
-          </section>
-        )}
-
-        {/* การ์ดข้อมูลติดต่อ (แก้ไขได้) */}
-        {canEdit && (
-          <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[14px] font-bold text-slate-900 flex items-center space-x-1.5">
-                <Icon name="contact_page" className="text-lg text-[#d32029]" />
-                <span>ข้อมูลติดต่อ</span>
-              </h3>
-              {!editing ? (
-                <button
-                  type="button"
-                  onClick={startEdit}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#a11119] hover:underline"
-                >
-                  <Icon name="edit" style={{ fontSize: 14 }} />
-                  แก้ไข
-                </button>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="text-[11px] font-semibold text-slate-400 px-2 py-1 rounded-full hover:bg-slate-50"
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="button"
-                    onClick={save}
-                    disabled={busy}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-[#d32029] hover:bg-[#b91c21] px-3 py-1 rounded-full disabled:opacity-50 transition"
-                  >
-                    <Icon name="check" style={{ fontSize: 14 }} />
-                    บันทึก
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {!editing ? (
-              <div className="space-y-2">
-                <ContactLine icon="call" label="เบอร์โทร" value={shownPhone} />
-                <ContactLine icon="mail" label="อีเมล" value={shownEmail} />
-                <ContactLine icon="chat" label="ไลน์" value={shownLine} />
-                <p className="text-[10px] text-slate-400 pt-1 flex items-center gap-1">
-                  <Icon name="info" style={{ fontSize: 12 }} />
-                  การแก้ไขบันทึกในอุปกรณ์นี้
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* รูปโปรไฟล์ */}
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-500">
-                    รูปโปรไฟล์
-                  </label>
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                      {previewPhoto ? (
-                        <Image
-                          src={previewPhoto}
-                          alt="preview"
-                          width={56}
-                          height={56}
-                          unoptimized
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Icon name="person" className="text-2xl text-slate-300" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <button
-                        type="button"
-                        onClick={() => fileRef.current?.click()}
-                        disabled={busy}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#a11119] bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-full disabled:opacity-50 transition"
-                      >
-                        <Icon name="upload" style={{ fontSize: 14 }} />
-                        {busy ? "กำลังประมวลผล…" : "อัปโหลดรูป"}
-                      </button>
-                      {previewPhoto && (
-                        <button
-                          type="button"
-                          onClick={() => setForm((f) => ({ ...f, photoUrl: "" }))}
-                          className="ml-1.5 text-[11px] font-semibold text-slate-400 hover:text-[#a11119]"
-                        >
-                          ลบรูป
-                        </button>
-                      )}
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={onPickFile}
-                        className="hidden"
-                      />
-                    </div>
-                  </div>
-                  {photoErr && (
-                    <p className="text-[10px] text-[#d32029] mt-1">{photoErr}</p>
-                  )}
-                  <input
-                    type="url"
-                    value={
-                      form.photoUrl?.startsWith("data:") ? "" : form.photoUrl ?? ""
-                    }
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, photoUrl: e.target.value }))
-                    }
-                    placeholder="หรือวาง URL รูป (https://…)"
-                    className="mt-2 w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[13px] focus:outline-none focus:border-red-300 focus:bg-white transition"
-                  />
-                </div>
-
-                <EditField
-                  icon="call"
-                  label="เบอร์โทร"
-                  type="tel"
-                  value={form.phone ?? ""}
-                  onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
-                  placeholder="08x-xxx-xxxx"
-                />
-                <EditField
-                  icon="mail"
-                  label="อีเมล"
-                  type="email"
-                  value={form.email ?? ""}
-                  onChange={(v) => setForm((f) => ({ ...f, email: v }))}
-                  placeholder="name@example.com"
-                />
-                <EditField
-                  icon="chat"
-                  label="ไลน์"
-                  type="text"
-                  value={form.line ?? ""}
-                  onChange={(v) => setForm((f) => ({ ...f, line: v }))}
-                  placeholder="LINE ID"
-                />
-                <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                  <Icon name="info" style={{ fontSize: 12 }} />
-                  การแก้ไขบันทึกในอุปกรณ์นี้ (ยังไม่ซิงก์ข้ามเครื่อง)
-                </p>
-              </div>
-            )}
           </section>
         )}
 
@@ -1014,60 +793,6 @@ export function MemberScreen() {
 }
 
 /* ---------- sub-components ---------- */
-function ContactLine({
-  icon,
-  label,
-  value,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between text-[12px]">
-      <span className="text-slate-500 flex items-center gap-1.5">
-        <Icon name={icon} style={{ fontSize: 15 }} className="text-slate-400" />
-        {label}
-      </span>
-      <span className={value ? "font-semibold text-slate-700" : "text-slate-300"}>
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
-
-function EditField({
-  icon,
-  label,
-  type,
-  value,
-  onChange,
-  placeholder,
-}: {
-  icon: string;
-  label: string;
-  type: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
-        <Icon name={icon} style={{ fontSize: 14 }} className="text-slate-400" />
-        {label}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1 w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[13px] focus:outline-none focus:border-red-300 focus:bg-white transition"
-      />
-    </div>
-  );
-}
-
 // RedemptionCard ย้ายไปไฟล์ ./redemption-card.tsx (ใช้ร่วมกับหน้าประวัติการแลก)
 
 /** รายการเดินแต้มแบบแอปธนาคาร — จัดกลุ่มตามวันที่ */

@@ -10,11 +10,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon } from "./icon";
 import { useSession } from "@/lib/commission/session";
-import { getProfileOverride } from "@/lib/commission/profile";
+import { useMyRep } from "@/lib/commission/team-data";
 import { fetchSaleRep, type SaleRep } from "@/lib/commission/sale-reps-store";
 
 export function ProfileCard() {
   const { session, ready } = useSession();
+  const myRep = useMyRep();
   // เติมข้อมูล rep ถ้า session ขาด (เช่น login ค้างจาก session เก่าก่อนมีฟิลด์นี้)
   const [repFallback, setRepFallback] = useState<SaleRep | null>(null);
   const repCode = session?.repCode ?? null;
@@ -35,16 +36,8 @@ export function ProfileCard() {
 
   if (!ready || !session) return null;
 
-  const profileKey = session.isSales
-    ? session.empId
-      ? `emp:${session.empId}`
-      : null
-    : session.isAdmin
-      ? null
-      : `dealer:${session.dealer.code}`;
-  // รูปที่ตั้งเองในเครื่อง ใช้เฉพาะพนักงานขาย (ร้านค้าไม่แก้รูปเองแล้ว)
-  const photo =
-    profileKey && session.isSales ? getProfileOverride(profileKey).photoUrl ?? "" : "";
+  // รูปพนักงานขายจากฐานข้อมูล (admin ดูแล)
+  const photo = myRep?.photoUrl ?? "";
 
   // sales: ใช้ session ก่อน ถ้าขาดใช้ repFallback
   const repCr = session.repCr ?? repFallback?.crCode ?? null;

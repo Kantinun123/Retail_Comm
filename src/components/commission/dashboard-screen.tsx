@@ -33,7 +33,7 @@ import { getDataset } from "@/lib/commission/dataset";
 import { storeTable, empTable } from "@/lib/commission/sales-table";
 import { doLogout, setStoreFilter, useSession } from "@/lib/commission/session";
 import { ViewModeBar } from "./view-mode-bar";
-import { getProfileOverride } from "@/lib/commission/profile";
+import { useMyRep } from "@/lib/commission/team-data";
 import { downloadSales } from "@/lib/commission/excel";
 import type { FilterState, GroupKey, Sale } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
@@ -61,6 +61,7 @@ export function DashboardScreen({
   variant?: "store" | "staffIncentive";
 }) {
   const { session, ready, setFilter } = useSession();
+  const myRep = useMyRep();
   const router = useRouter();
   const [filter, setLocalFilter] = useState<FilterState | null>(null);
   const [showData, setShowData] = useState(false);
@@ -99,16 +100,8 @@ export function DashboardScreen({
     isStaffIncentive || session.isSales ? "emp" : "store";
 
   // รูปโปรไฟล์ของผู้ล็อกอิน (ถ้าตั้งไว้ในหน้าสมาชิก) สำหรับแสดงใน header
-  const myProfileKey = session.isSales
-    ? session.empId
-      ? `emp:${session.empId}`
-      : null
-    : session.isAdmin
-      ? null
-      : `dealer:${session.dealer.code}`;
-  const myPhoto = myProfileKey
-    ? getProfileOverride(myProfileKey).photoUrl ?? ""
-    : "";
+  // รูปพนักงานขายจากฐานข้อมูล (admin ดูแล) — ร้านค้า/admin ไม่มีรูปส่วนตัว ใช้ตัวย่อ
+  const myPhoto = myRep?.photoUrl ?? "";
   const t = totals(state, empScope, dealerScope);
   const groups = perGroup(state, empScope, dealerScope);
   const groupTotalComm = groups.reduce((a, g) => a + g.commission, 0);
@@ -1149,7 +1142,7 @@ function EmployeeRow({
 }) {
   const [open, setOpen] = useState(false);
   // รูปโปรไฟล์ที่พนักงานตั้งไว้ (ถ้ามี) ไม่งั้นใช้ตัวย่อ
-  const empPhoto = getProfileOverride(`emp:${emp.id}`).photoUrl ?? "";
+  const empPhoto = emp.photoUrl ?? "";
   // สโคปตามพนักงานคนนี้โดยตรง (empId) จึงไม่ต้องส่ง dealerScope ซ้ำ
   const rows = scopedSales(state, emp.id)
     .filter((x) => x.empId === emp.id)
