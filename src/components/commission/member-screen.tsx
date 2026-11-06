@@ -23,6 +23,7 @@ import {
 } from "@/lib/commission/logic";
 import { doLogout, useSession, useHomeHref } from "@/lib/commission/session";
 import { MemberTeamCards } from "./member-team-cards";
+import { useTeamData } from "@/lib/commission/team-data";
 import {
   getProfileOverride,
   profileKey,
@@ -92,6 +93,8 @@ export function MemberScreen() {
   const [photoErr, setPhotoErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // ข้อมูลพนักงานจากฐานข้อมูล (ชื่อ-นามสกุล/รูป) สำหรับหัวการ์ดของพนักงานขาย
+  const teamData = useTeamData(session && session.isSales ? session.dealer.code : "");
 
   // แต้ม: การแลกของรางวัล
   const [showGifts, setShowGifts] = useState(false);
@@ -267,15 +270,20 @@ export function MemberScreen() {
     setTimeout(() => setRedeemMsg(null), 3500);
   }
 
-  const displayName = isSales && session.me
-    ? session.me.name
+  const myRep =
+    isSales && teamData
+      ? teamData.roster.find((e) => e.repCode === session.empId) ?? null
+      : null;
+  // พนักงานขาย: ชื่อ-นามสกุลของตัวเองเป็นบรรทัดแรก (ไม่ใช่ชื่อร้าน)
+  const displayName = isSales
+    ? session.me?.name ?? myRep?.name ?? session.repName ?? session.dealer.name
     : isAdmin
       ? "ผู้ดูแลระบบ"
       : session.dealer.name;
   const avatar =
     isSales && session.me?.avatar
       ? session.me.avatar
-      : displayName.slice(0, 2);
+      : displayName.replace(/\s/g, "").slice(0, 2);
   const roleLabel = isSales
     ? "พนักงานขาย"
     : isAdmin
@@ -292,6 +300,8 @@ export function MemberScreen() {
   const shownPhoto = isSales ? override.photoUrl ?? "" : "";
   // ค่าในฟอร์ม (ตอนแก้ไข) ใช้รูป preview จาก form ก่อน
   const previewPhoto = editing ? form.photoUrl ?? "" : shownPhoto;
+  // หัวการ์ด: รูปจากฐานข้อมูล (admin ดูแล) มาก่อน ถ้าไม่มีใช้รูปที่ตั้งเองในเครื่อง
+  const heroPhoto = editing ? previewPhoto : myRep?.photoUrl || previewPhoto;
 
   // ตัวละคร + ข้อมูลติดต่อ: เฉพาะพนักงานขาย (ร้านค้า/admin ไม่แสดง)
   const canEdit = !!pKey && isSales;
@@ -367,9 +377,9 @@ export function MemberScreen() {
         <section className="rounded-2xl bg-gradient-to-br from-[#d32029] to-[#8f1114] text-white p-4 shadow-lg shadow-[#d32029]/20">
           <div className="flex items-center space-x-3">
             <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-[20px] font-bold shrink-0 overflow-hidden">
-              {previewPhoto ? (
+              {heroPhoto ? (
                 <Image
-                  src={previewPhoto}
+                  src={heroPhoto}
                   alt={displayName}
                   width={64}
                   height={64}
@@ -387,7 +397,9 @@ export function MemberScreen() {
               <p className="text-[12px] text-red-100/90 flex items-center gap-1 mt-0.5">
                 <Icon name="badge" style={{ fontSize: 14 }} />
                 {roleLabel}
-                {isSales && session.me ? ` · ${session.me.id}` : ""}
+                {isSales && (session.me?.id ?? session.empId)
+                  ? ` · ${session.me?.id ?? session.empId}`
+                  : ""}
               </p>
               <p className="text-[12px] text-red-100/80 flex items-center gap-1 mt-0.5">
                 <Icon name="storefront" style={{ fontSize: 14 }} />

@@ -12,22 +12,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "./icon";
 import { useSession } from "@/lib/commission/session";
+import { useTeamData } from "@/lib/commission/team-data";
 import {
-  fetchStore,
-  fetchStoreRoster,
   tenureFromStartDate,
   LEVEL_META,
   POSITION_LABEL,
   type Employee,
-  type StoreInfo,
 } from "@/lib/commission/employee-store";
 import { cn } from "@/lib/utils";
-
-interface TeamData {
-  code: string;
-  roster: Employee[];
-  store: StoreInfo | null;
-}
 
 /** ตัดทุกอย่างที่ไม่ใช่ตัวเลข/+ ออก เพื่อใช้ใน tel: */
 function telHref(phone: string): string {
@@ -132,23 +124,8 @@ export function MemberTeamCards() {
   const isSales = !!session?.isSales;
   const empId = session?.empId ?? null;
 
-  const [data, setData] = useState<TeamData | null>(null);
   const [selected, setSelected] = useState<Employee | null>(null);
-
-  useEffect(() => {
-    if (!dealerCode) return;
-    let cancelled = false;
-    Promise.all([fetchStoreRoster(dealerCode), fetchStore(dealerCode)])
-      .then(([roster, store]) => {
-        if (!cancelled) setData({ code: dealerCode, roster, store });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [dealerCode]);
-
-  const view = data && data.code === dealerCode ? data : null;
+  const view = useTeamData(dealerCode);
 
   const { me, supervisors, staff } = useMemo(() => {
     const roster = (view?.roster ?? []).filter((e) => e.isActive);
