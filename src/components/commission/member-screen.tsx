@@ -288,12 +288,13 @@ export function MemberScreen() {
   const shownPhone = override.phone ?? basePhone;
   const shownEmail = override.email ?? "";
   const shownLine = override.line ?? "";
-  const shownPhoto = override.photoUrl ?? "";
+  // ร้านค้าไม่ใช้รูป/ข้อมูลติดต่อที่ตั้งเองในเครื่องแล้ว (ใช้ข้อมูลจากฐานข้อมูลที่ admin ดูแล)
+  const shownPhoto = isSales ? override.photoUrl ?? "" : "";
   // ค่าในฟอร์ม (ตอนแก้ไข) ใช้รูป preview จาก form ก่อน
   const previewPhoto = editing ? form.photoUrl ?? "" : shownPhoto;
 
-  // แก้ไขได้เฉพาะผู้ที่มี pKey (sales/ dealer) — admin แก้ไม่ได้
-  const canEdit = !!pKey;
+  // ตัวละคร + ข้อมูลติดต่อ: เฉพาะพนักงานขาย (ร้านค้า/admin ไม่แสดง)
+  const canEdit = !!pKey && isSales;
 
   function startEdit() {
     setForm({

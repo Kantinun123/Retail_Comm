@@ -42,7 +42,9 @@ export function ProfileCard() {
     : session.isAdmin
       ? null
       : `dealer:${session.dealer.code}`;
-  const photo = profileKey ? getProfileOverride(profileKey).photoUrl ?? "" : "";
+  // รูปที่ตั้งเองในเครื่อง ใช้เฉพาะพนักงานขาย (ร้านค้าไม่แก้รูปเองแล้ว)
+  const photo =
+    profileKey && session.isSales ? getProfileOverride(profileKey).photoUrl ?? "" : "";
 
   // sales: ใช้ session ก่อน ถ้าขาดใช้ repFallback
   const repCr = session.repCr ?? repFallback?.crCode ?? null;

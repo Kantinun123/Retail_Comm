@@ -133,6 +133,7 @@ export function MemberTeamCards() {
   const empId = session?.empId ?? null;
 
   const [data, setData] = useState<TeamData | null>(null);
+  const [selected, setSelected] = useState<Employee | null>(null);
 
   useEffect(() => {
     if (!dealerCode) return;
@@ -237,30 +238,152 @@ export function MemberTeamCards() {
               const tenure = tenureFromStartDate(e.startDate);
               const display = e.nickname ? `${e.name} (${e.nickname})` : e.name;
               return (
-                <li key={e.repCode} className="flex items-center gap-2.5 py-2 border-b border-slate-50 last:border-0">
-                  {e.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={e.photoUrl} alt={e.name} className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0" />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-red-50 text-[#a11119] flex items-center justify-center text-[12px] font-bold shrink-0">
-                      {e.name.replace(/\s/g, "").slice(0, 2)}
+                <li key={e.repCode} className="border-b border-slate-50 last:border-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelected(e)}
+                    aria-label={`ดูรายละเอียด ${display}`}
+                    className="w-full flex items-center gap-2.5 py-2 text-left hover:bg-slate-50 active:bg-slate-100 transition rounded-lg"
+                  >
+                    {e.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={e.photoUrl} alt={e.name} className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-red-50 text-[#a11119] flex items-center justify-center text-[12px] font-bold shrink-0">
+                        {e.name.replace(/\s/g, "").slice(0, 2)}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12.5px] font-semibold text-slate-900 truncate">{display}</p>
+                      <p className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5">
+                        <span>{e.position ? POSITION_LABEL[e.position] : "-"}</span>
+                        {tenure && <span>· อายุงาน {tenure}</span>}
+                      </p>
                     </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] font-semibold text-slate-900 truncate">{display}</p>
-                    <p className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5">
-                      <span>{e.position ? POSITION_LABEL[e.position] : "-"}</span>
-                      {tenure && <span>· อายุงาน {tenure}</span>}
-                    </p>
-                  </div>
-                  <LevelBadge level={e.level} />
+                    <LevelBadge level={e.level} />
+                    <Icon name="chevron_right" className="text-slate-300 text-lg shrink-0" />
+                  </button>
                 </li>
               );
             })}
           </ul>
-          <p className="text-[10px] text-slate-400 mt-2">ไม่แสดงวันเกิด อายุ และเบอร์ของพนักงาน</p>
+          <p className="text-[10px] text-slate-400 mt-2">กดที่ชื่อเพื่อดูรายละเอียด · ต้องการแก้ไขข้อมูล แจ้งผู้ดูแลระบบ</p>
         </section>
       )}
+
+      {selected && <EmployeeDetailSheet emp={selected} onClose={() => setSelected(null)} />}
     </>
+  );
+}
+
+/** รายละเอียดพนักงานในร้าน (อ่านอย่างเดียว) — ไม่แสดงวันเกิด/อายุ และหมายเหตุภายใน */
+function EmployeeDetailSheet({ emp, onClose }: { emp: Employee; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const tenure = tenureFromStartDate(emp.startDate);
+  const phones = [emp.phone, emp.phone2].filter((p): p is string => !!p && !!p.trim());
+  const startText = emp.startDate
+    ? new Date(emp.startDate).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`รายละเอียด ${emp.name}`}
+        className="w-full max-w-md bg-white rounded-t-3xl p-5 pb-8 max-h-[85vh] overflow-y-auto shadow-2xl"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          {emp.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={emp.photoUrl} alt={emp.name} className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shrink-0" />
+          ) : (
+            <div className="w-16 h-16 rounded-2xl bg-red-50 text-[#a11119] flex items-center justify-center text-[18px] font-bold shrink-0">
+              {emp.name.replace(/\s/g, "").slice(0, 2)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[16px] font-bold text-slate-900 leading-tight">{emp.name}</p>
+            {emp.nickname && <p className="text-[12px] text-slate-500">ชื่อเล่น {emp.nickname}</p>}
+            <div className="mt-1.5">
+              <LevelBadge level={emp.level} />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="ปิด"
+            className="shrink-0 w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"
+          >
+            <Icon name="close" style={{ fontSize: 18 }} />
+          </button>
+        </div>
+
+        <div className="mt-3">
+          <Row label="รหัสพนักงาน">{emp.repCode}</Row>
+          {emp.crCode && <Row label="รหัส CR">{emp.crCode}</Row>}
+          <Row label="ตำแหน่ง">{emp.position ? POSITION_LABEL[emp.position] : "-"}</Row>
+          {startText && <Row label="วันเริ่มงาน">{startText}</Row>}
+          {tenure && <Row label="อายุงาน">{tenure}</Row>}
+          {emp.lineId && <Row label="ไลน์">{emp.lineId}</Row>}
+        </div>
+
+        {(phones.length > 0 || emp.email) && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-3">
+            {phones.map((p) => (
+              <a
+                key={p}
+                href={telHref(p)}
+                className="inline-flex items-center gap-1 text-[12px] font-bold text-white bg-[#16a34a] rounded-full px-3.5 py-2 active:scale-95 transition"
+              >
+                <Icon name="call" style={{ fontSize: 15 }} />
+                โทร {p}
+              </a>
+            ))}
+            {emp.email && (
+              <a
+                href={`mailto:${emp.email}`}
+                className="inline-flex items-center gap-1 text-[12px] font-bold text-[#a11119] bg-red-50 border border-red-200/70 rounded-full px-3.5 py-2 active:scale-95 transition max-w-full"
+              >
+                <Icon name="mail" style={{ fontSize: 15 }} />
+                <span className="truncate">{emp.email}</span>
+              </a>
+            )}
+          </div>
+        )}
+        {phones.length === 0 && !emp.email && !emp.lineId && (
+          <p className="text-[12px] text-slate-400 mt-3">ยังไม่มีข้อมูลติดต่อของพนักงานคนนี้</p>
+        )}
+
+        {emp.skills.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[12px] font-semibold text-slate-500 mb-1.5">ทักษะ</p>
+            <div className="flex flex-wrap gap-1.5">
+              {emp.skills.map((s) => (
+                <span key={s} className="text-[11px] font-semibold bg-slate-100 text-slate-700 rounded-full px-2.5 py-1">
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="text-[10.5px] text-slate-400 mt-4">
+          ข้อมูลผิดหรือไม่ตรงปัจจุบัน แจ้งผู้ดูแลระบบเพื่อแก้ไข
+        </p>
+      </div>
+    </div>
   );
 }
