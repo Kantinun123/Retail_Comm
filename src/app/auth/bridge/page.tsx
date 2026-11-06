@@ -8,6 +8,7 @@ interface Me {
   role: string;
   name: string | null;
   storeCodes: string[] | null;
+  dealerCode: string | null;
 }
 
 /** หลัง login ด้วย Microsoft: อ่านตัวตนจริงจาก /api/me แล้วตั้ง session (identity bridge) */
@@ -38,8 +39,11 @@ export default function AuthBridgePage() {
         } else if (role === "area" || role === "re") {
           doLogin({ role: "area", areaStores: storeCodes ?? [], areaName: name ?? undefined });
           router.replace("/app/stores");
+        } else if (role === "dealer" && json.me.dealerCode) {
+          doLogin({ role: "dealer", dealerCode: json.me.dealerCode });
+          router.replace("/app/home");
         } else {
-          // dealer/sales ยังใช้ล็อกอินเดโมในรอบนี้
+          // sales ยังใช้ล็อกอินเดโมในรอบนี้
           setMessage("บัญชีประเภทนี้ยังไม่เปิดให้ใช้ Microsoft login");
           setTimeout(() => router.replace("/"), 2000);
         }

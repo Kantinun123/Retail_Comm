@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icon";
@@ -357,6 +358,16 @@ function DemoLoginScreen() {
       </div>
 
       <MicrosoftLoginButton />
+      <p className="text-center text-[12px] text-slate-500 -mt-1 mb-3">
+        ร้านค้า:{" "}
+        <Link href="/auth/email" className="font-bold text-[#d32029]">
+          เข้าสู่ระบบด้วยอีเมล
+        </Link>
+        {" · "}
+        <Link href="/auth/signup" className="font-bold text-[#d32029]">
+          สมัครใช้งาน
+        </Link>
+      </p>
 
       {/* Role Selector */}
       <div className="mb-3">

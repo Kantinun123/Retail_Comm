@@ -1,0 +1,209 @@
+"use client";
+
+/* อนุมัติผู้ใช้ร้านค้า (admin) — ต้องล็อกอินด้วยบัญชีจริง (Microsoft/อีเมล) ที่ role = admin */
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Icon } from "./icon";
+import { useSession } from "@/lib/commission/session";
+import { cn } from "@/lib/utils";
+
+type Tab = "pending" | "approved" | "rejected";
+
+interface UserRow {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  status: string;
+  dealer_code: string | null;
+  dealer_name: string | null;
+  requested_dealer_code: string | null;
+  requested_dealer_name: string | null;
+  existing_dealer_user: string | null;
+  reject_reason: string | null;
+  created_at: string;
+}
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "pending", label: "รออนุมัติ" },
+  { key: "approved", label: "อนุมัติแล้ว" },
+  { key: "rejected", label: "ปฏิเสธ/ระงับ" },
+];
+
+export function AdminUsersScreen() {
+  const { session, ready } = useSession();
+  const [tab, setTab] = useState<Tab>("pending");
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [authErr, setAuthErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/admin/users?status=${tab}`, { cache: "no-store" })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.status === 401 || res.status === 403) {
+          setAuthErr(
+            res.status === 401
+              ? "ต้องเข้าสู่ระบบด้วยบัญชีจริง (Microsoft หรืออีเมล) ที่เป็น admin จึงจะจัดการผู้ใช้ได้ — การเข้าแบบเดโมใช้ไม่ได้"
+              : "บัญชีนี้ไม่มีสิทธิ์ admin"
+          );
+          setUsers([]);
+          return;
+        }
+        const j = await res.json();
+        setAuthErr(null);
+        setUsers(j.ok ? j.users : []);
+      })
+      .catch(() => !cancelled && setUsers([]))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, reload]);
+
+  async function act(u: UserRow, action: "approve" | "reject" | "revoke") {
+    let reason: string | undefined;
+    if (action !== "approve") {
+      const r = window.prompt(action === "reject" ? "เหตุผลที่ปฏิเสธ" : "เหตุผลที่ระงับ", "");
+      if (r === null) return;
+      reason = r;
+    }
+    setBusy(u.id);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: u.id, action, reason, dealerCode: u.requested_dealer_code }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setMsg({ type: "err", text: j.error ?? "ทำรายการไม่สำเร็จ" });
+      } else {
+        setMsg({ type: "ok", text: action === "approve" ? "อนุมัติแล้ว" : "บันทึกแล้ว" });
+        setReload((r) => r + 1);
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!ready || !session) return null;
+  if (!session.isAdmin) {
+    return <p className="mt-10 text-center text-sm text-slate-500">เฉพาะผู้ดูแลระบบ</p>;
+  }
+
+  return (
+    <div className="pb-24">
+      <div className="flex items-center gap-2 py-4">
+        <Link href="/app/home" aria-label="กลับ" className="p-2 -ml-2 rounded-xl hover:bg-slate-100">
+          <Icon name="arrow_back" className="text-xl" />
+        </Link>
+        <h1 className="text-[17px] font-bold text-slate-900">อนุมัติผู้ใช้ร้านค้า</h1>
+      </div>
+
+      <div className="flex gap-2 mb-3">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => {
+              setLoading(true);
+              setTab(t.key);
+            }}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-[12px] font-bold border transition",
+              tab === t.key
+                ? "bg-[#d32029] text-white border-[#d32029]"
+                : "bg-white text-slate-600 border-slate-200"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {msg && (
+        <p
+          className={cn(
+            "mb-3 text-[12px] rounded-lg px-3 py-2 border",
+            msg.type === "ok"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-red-50 text-[#a11119] border-red-200"
+          )}
+        >
+          {msg.text}
+        </p>
+      )}
+
+      {authErr ? (
+        <p className="text-[13px] text-[#a11119] bg-red-50 border border-red-200 rounded-xl p-4">{authErr}</p>
+      ) : loading ? (
+        <p className="text-center text-slate-400 text-sm py-10">กำลังโหลด...</p>
+      ) : users.length === 0 ? (
+        <p className="text-center text-slate-400 text-sm py-10">ไม่มีรายการ</p>
+      ) : (
+        <div className="space-y-2.5">
+          {users.map((u) => {
+            const storeName = u.dealer_name ?? u.requested_dealer_name;
+            const storeCode = u.dealer_code ?? u.requested_dealer_code;
+            return (
+              <div key={u.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
+                <p className="text-[14px] font-bold text-slate-900">{u.full_name || u.email}</p>
+                <p className="text-[12px] text-slate-500 mt-0.5">
+                  {storeName ? `${storeName} (${storeCode})` : "ไม่ได้ระบุร้าน"}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {u.email}
+                  {u.phone ? ` · ${u.phone}` : ""}
+                </p>
+                {u.status === "pending" && u.existing_dealer_user && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 mt-2">
+                    ร้านนี้มีบัญชีอยู่แล้ว ({u.existing_dealer_user}) — ต้องระงับบัญชีเดิมก่อนจึงอนุมัติได้
+                  </p>
+                )}
+                {u.status === "rejected" && u.reject_reason && (
+                  <p className="text-[11px] text-slate-500 mt-1">เหตุผล: {u.reject_reason}</p>
+                )}
+                <div className="flex gap-2 mt-2.5">
+                  {u.status !== "approved" && u.requested_dealer_code && (
+                    <button
+                      disabled={busy === u.id || !!u.existing_dealer_user}
+                      onClick={() => act(u, "approve")}
+                      className="flex-1 py-2 rounded-xl bg-[#d32029] text-white text-[12px] font-bold disabled:opacity-40"
+                    >
+                      อนุมัติ
+                    </button>
+                  )}
+                  {u.status === "pending" && (
+                    <button
+                      disabled={busy === u.id}
+                      onClick={() => act(u, "reject")}
+                      className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-[12px] font-bold disabled:opacity-40"
+                    >
+                      ปฏิเสธ
+                    </button>
+                  )}
+                  {u.status === "approved" && (
+                    <button
+                      disabled={busy === u.id}
+                      onClick={() => act(u, "revoke")}
+                      className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-[12px] font-bold disabled:opacity-40"
+                    >
+                      ระงับบัญชี
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

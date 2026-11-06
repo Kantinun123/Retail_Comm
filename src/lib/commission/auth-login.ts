@@ -17,6 +17,8 @@ export interface AuthLoginResult {
   error?: string;
   /** สถานะ profile ถ้าไม่ approved จะบอกไว้ (pending/rejected) */
   status?: string;
+  /** role ใน session หลัง login สำเร็จ */
+  role?: Role;
 }
 
 /** map profile.role (6 แบบ) -> Role ของ session (3 แบบ) ชั่วคราวในเฟสนี้
@@ -54,7 +56,7 @@ export async function loginWithEmail(
   // อ่าน profile ของผู้ login (RLS: read own profile)
   const { data: profile, error: pErr } = await sb
     .from("profiles")
-    .select("status, role, emp_id, dealer_code")
+    .select("status, role, emp_id, dealer_code, reject_reason")
     .eq("id", auth.user.id)
     .single();
 
@@ -64,8 +66,16 @@ export async function loginWithEmail(
   }
 
   if (profile.status !== "approved") {
-    // ยังไม่อนุมัติ -> ไม่ตั้ง session (ให้หน้า login พาไป /auth/pending ได้)
-    return { ok: false, status: profile.status, error: "บัญชียังไม่ได้รับการอนุมัติ" };
+    // ยังไม่อนุมัติ/ถูกปฏิเสธ -> ไม่ตั้ง session ; ออกจาก Supabase session ด้วย
+    await sb.auth.signOut();
+    return {
+      ok: false,
+      status: profile.status,
+      error:
+        profile.status === "rejected"
+          ? `คำขอถูกปฏิเสธ: ${profile.reject_reason ?? "ติดต่อผู้ดูแลระบบ"}`
+          : "บัญชียังไม่ได้รับการอนุมัติ",
+    };
   }
 
   // identity bridge: เขียนลง sessionStorage keys เดิม
@@ -76,7 +86,7 @@ export async function loginWithEmail(
     empId: role === "sales" ? profile.emp_id ?? undefined : undefined,
   });
 
-  return { ok: true };
+  return { ok: true, role };
 }
 
 /** ออกจากระบบทั้ง Supabase session และ sessionStorage */

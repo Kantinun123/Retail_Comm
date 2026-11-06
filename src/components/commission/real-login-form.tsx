@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./icon";
@@ -23,7 +24,7 @@ export function RealLoginForm() {
     try {
       const res = await loginWithEmail(email.trim(), password);
       if (res.ok) {
-        router.push("/app/dashboard");
+        router.push(res.role === "sales" ? "/app/home-staff" : "/app/home");
         return;
       }
       if (res.status === "pending") {
@@ -140,6 +141,12 @@ export function RealLoginForm() {
         >
           {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
         </button>
+        <p className="text-center text-[12px] text-slate-500">
+          ร้านค้าใหม่?{" "}
+          <Link href="/auth/signup" className="font-bold text-[#d32029]">
+            สมัครใช้งาน
+          </Link>
+        </p>
       </form>
     </main>
   );
