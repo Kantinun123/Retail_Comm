@@ -26,7 +26,8 @@ export interface StoreTeamCaps {
 export function getStoreTeamCaps(session: SessionData | null): StoreTeamCaps {
   const isAdmin = !!session?.isAdmin;
   return {
-    canViewAllStores: isAdmin,
+    // admin = ทุกร้าน ; Area/Coach = รายการร้านที่ดูแล (กรองที่หน้าจอ + บังคับที่ API)
+    canViewAllStores: isAdmin || !!session?.isArea,
     canEditEmployee: isAdmin,
     canToggleStore: isAdmin,
     canManageSupervisors: isAdmin,

@@ -79,10 +79,14 @@ export function StoreDetailScreen({ code }: { code: string }) {
 
   // ร้านค้า/พนักงาน เห็นได้เฉพาะร้านตัวเอง -> ถ้าเปิดร้านอื่น พาไปร้านตัวเอง
   const ownCode = session?.dealer.code || null;
-  const blocked = !!session && !caps.canViewAllStores && !!ownCode && ownCode !== code;
+  const areaBlocked = !!session?.isArea && !session.areaStores.includes(code);
+  const blocked =
+    areaBlocked || (!!session && !caps.canViewAllStores && !!ownCode && ownCode !== code);
   useEffect(() => {
-    if (ready && blocked && ownCode) router.replace(`/app/store/${ownCode}`);
-  }, [ready, blocked, ownCode, router]);
+    if (!ready || !blocked) return;
+    if (areaBlocked) router.replace("/app/stores");
+    else if (ownCode) router.replace(`/app/store/${ownCode}`);
+  }, [ready, blocked, areaBlocked, ownCode, router]);
 
   const reload = useCallback(() => {
     fetchStoreRoster(code).then(setRoster).catch(() => {});

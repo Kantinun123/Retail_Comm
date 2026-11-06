@@ -10,6 +10,7 @@ import { fetchSaleReps, type SaleRep } from "@/lib/commission/sale-reps-store";
 import type { Dealer, Role } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
 import { RealLoginForm } from "./real-login-form";
+import { MicrosoftLoginButton } from "./microsoft-login-button";
 
 /** เปิด login จริง (email/password + Supabase Auth) เมื่อ NEXT_PUBLIC_REAL_AUTH=1
  *  ค่าเริ่มต้น = โหมดเดโม (dropdown เลือก role) เพื่อไม่ให้ production เดิมพัง
@@ -354,6 +355,8 @@ function DemoLoginScreen() {
           </span>
         </div>
       </div>
+
+      <MicrosoftLoginButton />
 
       {/* Role Selector */}
       <div className="mb-3">

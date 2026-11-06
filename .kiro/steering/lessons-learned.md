@@ -601,3 +601,15 @@ export const dynamic = "force-dynamic";
 **บทเรียนการทดสอบ**: (1) สคริปต์ตรวจต้องแยก "ถูกปฏิเสธสิทธิ์" (รหัส 42501) ออกจาก error อื่น — รอบแรกผมป้าย PGRST203 (ชื่อฟังก์ชันกำกวมเพราะ overload) และ 57014 (statement timeout) เป็น DENIED ทั้งที่ฟังก์ชันเรียกได้ ; (2) อย่าสั่งคำสั่งเขียนกับคำสั่งตรวจผลใน tool call ชุดเดียวกัน (รันขนาน) ; (3) `service_sales_summary` แบบทุกร้านเคย statement timeout เป็นบางครั้งตอนเรียกครั้งแรก (พบทั้งก่อนและหลังแก้ ไม่เกี่ยวกับการถอนสิทธิ์) — ควรทำ index/cache ภายหลัง
 
 **ช่องว่างเชิงสถาปัตยกรรมของ login จริง**: API route อ่านขอบเขตร้านจาก query string (`?dealerCode=`) ที่ client ส่งมา แล้วเรียก RPC ด้วย service-role -> แม้ล็อกอินจริงแล้ว ผู้ใช้ก็เปลี่ยน dealerCode ดูร้านอื่นได้. ต้องย้ายการหาขอบเขตไปฝั่งเซิร์ฟเวอร์ (อ่าน session cookie -> profile -> รายการร้านที่อนุญาต) ทุก route ; Area/Coach ดูหลายร้าน -> ใช้ `profiles.emp_id` (rep_code) -> `rep_store_assignments`
+
+---
+
+## 🔑 Microsoft (Azure) login รอบ 1 — โครงที่วางไว้ (ยังไม่เปิดใช้จนกว่าตั้ง Azure provider)
+
+- `profiles.emp_id` มี FK ไป `employees(emp_code)` (ตารางเดิม) ใส่ rep_code ของ `sale_reps` ไม่ได้ -> เพิ่มคอลัมน์ `profiles.rep_code` (ไม่มี FK) และใส่ใน trigger `protect_profile_privileged_columns` ด้วย
+- คำเชิญ: ตาราง `user_invites` (RLS เปิด ไม่มี policy = service_role เท่านั้น) ; `handle_new_user` ใช้คำเชิญ **เฉพาะ provider = azure** กัน email/password สมัครด้วยอีเมลคนอื่นแล้วแย่งสิทธิ์ (SQL: `scripts/sql/auth-msft-invites.sql`)
+- flow: ปุ่ม Microsoft -> `/auth/callback?redirect_to=/auth/bridge` -> `/auth/bridge` เรียก `/api/me` -> `doLogin` (admin หรือ area) ; role ใหม่ `"area"` ใน session (เก็บ `areaStores`)
+- `getAuthContext()` (`src/lib/supabase/auth-context.ts`): มี session จริง -> บังคับขอบเขตร้านฝั่ง server ; ไม่มี (เดโม) -> พฤติกรรมเดิม ใช้แล้วที่ `GET /api/employees`
+- `/auth/callback` เดิมต่อ `redirect_to` ตรง ๆ (open redirect `//evil.com`) -> ตรวจให้เป็น path ภายในเท่านั้น และถ้า exchange code ล้มเหลวให้ไป `/auth/error`
+- `server-only` ไม่ได้ติดตั้งในโปรเจค อย่า import
+- ยังไม่ได้ทดสอบ OAuth จริง (รอ Tenant/Client ID) ; ตรวจแล้วเฉพาะ tsc, `/api/me` ไม่ login = 401, callback กัน `//evil.com`

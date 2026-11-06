@@ -43,6 +43,9 @@ const KEYS = {
   adminViewDealer: "adminViewDealer", // รหัสร้านที่กำลังดูในมุมมอง store/staff
   adminViewRep: "adminViewRep",       // rep_code ที่กำลังดูในมุมมอง staff
   adminViewRepName: "adminViewRepName",
+  // Area/Coach: ร้านที่ดูแล (JSON array ของรหัสร้าน) + ชื่อที่แสดง
+  areaStores: "areaStores",
+  areaName: "areaName",
 } as const;
 
 export type AdminViewMode = "admin" | "store" | "staff";
@@ -68,6 +71,12 @@ export interface SessionData {
   repModel: string | null;
   /** ผู้ดูแลระบบ: เห็นทุกร้านทุกข้อมูล */
   isAdmin: boolean;
+  /** Area Manager / Coach (login จริงด้วย Microsoft): เห็นเฉพาะร้านที่ดูแล */
+  isArea: boolean;
+  /** รหัสร้านที่ Area/Coach ดูแล (ว่างถ้าไม่ใช่ area) */
+  areaStores: string[];
+  /** ชื่อ Area/Coach ที่แสดง */
+  areaName: string | null;
   /**
    * ขอบเขตร้านที่ admin กำลังเจาะดู (รหัสร้าน) หรือ null = ดูทุกร้านรวมกัน
    * สำหรับ dealer/sales ค่านี้ไม่ใช้ (scope อิง dealerCode/empId ตามเดิม)
@@ -106,6 +115,17 @@ function readSession(): SessionData {
   const empId = sessionStorage.getItem(KEYS.empId);
   const me = empId ? employeeById(empId) ?? null : null;
   const isAdmin = role === "admin";
+  const isArea = role === "area";
+  let areaStores: string[] = [];
+  if (isArea) {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem(KEYS.areaStores) || "[]");
+      if (Array.isArray(raw)) areaStores = raw.map(String);
+    } catch {
+      /* ignore */
+    }
+  }
+  const areaName = isArea ? sessionStorage.getItem(KEYS.areaName) || null : null;
   // admin อาจเจาะดูร้านหนึ่ง (storeFilter) หรือดูทุกร้าน (null)
   const storeFilter = isAdmin
     ? sessionStorage.getItem(KEYS.storeFilter) || null
@@ -146,6 +166,9 @@ function readSession(): SessionData {
     repDealerName,
     repModel,
     isAdmin,
+    isArea,
+    areaStores,
+    areaName,
     storeFilter,
     adminViewMode,
     adminViewDealer,
@@ -166,10 +189,21 @@ export interface LoginInput {
   repCr?: string;
   repDealerName?: string;
   repModel?: string;
+  /** area: ร้านที่ดูแล + ชื่อ */
+  areaStores?: string[];
+  areaName?: string;
 }
 
-export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repDealerName, repModel }: LoginInput) {
+export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repDealerName, repModel, areaStores, areaName }: LoginInput) {
   sessionStorage.setItem(KEYS.loggedIn, "true");
+  if (role === "area") {
+    sessionStorage.setItem(KEYS.areaStores, JSON.stringify(areaStores ?? []));
+    if (areaName) sessionStorage.setItem(KEYS.areaName, areaName);
+    else sessionStorage.removeItem(KEYS.areaName);
+  } else {
+    sessionStorage.removeItem(KEYS.areaStores);
+    sessionStorage.removeItem(KEYS.areaName);
+  }
   if (dealerCode) sessionStorage.setItem(KEYS.dealerCode, dealerCode);
   else sessionStorage.removeItem(KEYS.dealerCode);
   sessionStorage.setItem(KEYS.role, role);
@@ -243,6 +277,8 @@ export function doLogout() {
   sessionStorage.removeItem(KEYS.repCr);
   sessionStorage.removeItem(KEYS.repDealerName);
   sessionStorage.removeItem(KEYS.repModel);
+  sessionStorage.removeItem(KEYS.areaStores);
+  sessionStorage.removeItem(KEYS.areaName);
   sessionStorage.removeItem(KEYS.adminViewMode);
   sessionStorage.removeItem(KEYS.adminViewDealer);
   sessionStorage.removeItem(KEYS.adminViewRep);
@@ -298,6 +334,7 @@ export function useSession(): {
 export function useHomeHref(): string {
   const { session } = useSession();
   if (session && session.isSales) return "/app/home-staff";
+  if (session && session.isArea) return "/app/stores";
   // admin ใช้ Hub ร่วมกับร้านค้า (เวอร์ชันทุกร้าน)
   return "/app/home";
 }

@@ -1,32 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-// export async function GET(request: Request) {
-//   // The `/auth/callback` route is required for the server-side auth flow implemented
-//   // by the SSR package. It exchanges an auth code for the user's session.
-//   // https://supabase.com/docs/guides/auth/server-side/nextjs
-//   const requestUrl = new URL(request.url);
-//   const code = requestUrl.searchParams.get("code");
-//   const origin = requestUrl.origin;
-//   const redirectTo = requestUrl.searchParams.get("redirect_to")?.toString();
-
-//   if (code) {
-//     const supabase = await createClient();
-//     await supabase.auth.exchangeCodeForSession(code);
-//   }
-
-//   if (redirectTo) {
-//     return NextResponse.redirect(`${origin}${redirectTo}`);
-//   }
-
-//   // URL to redirect to after sign in process completes
-//   return NextResponse.redirect(`${origin}/app`);
-// }
+/** อนุญาตเฉพาะ path ภายในแอป (ขึ้นต้น "/" แต่ไม่ใช่ "//" หรือ "/\") กัน open redirect */
+function safeRedirectPath(raw: string | null | undefined): string {
+  if (!raw) return "/app";
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
+    return "/app";
+  }
+  return raw;
+}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const redirectTo = requestUrl.searchParams.get("redirect_to")?.toString();
+  const next = safeRedirectPath(requestUrl.searchParams.get("redirect_to"));
 
   // Reconstruct origin from headers to handle proxies/production environments
   const host = request.headers.get("host");
@@ -35,12 +22,13 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      return NextResponse.redirect(
+        `${origin}/auth/error?error=${encodeURIComponent(error.message)}`
+      );
+    }
   }
 
-  if (redirectTo) {
-    return NextResponse.redirect(`${origin}${redirectTo}`);
-  }
-
-  return NextResponse.redirect(`${origin}/app`);
+  return NextResponse.redirect(`${origin}${next}`);
 }

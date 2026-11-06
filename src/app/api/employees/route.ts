@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { canAccessDealer, getAuthContext } from "@/lib/supabase/auth-context";
 
 /**
  * ฐานข้อมูลพนักงาน + ร้านค้า (อ่าน)
@@ -15,6 +16,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const sb = createServiceClient();
+    // มี session จริง (Microsoft/email) -> บังคับขอบเขตร้านฝั่ง server ; ไม่มี (เดโม) -> พฤติกรรมเดิม
+    const ctx = await getAuthContext();
 
     if (mode === "roster") {
       if (!dealerCode) {
@@ -22,6 +25,9 @@ export async function GET(req: NextRequest) {
           { ok: false, error: "ต้องระบุ dealerCode" },
           { status: 400 }
         );
+      }
+      if (ctx && !canAccessDealer(ctx, dealerCode)) {
+        return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
       }
       const { data, error } = await sb.rpc("store_roster", {
         p_dealer: dealerCode,
@@ -41,7 +47,13 @@ export async function GET(req: NextRequest) {
         { ok: false, error: error.message },
         { status: 500 }
       );
-    return NextResponse.json({ ok: true, stores: data });
+    const stores =
+      ctx && ctx.allowedDealerCodes !== "all"
+        ? (data as { code: string }[]).filter((s) =>
+            (ctx.allowedDealerCodes as string[]).includes(s.code)
+          )
+        : data;
+    return NextResponse.json({ ok: true, stores });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "server error";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });

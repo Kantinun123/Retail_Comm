@@ -51,7 +51,12 @@ export function StoresScreen() {
   useEffect(() => {
     if (!ready || !session || !caps.canViewAllStores) return;
     fetchStores()
-      .then(setStores)
+      .then((list) =>
+        // Area/Coach เห็นเฉพาะร้านที่ดูแล (API กรองซ้ำอีกชั้นเมื่อมี session จริง)
+        setStores(
+          session.isArea ? list.filter((s) => session.areaStores.includes(s.code)) : list
+        )
+      )
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [ready, session, caps.canViewAllStores]);

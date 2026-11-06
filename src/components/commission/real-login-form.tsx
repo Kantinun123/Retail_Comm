@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./icon";
 import { loginWithEmail } from "@/lib/commission/auth-login";
+import { MicrosoftLoginButton } from "./microsoft-login-button";
 
 /** ฟอร์ม login จริง (email/password + Supabase Auth) — identity bridge ไป session เดิม */
 export function RealLoginForm() {
@@ -76,6 +77,8 @@ export function RealLoginForm() {
           </div>
         </div>
       </div>
+
+      <MicrosoftLoginButton />
 
       {/* Form */}
       <form className="flex flex-col space-y-3.5" onSubmit={handleSubmit}>
