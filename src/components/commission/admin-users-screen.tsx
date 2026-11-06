@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon } from "./icon";
 import { useSession } from "@/lib/commission/session";
+import { refreshAdminPending } from "@/lib/commission/admin-pending";
 import { cn } from "@/lib/utils";
 
 type Tab = "pending" | "approved" | "rejected";
@@ -90,6 +91,7 @@ export function AdminUsersScreen() {
         if (j.credentials) setCreds(j.credentials);
         setMsg({ type: "ok", text: action === "reset" ? "รีเซ็ตแล้ว" : "ปิดคำขอแล้ว" });
         setResetReload((n) => n + 1);
+        refreshAdminPending();
       }
     } finally {
       setBusy(null);
@@ -175,6 +177,7 @@ export function AdminUsersScreen() {
         if (j.credentials) setCreds(j.credentials);
         setMsg({ type: "ok", text: action === "approve" ? "อนุมัติแล้ว" : "บันทึกแล้ว" });
         setReload((r) => r + 1);
+        refreshAdminPending();
       }
     } finally {
       setBusy(null);

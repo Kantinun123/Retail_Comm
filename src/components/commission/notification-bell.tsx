@@ -14,6 +14,7 @@ import {
   type NotifItem,
 } from "@/lib/commission/notifications";
 import { useSession } from "@/lib/commission/session";
+import { useAdminPending } from "@/lib/commission/admin-pending";
 import { cn } from "@/lib/utils";
 
 /** เวลาแบบย่อ "x นาทีที่แล้ว" / วันเวลา */
@@ -46,6 +47,9 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotifItem[]>([]);
   const [unread, setUnread] = useState(0);
+  // งานที่รอ admin (คำขอสมัคร/รีเซ็ตรหัสผ่าน) — เป็นตัวเลขสดจากฐานข้อมูล ไม่หายจนกว่าจะดำเนินการ
+  const pending = useAdminPending(!!session?.isAdmin);
+  const badge = unread + pending.total;
   const [toast, setToast] = useState<NotifItem | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const lastSeenId = useRef<string | null>(null);
@@ -138,10 +142,10 @@ export function NotificationBell({
             )}
           >
             <span className="relative">
-              <Icon name="notifications" className="text-2xl" fill={unread > 0 || open} />
-              {unread > 0 && (
+              <Icon name="notifications" className="text-2xl" fill={badge > 0 || open} />
+              {badge > 0 && (
                 <span className="absolute -top-1 -right-1.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[#d32029] text-white text-[9px] font-bold flex items-center justify-center">
-                  {unread > 9 ? "9+" : unread}
+                  {badge > 9 ? "9+" : badge}
                 </span>
               )}
             </span>
@@ -161,10 +165,10 @@ export function NotificationBell({
             aria-label="การแจ้งเตือน"
             className="relative w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-[#a11119] active:scale-95 transition"
           >
-            <Icon name="notifications" className="text-xl" fill={unread > 0} />
-            {unread > 0 && (
+            <Icon name="notifications" className="text-xl" fill={badge > 0} />
+            {badge > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#d32029] text-white text-[9px] font-bold flex items-center justify-center">
-                {unread > 9 ? "9+" : unread}
+                {badge > 9 ? "9+" : badge}
               </span>
             )}
           </button>
@@ -195,7 +199,41 @@ export function NotificationBell({
             </div>
 
             <div className="overflow-y-auto">
-              {items.length === 0 ? (
+              {pending.total > 0 && (
+                <ul className="divide-y divide-amber-100 border-b border-slate-100 bg-amber-50/60">
+                  {(
+                    [
+                      { n: pending.signups, icon: "how_to_reg", title: "คำขอสมัครรออนุมัติ", detail: "ร้านค้าที่สมัครและรอ admin อนุมัติ" },
+                      { n: pending.resets, icon: "key", title: "คำขอรีเซ็ตรหัสผ่าน", detail: "ร้านค้าขอรหัสผ่านชั่วคราวใหม่" },
+                    ] as const
+                  )
+                    .filter((p) => p.n > 0)
+                    .map((p) => (
+                      <li key={p.title}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            router.push("/app/admin-users");
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 flex items-start space-x-2.5 hover:bg-amber-50 transition"
+                        >
+                          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                            <Icon name={p.icon} className="text-lg" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[12px] font-semibold text-slate-700">
+                              {p.title} {p.n} รายการ
+                            </p>
+                            <p className="text-[11px] text-slate-500">{p.detail}</p>
+                          </div>
+                          <Icon name="chevron_right" className="text-slate-300 text-lg shrink-0 self-center" />
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              )}
+              {items.length === 0 && pending.total === 0 ? (
                 <div className="px-3.5 py-8 text-center">
                   <Icon
                     name="notifications_off"
