@@ -39,7 +39,8 @@ for (let r = 1; r < md.length; r++) {
   const code = cleanCode(md[r][iCode]);
   if (!code) continue;
   masterByCode.set(code, {
-    region: String(md[r][iRegion] ?? "").trim() || null,
+    // รวม "อีสาน1"/"อีสาน2" เป็น "อีสาน" (ตามที่ผู้ใช้กำหนด) — ไม่แก้ไฟล์ CSV ต้นฉบับ
+    region: (String(md[r][iRegion] ?? "").trim().replace(/^อีสาน\s*\d+$/, "อีสาน")) || null,
     province: String(md[r][iProv] ?? "").trim() || null,
   });
 }
