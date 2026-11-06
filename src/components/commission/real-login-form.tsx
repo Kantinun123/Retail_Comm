@@ -152,7 +152,10 @@ export function RealLoginForm() {
             {showForgot && (
               <p className="mt-2 text-[11px] text-slate-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
                 ติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน ผู้ดูแลจะออกรหัสผ่านชั่วคราวให้
-                และระบบจะให้ตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก
+                และระบบจะให้ตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก{" "}
+                <Link href="/auth/forgot" className="font-bold text-[#d32029] underline">
+                  ส่งคำขอรีเซ็ตรหัสผ่าน
+                </Link>
               </p>
             )}
           </div>

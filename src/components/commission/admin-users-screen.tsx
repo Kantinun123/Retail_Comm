@@ -48,6 +48,54 @@ export function AdminUsersScreen() {
   const [newEmail, setNewEmail] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // คำขอรีเซ็ตรหัสผ่านจากร้านค้า
+  interface ResetReq {
+    id: number;
+    dealer_code: string;
+    dealer_name: string | null;
+    account_email: string | null;
+    contact_name: string;
+    phone: string;
+    note: string | null;
+    created_at: string;
+  }
+  const [resetReqs, setResetReqs] = useState<ResetReq[]>([]);
+  const [resetReload, setResetReload] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/reset-requests", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => !cancelled && j.ok && setResetReqs(j.requests))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [resetReload]);
+
+  async function handleReset(r: ResetReq, action: "reset" | "dismiss") {
+    if (action === "reset" && !window.confirm(`ยืนยันตัวตนผู้ติดต่อแล้ว และรีเซ็ตรหัสผ่านร้าน ${r.dealer_name ?? r.dealer_code}?`)) return;
+    setBusy(`req-${r.id}`);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/reset-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: r.id, action }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setMsg({ type: "err", text: j.error ?? "ทำรายการไม่สำเร็จ" });
+      } else {
+        if (j.credentials) setCreds(j.credentials);
+        setMsg({ type: "ok", text: action === "reset" ? "รีเซ็ตแล้ว" : "ปิดคำขอแล้ว" });
+        setResetReload((n) => n + 1);
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
   useEffect(() => {
     fetch("/api/public/dealers")
       .then((r) => r.json())
@@ -173,6 +221,51 @@ export function AdminUsersScreen() {
               ปิด
             </button>
           </div>
+        </div>
+      )}
+
+      {resetReqs.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5">
+          <p className="text-[13px] font-bold text-amber-900 mb-2">
+            คำขอรีเซ็ตรหัสผ่าน ({resetReqs.length})
+          </p>
+          <div className="space-y-2">
+            {resetReqs.map((r) => (
+              <div key={r.id} className="bg-white rounded-xl border border-amber-100 p-3">
+                <p className="text-[13px] font-bold text-slate-900">
+                  {r.dealer_name ?? r.dealer_code} ({r.dealer_code})
+                </p>
+                <p className="text-[12px] text-slate-600 mt-0.5">
+                  {r.contact_name} · โทร {r.phone}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {r.account_email ? `บัญชี: ${r.account_email}` : "ร้านนี้ยังไม่มีบัญชีที่อนุมัติแล้ว"}
+                  {" · "}
+                  {new Date(r.created_at).toLocaleString("th-TH")}
+                </p>
+                {r.note && <p className="text-[11px] text-slate-500 mt-1">หมายเหตุ: {r.note}</p>}
+                <div className="flex gap-2 mt-2">
+                  <button
+                    disabled={busy === `req-${r.id}` || !r.account_email}
+                    onClick={() => handleReset(r, "reset")}
+                    className="flex-1 py-2 rounded-xl bg-[#d32029] text-white text-[12px] font-bold disabled:opacity-40"
+                  >
+                    รีเซ็ตรหัสผ่าน
+                  </button>
+                  <button
+                    disabled={busy === `req-${r.id}`}
+                    onClick={() => handleReset(r, "dismiss")}
+                    className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-[12px] font-bold disabled:opacity-40"
+                  >
+                    ปิดคำขอ
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10.5px] text-amber-800 mt-2">
+            ติดต่อกลับที่เบอร์ในคำขอเพื่อยืนยันตัวตนก่อนกดรีเซ็ต
+          </p>
         </div>
       )}
 
