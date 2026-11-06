@@ -41,6 +41,44 @@ export function AdminUsersScreen() {
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const [reload, setReload] = useState(0);
+  // รหัสผ่านชั่วคราวที่เพิ่งสร้าง/รีเซ็ต — แสดงครั้งเดียว ไม่เก็บที่อื่น
+  const [creds, setCreds] = useState<{ email: string; tempPassword: string } | null>(null);
+  const [dealers, setDealers] = useState<{ code: string; name: string }[]>([]);
+  const [newDealer, setNewDealer] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/public/dealers")
+      .then((r) => r.json())
+      .then((j) => j.ok && setDealers(j.dealers))
+      .catch(() => {});
+  }, []);
+
+  async function createAccount() {
+    if (!newDealer) return;
+    setCreating(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", dealerCode: newDealer, email: newEmail }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setMsg({ type: "err", text: j.error ?? "สร้างบัญชีไม่สำเร็จ" });
+      } else {
+        setCreds(j.credentials);
+        setNewDealer("");
+        setNewEmail("");
+        setMsg({ type: "ok", text: "สร้างบัญชีแล้ว" });
+        setReload((r) => r + 1);
+      }
+    } finally {
+      setCreating(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -67,9 +105,9 @@ export function AdminUsersScreen() {
     };
   }, [tab, reload]);
 
-  async function act(u: UserRow, action: "approve" | "reject" | "revoke") {
+  async function act(u: UserRow, action: "approve" | "reject" | "revoke" | "reset") {
     let reason: string | undefined;
-    if (action !== "approve") {
+    if (action === "reject" || action === "revoke") {
       const r = window.prompt(action === "reject" ? "เหตุผลที่ปฏิเสธ" : "เหตุผลที่ระงับ", "");
       if (r === null) return;
       reason = r;
@@ -86,6 +124,7 @@ export function AdminUsersScreen() {
       if (!j.ok) {
         setMsg({ type: "err", text: j.error ?? "ทำรายการไม่สำเร็จ" });
       } else {
+        if (j.credentials) setCreds(j.credentials);
         setMsg({ type: "ok", text: action === "approve" ? "อนุมัติแล้ว" : "บันทึกแล้ว" });
         setReload((r) => r + 1);
       }
@@ -105,7 +144,66 @@ export function AdminUsersScreen() {
         <Link href="/app/home" aria-label="กลับ" className="p-2 -ml-2 rounded-xl hover:bg-slate-100">
           <Icon name="arrow_back" className="text-xl" />
         </Link>
-        <h1 className="text-[17px] font-bold text-slate-900">อนุมัติผู้ใช้ร้านค้า</h1>
+        <h1 className="text-[17px] font-bold text-slate-900">บัญชีผู้ใช้ร้านค้า</h1>
+      </div>
+
+      {creds && (
+        <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3.5">
+          <p className="text-[12px] font-bold text-amber-900">บัญชีสำหรับส่งให้ร้าน (แสดงครั้งเดียว)</p>
+          <p className="text-[13px] mt-1.5 text-slate-800">
+            ผู้ใช้: <b className="select-all">{creds.email}</b>
+          </p>
+          <p className="text-[13px] text-slate-800">
+            รหัสผ่านชั่วคราว: <b className="select-all font-mono">{creds.tempPassword}</b>
+          </p>
+          <p className="text-[11px] text-amber-800 mt-1.5">
+            ร้านต้องตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก · ปิดกล่องนี้แล้วจะดูรหัสไม่ได้อีก
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => navigator.clipboard?.writeText(`ผู้ใช้: ${creds.email}\nรหัสผ่านชั่วคราว: ${creds.tempPassword}`)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-[12px] font-bold"
+            >
+              คัดลอก
+            </button>
+            <button
+              onClick={() => setCreds(null)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-[12px] font-bold"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-4 bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
+        <p className="text-[13px] font-bold text-slate-900 mb-2">สร้างบัญชีให้ร้าน</p>
+        <select
+          value={newDealer}
+          onChange={(e) => setNewDealer(e.target.value)}
+          className="w-full bg-[#faf8f8] text-[13px] rounded-xl px-3 py-2.5 border border-slate-200"
+        >
+          <option value="">เลือกร้าน</option>
+          {dealers.map((d) => (
+            <option key={d.code} value={d.code}>
+              {d.name} ({d.code})
+            </option>
+          ))}
+        </select>
+        <input
+          type="email"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          placeholder="อีเมลร้าน (ไม่บังคับ — ว่างไว้จะใช้ รหัสร้าน@retail-comm.local)"
+          className="w-full mt-2 bg-[#faf8f8] text-[13px] rounded-xl px-3 py-2.5 border border-slate-200"
+        />
+        <button
+          onClick={createAccount}
+          disabled={!newDealer || creating}
+          className="w-full mt-2.5 py-2.5 rounded-xl bg-[#d32029] text-white text-[13px] font-bold disabled:opacity-40"
+        >
+          {creating ? "กำลังสร้าง..." : "สร้างบัญชีและสุ่มรหัสผ่าน"}
+        </button>
       </div>
 
       <div className="flex gap-2 mb-3">
@@ -187,6 +285,19 @@ export function AdminUsersScreen() {
                       className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-[12px] font-bold disabled:opacity-40"
                     >
                       ปฏิเสธ
+                    </button>
+                  )}
+                  {u.status === "approved" && (
+                    <button
+                      disabled={busy === u.id}
+                      onClick={() => {
+                        if (window.confirm(`รีเซ็ตรหัสผ่านของ ${u.email}? รหัสเดิมจะใช้ไม่ได้ทันที`)) {
+                          act(u, "reset");
+                        }
+                      }}
+                      className="flex-1 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-[12px] font-bold disabled:opacity-40"
+                    >
+                      รีเซ็ตรหัสผ่าน
                     </button>
                   )}
                   {u.status === "approved" && (

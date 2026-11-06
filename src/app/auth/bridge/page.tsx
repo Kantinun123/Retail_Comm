@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { doLogin } from "@/lib/commission/session";
+import { setMustChangePassword } from "@/lib/commission/auth-login";
 
 interface Me {
   role: string;
   name: string | null;
   storeCodes: string[] | null;
   dealerCode: string | null;
+  mustChangePassword?: boolean;
 }
 
 /** หลัง login ด้วย Microsoft: อ่านตัวตนจริงจาก /api/me แล้วตั้ง session (identity bridge) */
@@ -41,7 +43,8 @@ export default function AuthBridgePage() {
           router.replace("/app/stores");
         } else if (role === "dealer" && json.me.dealerCode) {
           doLogin({ role: "dealer", dealerCode: json.me.dealerCode });
-          router.replace("/app/home");
+          setMustChangePassword(!!json.me.mustChangePassword);
+          router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/home");
         } else {
           // sales ยังใช้ล็อกอินเดโมในรอบนี้
           setMessage("บัญชีประเภทนี้ยังไม่เปิดให้ใช้ Microsoft login");

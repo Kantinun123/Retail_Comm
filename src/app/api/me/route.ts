@@ -39,6 +39,7 @@ export async function GET() {
       name,
       repCode: ctx.repCode,
       dealerCode: ctx.dealerCode,
+      mustChangePassword: ctx.mustChangePassword,
       storeCodes: ctx.allowedDealerCodes === "all" ? null : ctx.allowedDealerCodes,
     },
   });

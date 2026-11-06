@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthContext } from "@/lib/supabase/auth-context";
+import { generateTempPassword } from "@/lib/supabase/temp-password";
 
 /**
  * จัดการคำขอสมัครผู้ใช้ (admin เท่านั้น — ต้องมี session จริงที่ role=admin เสมอ)
@@ -72,7 +73,14 @@ export async function POST(req: NextRequest) {
   const adm = await requireAdmin();
   if (!adm.ok) return NextResponse.json({ ok: false, error: adm.error }, { status: adm.status });
 
-  let body: { userId?: string; action?: string; dealerCode?: string; reason?: string };
+  let body: {
+    userId?: string;
+    action?: string;
+    dealerCode?: string;
+    reason?: string;
+    email?: string;
+    fullName?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -80,9 +88,65 @@ export async function POST(req: NextRequest) {
   }
   const userId = String(body.userId ?? "").trim();
   const action = String(body.action ?? "");
-  if (!userId) return NextResponse.json({ ok: false, error: "missing userId" }, { status: 400 });
 
   const sb = createServiceClient();
+
+  // สร้างบัญชีให้ร้าน (แจกบัญชี): สร้าง auth user + อนุมัติทันที + บังคับเปลี่ยนรหัสครั้งแรก
+  if (action === "create") {
+    const dealerCode = String(body.dealerCode ?? "").trim();
+    if (!dealerCode) return NextResponse.json({ ok: false, error: "ต้องระบุร้าน" }, { status: 400 });
+    const { data: dealer } = await sb.from("dealers").select("code").eq("code", dealerCode).maybeSingle();
+    if (!dealer) return NextResponse.json({ ok: false, error: "ไม่พบร้านนี้" }, { status: 400 });
+
+    const { data: taken } = await sb
+      .from("profiles")
+      .select("email")
+      .eq("dealer_code", dealerCode)
+      .eq("role", "dealer")
+      .eq("status", "approved")
+      .maybeSingle();
+    if (taken) {
+      return NextResponse.json(
+        { ok: false, error: `ร้านนี้มีบัญชีอยู่แล้ว (${taken.email})` },
+        { status: 409 }
+      );
+    }
+
+    // ไม่มีอีเมลจริง -> ใช้อีเมลสมมติตามรหัสร้าน (รีเซ็ตรหัสทางอีเมลไม่ได้ ต้องให้ admin รีเซ็ต)
+    const email = (String(body.email ?? "").trim() || `${dealerCode}@retail-comm.local`).toLowerCase();
+    const tempPassword = generateTempPassword();
+    const { data: created, error: cErr } = await sb.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name: String(body.fullName ?? "").trim() || null },
+    });
+    if (cErr || !created.user) {
+      return NextResponse.json({ ok: false, error: cErr?.message ?? "สร้างบัญชีไม่สำเร็จ" }, { status: 400 });
+    }
+    const { error: pErr } = await sb
+      .from("profiles")
+      .update({
+        role: "dealer",
+        dealer_code: dealerCode,
+        status: "approved",
+        must_change_password: true,
+        approved_by: adm.ctx.userId,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", created.user.id);
+    if (pErr) {
+      // ย้อนกลับ ไม่ให้เหลือบัญชีค้างที่ไม่มีสิทธิ์
+      await sb.auth.admin.deleteUser(created.user.id);
+      return NextResponse.json(
+        { ok: false, error: pErr.code === "23505" ? "ร้านนี้มีบัญชีอยู่แล้ว" : pErr.message },
+        { status: pErr.code === "23505" ? 409 : 500 }
+      );
+    }
+    return NextResponse.json({ ok: true, credentials: { email, tempPassword } });
+  }
+
+  if (!userId) return NextResponse.json({ ok: false, error: "missing userId" }, { status: 400 });
   const { data: target } = await sb
     .from("profiles")
     .select("id, role, status, requested_dealer_code")
@@ -135,6 +199,18 @@ export async function POST(req: NextRequest) {
       );
     }
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "reset") {
+    if (target.role !== "dealer" || target.status !== "approved") {
+      return NextResponse.json({ ok: false, error: "รีเซ็ตได้เฉพาะบัญชีร้านค้าที่อนุมัติแล้ว" }, { status: 400 });
+    }
+    const tempPassword = generateTempPassword();
+    const { error: uErr } = await sb.auth.admin.updateUserById(userId, { password: tempPassword });
+    if (uErr) return NextResponse.json({ ok: false, error: uErr.message }, { status: 500 });
+    await sb.from("profiles").update({ must_change_password: true }).eq("id", userId);
+    const { data: prof } = await sb.from("profiles").select("email").eq("id", userId).single();
+    return NextResponse.json({ ok: true, credentials: { email: prof?.email ?? "", tempPassword } });
   }
 
   if (action === "reject" || action === "revoke") {

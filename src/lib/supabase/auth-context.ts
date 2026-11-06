@@ -14,6 +14,7 @@ export interface AuthContext {
   role: string;
   repCode: string | null;
   dealerCode: string | null;
+  mustChangePassword: boolean;
   allowedDealerCodes: "all" | string[];
 }
 
@@ -25,7 +26,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
 
   const { data: profile } = await sb
     .from("profiles")
-    .select("role, status, rep_code, dealer_code")
+    .select("role, status, rep_code, dealer_code, must_change_password")
     .eq("id", user.id)
     .single();
   if (!profile || profile.status !== "approved" || !profile.role) return null;
@@ -52,6 +53,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     role: profile.role,
     repCode: profile.rep_code ?? null,
     dealerCode: profile.dealer_code ?? null,
+    mustChangePassword: !!profile.must_change_password,
     allowedDealerCodes: allowed,
   };
 }

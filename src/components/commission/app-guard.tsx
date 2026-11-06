@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/lib/commission/session";
 import { useDatasetReady } from "@/lib/commission/dataset";
 
@@ -16,11 +16,22 @@ export function AppGuard({ children }: { children: React.ReactNode }) {
   const { session, ready } = useSession();
   const router = useRouter();
 
+  const pathname = usePathname();
+
   useEffect(() => {
     if (dataReady && ready && (!session || !session.loggedIn)) {
       router.replace("/");
+      return;
     }
-  }, [dataReady, ready, session, router]);
+    // บัญชีที่ admin แจกให้: ต้องเปลี่ยนรหัสผ่านก่อนใช้หน้าอื่น
+    if (
+      session?.loggedIn &&
+      sessionStorage.getItem("mustChangePw") === "1" &&
+      pathname !== "/app/change-password"
+    ) {
+      router.replace("/app/change-password");
+    }
+  }, [dataReady, ready, session, router, pathname]);
 
   if (!dataReady || !ready || !session || !session.loggedIn) {
     return (

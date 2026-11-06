@@ -10,6 +10,7 @@ import {
   employeeById,
 } from "./logic";
 import { subscribeDataset } from "./dataset";
+import { createClient } from "@/lib/supabase/client";
 import type { Dealer, FilterState, Role, TeamMember } from "./types";
 
 /** ร้าน placeholder กัน session.dealer เป็น undefined ตอน dataset ยังไม่โหลด */
@@ -267,6 +268,15 @@ export function exitAdminView() {
 }
 
 export function doLogout() {
+  sessionStorage.removeItem("mustChangePw");
+  // ออกจาก Supabase session จริงด้วย (ไม่แตะ anonymous ของเดโม) กัน API ฝั่ง server ยัง scope ตามผู้ใช้เดิม
+  const sb = createClient();
+  sb.auth
+    .getSession()
+    .then(({ data }) => {
+      if (data.session && !data.session.user.is_anonymous) return sb.auth.signOut();
+    })
+    .catch(() => {});
   sessionStorage.removeItem(KEYS.loggedIn);
   sessionStorage.removeItem(KEYS.dealerCode);
   sessionStorage.removeItem(KEYS.role);

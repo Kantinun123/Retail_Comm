@@ -24,7 +24,13 @@ export function RealLoginForm() {
     try {
       const res = await loginWithEmail(email.trim(), password);
       if (res.ok) {
-        router.push(res.role === "sales" ? "/app/home-staff" : "/app/home");
+        router.push(
+          res.mustChangePassword
+            ? "/app/change-password"
+            : res.role === "sales"
+              ? "/app/home-staff"
+              : "/app/home"
+        );
         return;
       }
       if (res.status === "pending") {

@@ -19,6 +19,16 @@ export interface AuthLoginResult {
   status?: string;
   /** role ใน session หลัง login สำเร็จ */
   role?: Role;
+  /** บัญชีที่ admin แจกให้ ต้องเปลี่ยนรหัสผ่านก่อนใช้งาน */
+  mustChangePassword?: boolean;
+}
+
+const MUST_CHANGE_KEY = "mustChangePw";
+
+/** ตั้ง/ล้างธง "ต้องเปลี่ยนรหัสผ่าน" (AppGuard จะพาไปหน้าเปลี่ยนรหัสจนกว่าจะล้าง) */
+export function setMustChangePassword(v: boolean) {
+  if (v) sessionStorage.setItem(MUST_CHANGE_KEY, "1");
+  else sessionStorage.removeItem(MUST_CHANGE_KEY);
 }
 
 /** map profile.role (6 แบบ) -> Role ของ session (3 แบบ) ชั่วคราวในเฟสนี้
@@ -56,7 +66,7 @@ export async function loginWithEmail(
   // อ่าน profile ของผู้ login (RLS: read own profile)
   const { data: profile, error: pErr } = await sb
     .from("profiles")
-    .select("status, role, emp_id, dealer_code, reject_reason")
+    .select("status, role, emp_id, dealer_code, reject_reason, must_change_password")
     .eq("id", auth.user.id)
     .single();
 
@@ -86,7 +96,8 @@ export async function loginWithEmail(
     empId: role === "sales" ? profile.emp_id ?? undefined : undefined,
   });
 
-  return { ok: true, role };
+  setMustChangePassword(!!profile.must_change_password);
+  return { ok: true, role, mustChangePassword: !!profile.must_change_password };
 }
 
 /** ออกจากระบบทั้ง Supabase session และ sessionStorage */

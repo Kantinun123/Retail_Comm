@@ -359,16 +359,25 @@ export function HomeHubScreen() {
       {/* Header */}
       <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
         <span className="font-bold text-[16px] text-[#231313]">หน้าหลัก</span>
-        <button
-          onClick={() => {
-            doLogout();
-            router.replace("/");
-          }}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
-        >
-          <Icon name="logout" style={{ fontSize: 16 }} />
-          ออกจากระบบ
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/app/change-password"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
+          >
+            <Icon name="key" style={{ fontSize: 16 }} />
+            เปลี่ยนรหัสผ่าน
+          </Link>
+          <button
+            onClick={() => {
+              doLogout();
+              router.replace("/");
+            }}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
+          >
+            <Icon name="logout" style={{ fontSize: 16 }} />
+            ออกจากระบบ
+          </button>
+        </div>
       </header>
 
       <div className="space-y-5 pb-4">
