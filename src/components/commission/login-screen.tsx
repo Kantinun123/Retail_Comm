@@ -200,6 +200,7 @@ function DemoLoginScreen() {
   const [dealerCode, setDealerCode] = useState<string>(dealers[0]?.code ?? "");
   const [password, setPassword] = useState("1234");
   const [showPwd, setShowPwd] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
   const [error, setError] = useState("");
   // พนักงานขาย (sale_reps) ของร้านที่เลือก — ใช้ตอน role=sales
   const [reps, setReps] = useState<SaleRep[]>([]);
@@ -527,10 +528,21 @@ function DemoLoginScreen() {
                 <Icon name="lock" className="text-base text-[#d32029]" />
                 <span>รหัสผ่าน / PIN</span>
               </span>
-              <span className="text-[12px] font-semibold text-[#d32029]">
+              <button
+                type="button"
+                onClick={() => setShowForgot((s) => !s)}
+                aria-expanded={showForgot}
+                className="text-[12px] font-semibold text-[#d32029] hover:underline"
+              >
                 ลืมรหัสผ่าน?
-              </span>
+              </button>
             </div>
+            {showForgot && (
+              <p className="mb-2 text-[11px] text-slate-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                ติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน ผู้ดูแลจะออกรหัสผ่านชั่วคราวให้
+                และระบบจะให้ตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก
+              </p>
+            )}
             <div className="relative flex items-center">
               <input
                 type={showPwd ? "text" : "password"}
