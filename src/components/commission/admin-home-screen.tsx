@@ -261,6 +261,17 @@ export function AdminHomeScreen() {
               <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
             </Link>
 
+            <Link href="/app/stores" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 transition">
+              <div className="w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
+                <Icon name="groups" className="text-2xl" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14.5px] font-bold text-slate-900">ร้านค้าและทีมงาน</p>
+                <p className="text-[11px] text-slate-500">ร้าน · Area/Coach · พนักงาน จัดการครบที่เดียว</p>
+              </div>
+              <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
+            </Link>
+
             <Link href="/app/redemptions" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 transition">
               <div className="w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
                 <Icon name="redeem" className="text-2xl" />

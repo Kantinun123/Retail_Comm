@@ -54,3 +54,42 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.src = src;
   });
 }
+
+/** ย่อรูปแล้วคืนเป็น JPEG Blob (สำหรับอัปโหลดขึ้น Storage)
+ *  - ด้านยาวสุดไม่เกิน maxDim พิกเซล ; ไม่ขยายรูปที่เล็กกว่าอยู่แล้ว
+ *  - เบราว์เซอร์สมัยใหม่หมุนรูปตาม EXIF ให้เองตอนวาดลง canvas */
+export async function fileToResizedBlob(
+  file: File,
+  maxDim = 1600,
+  quality = 0.85
+): Promise<Blob> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("ไฟล์ที่เลือกไม่ใช่รูปภาพ");
+  }
+  // รูปจากกล้องมือถือใหญ่ได้ถึงหลาย MB ; จำกัดไฟล์ต้นทางที่ 25MB กันเครื่องค้าง
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error("ไฟล์รูปใหญ่เกินไป (จำกัด 25MB)");
+  }
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const img = await loadImage(dataUrl);
+
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("ไม่สามารถประมวลผลรูปได้");
+  ctx.drawImage(img, 0, 0, w, h);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("แปลงรูปไม่สำเร็จ"))),
+      "image/jpeg",
+      quality
+    );
+  });
+}
