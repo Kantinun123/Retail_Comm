@@ -15,6 +15,7 @@ import {
   tenureFromStartDate,
   saveEmployee,
   uploadEmployeePhoto,
+  deleteEmployeePhoto,
   LEVEL_META,
   POSITION_LABEL,
   type Employee,
@@ -122,6 +123,19 @@ export function EmployeeEditModal({
     }
   }
 
+  async function onRemovePhoto() {
+    if (!form.repCode || !form.photoUrl) return;
+    if (!window.confirm("ลบรูปของพนักงานคนนี้? รูปจะถูกลบออกจากระบบทันที")) return;
+    setMsg(null);
+    const res = await deleteEmployeePhoto(form.repCode);
+    if (res.ok) {
+      patch({ photoUrl: null });
+      setMsg({ type: "ok", text: "ลบรูปแล้ว" });
+    } else {
+      setMsg({ type: "err", text: res.error ?? "ลบรูปไม่สำเร็จ" });
+    }
+  }
+
   async function onSave() {
     if (!form.name.trim()) {
       setMsg({ type: "err", text: "กรุณากรอกชื่อพนักงาน" });
@@ -223,8 +237,17 @@ export function EmployeeEditModal({
                 className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#d32029] bg-red-50 border border-red-100 px-3 py-1.5 rounded-full active:scale-95"
               >
                 <Icon name="photo_camera" style={{ fontSize: 16 }} />
-                อัปโหลดรูป
+                {form.photoUrl ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
               </button>
+              {form.photoUrl && form.repCode && (
+                <button
+                  onClick={onRemovePhoto}
+                  className="ml-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full hover:text-[#a11119] active:scale-95"
+                >
+                  <Icon name="delete" style={{ fontSize: 16 }} />
+                  ลบรูป
+                </button>
+              )}
               <p className="text-[10px] text-slate-400 mt-1">
                 {form.repCode ? "JPG/PNG ≤ 5MB" : "บันทึกก่อนจึงอัปรูปได้"}
               </p>

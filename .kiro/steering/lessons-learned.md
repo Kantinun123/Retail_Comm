@@ -613,3 +613,44 @@ export const dynamic = "force-dynamic";
 - `/auth/callback` เดิมต่อ `redirect_to` ตรง ๆ (open redirect `//evil.com`) -> ตรวจให้เป็น path ภายในเท่านั้น และถ้า exchange code ล้มเหลวให้ไป `/auth/error`
 - `server-only` ไม่ได้ติดตั้งในโปรเจค อย่า import
 - ยังไม่ได้ทดสอบ OAuth จริง (รอ Tenant/Client ID) ; ตรวจแล้วเฉพาะ tsc, `/api/me` ไม่ login = 401, callback กัน `//evil.com`
+
+---
+
+## 🏪 ร้านค้าสมัครเอง + admin อนุมัติ (email/password, 1 บัญชีต่อร้าน)
+
+- flow: `/auth/signup` (`supabase.auth.signUp` + user_metadata: full_name/phone/requested_dealer_code) -> ยืนยันอีเมล -> `/auth/callback` -> `/auth/bridge` -> (pending) `/auth/pending` ; admin อนุมัติที่ `/app/admin-users` (`/api/admin/users` GET/POST)
+- trigger `handle_new_user` เก็บคำขอไว้ใน `profiles.requested_dealer_code` / `phone` (ไม่ตั้ง role/dealer_code จนกว่า admin อนุมัติ) ; ตรวจว่ารหัสร้านมีจริง ; ทดสอบด้วย DO block ที่ insert ลง auth.users แล้ว `raise exception` เพื่อ rollback (ได้ status=pending, req_dealer ตรง)
+- 1 บัญชีต่อร้าน: partial unique index `profiles_one_dealer_account_per_store` + API ตรวจก่อน (409) ; ต้อง "ระงับ" บัญชีเดิมก่อน
+- `/api/admin/users` ใช้ `getAuthContext()` ต้องเป็น admin **session จริงเสมอ** (ไม่ผูก flag REAL_AUTH) -> admin ที่เข้าแบบเดโมใช้หน้านี้ไม่ได้ (จะได้ 401 พร้อมข้อความอธิบาย) ต้อง login ด้วย Microsoft หรือ `/auth/email`
+- ESLint `set-state-in-effect`: อย่าเรียกฟังก์ชัน async ที่ setState จาก useEffect ผ่าน useCallback ; เขียน `fetch().then()` ใน effect ตรง ๆ + ตัวนับ `reload` สำหรับรีเฟรช, และ setLoading(true) ใน event handler แทน
+- ต้องเปิด "Confirm email" ใน Supabase Auth (Providers > Email) เองใน dashboard ; SMTP เริ่มต้นของ Supabase จำกัดจำนวนอีเมลต่อชั่วโมง ควรตั้ง custom SMTP ก่อนเปิดจริง (ยังไม่ได้ตรวจค่าที่ตั้งไว้)
+
+---
+
+## 🔐 แจกบัญชีร้าน + เปลี่ยนรหัสผ่าน (must_change_password)
+
+- admin สร้างบัญชีที่ `/app/admin-users` (`POST /api/admin/users {action:'create'}`): `auth.admin.createUser(email_confirm:true)` + อัปเดต profile เป็น dealer/approved/`must_change_password=true` ; ถ้าอัปเดต profile ล้มเหลวต้อง `deleteUser` ย้อนกลับ ไม่ให้เหลือ auth user ค้าง ; ไม่ระบุอีเมล -> `<รหัสร้าน>@retail-comm.local` (รีเซ็ตทางอีเมลไม่ได้ ต้องให้ admin รีเซ็ต)
+- รหัสชั่วคราวสุ่มด้วย `crypto.randomInt` (`src/lib/supabase/temp-password.ts`) แสดงให้ admin ครั้งเดียว ไม่ log ไม่เก็บ
+- เปลี่ยนรหัสผ่านผ่าน `POST /api/account/password` (service_role `updateUserById` แล้วเคลียร์ flag) ไม่ใช้ `auth.updateUser` ฝั่ง client เพราะผู้ใช้เคลียร์ flag เองไม่ได้ (trigger ป้องกันคอลัมน์ ตอบ 42501) ; ทดสอบแล้ว: login รหัสชั่วคราวได้, เคลียร์ flag เองถูกบล็อก, เปลี่ยนรหัสแล้วรหัสเก่าใช้ไม่ได้
+- การบังคับเปลี่ยนรหัสเป็นระดับหน้าจอ (sessionStorage `mustChangePw` + `AppGuard` redirect) ; API อื่นยังไม่ปฏิเสธจนกว่าจะเปลี่ยน (`/api/me` ส่ง `mustChangePassword` ไว้ให้บังคับฝั่ง server ภายหลัง)
+- `doLogout()` เดิมล้างแค่ sessionStorage ไม่ได้ออกจาก Supabase session จริง -> cookie ผู้ใช้เก่ายังอยู่ ทำให้ API ที่ใช้ `getAuthContext()` scope ตามคนเดิมหลังสลับบัญชีเดโม ; แก้ให้ `doLogout` signOut เฉพาะ session ที่ไม่ใช่ anonymous
+- ESLint `set-state-in-effect` ที่ `home-hub-screen.tsx:207` เป็นของเดิม ไม่เกี่ยวกับงานนี้
+
+---
+
+## 🔁 คำขอรีเซ็ตรหัสผ่านจากร้านค้า (ไม่ต้อง SMTP)
+
+- ร้านส่งที่ `/auth/forgot` -> `POST /api/public/reset-request` (ไม่ต้อง login) -> ตาราง `password_reset_requests` (RLS เปิดไม่มี policy, เข้าถึงผ่าน service_role) -> admin ดูและกด "รีเซ็ตรหัสผ่าน"/"ปิดคำขอ" ใน `/app/admin-users` (`/api/admin/reset-requests`)
+- API สาธารณะตอบ `ok:true` เหมือนกันทั้งกรณีร้านไม่มีจริง/ซ้ำ (ไม่เปิดเผยว่าร้านมีบัญชีไหม) ; unique index ร้านละ 1 คำขอที่ค้าง (23505 ถือว่าสำเร็จ) ; ตัดความยาวชื่อ/เบอร์/หมายเหตุ
+- ทดสอบ: ส่งซ้ำแล้วเหลือ 1 แถว, ร้านไม่มีจริงไม่สร้างแถว, ชื่อว่างได้ 400 ; ลบแถวทดสอบแล้ว ; ส่วน admin ต้องใช้ session จริงจึงยังไม่ได้ทดสอบผ่านหน้าจอ (ไม่ login ได้ 401)
+- PowerShell: ส่ง body ภาษาไทยด้วย `Invoke-WebRequest` ให้แปลงเป็น bytes UTF-8 (`[Text.Encoding]::UTF8.GetBytes`) ; ฟังก์ชันชื่อ `Post` ใน script ยาว ๆ ทำให้ output หาย ใช้ชื่ออื่น เช่น `Send`
+
+---
+
+## 🖼️ รูปพนักงาน SE จาก PowerPoint (รายชื่อ SE_...pptx) — จับคู่ตามตำแหน่งผิดได้ ต้องให้คนตรวจ
+
+- pptx = zip: รูปอยู่ `ppt/media/`, ตำแหน่งใน `ppt/slides/slideN.xml` (`<p:pic>` + `a:off/a:ext`, `r:embed` -> `_rels`) ; ข้อความกล่องร้านมีชื่อ/ชื่อเล่น/วันเข้างาน/Tel/Email แต่ **รูปไม่ได้ผูกกับชื่อ** ต้องเดาจากตำแหน่ง (คอลัมน์เดียวกัน เรียงบนลงล่าง)
+- รูปถูกครอปบนสไลด์ด้วย `<a:srcRect l t r b>` (หน่วย 1/1000 %) — ต้อง extract ตามนี้ ไม่งั้นได้รูปเต็มตัว+ชื่อใต้รูป
+- **จับคู่ตามตำแหน่งผิด 8 คน** (สไลด์ที่กล่องร้านซ้อนกัน/รูปวางข้ามคอลัมน์) แม้หลายรายได้ "ความมั่นใจสูง" -> ต้องสร้างภาพรวมพร้อมชื่อ (`--sheet`) ให้ผู้ใช้ตรวจด้วยตาก่อน apply เสมอ ; ผลการตรวจเก็บเป็น `OVERRIDE`/`EXCLUDE` ในสคริปต์ให้รันซ้ำได้
+- สคริปต์: `scripts/import-se-photos-pptx.mjs` (dry-run เป็นค่าเริ่มต้น, ไม่เขียนทับรูปเดิมเว้นแต่ `--overwrite`, `--include-review` เมื่อผู้ใช้ยืนยันภาพรวมแล้ว) ; อัปโหลด 61 คน -> bucket `employee-photos/<rep_code>.jpg` (≤800px)
+- PowerShell: ห้ามส่งสตรีม progress ของ `Expand-Archive` ปน stdout (ตั้ง `$ProgressPreference='SilentlyContinue'`) ; อ่านผลจากไฟล์ log แทน console เมื่อ output ยาว/มีภาษาไทย

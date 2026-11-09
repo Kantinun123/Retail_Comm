@@ -348,6 +348,16 @@ export async function uploadEmployeePhoto(
   return (await res.json()) as { ok: boolean; url?: string; error?: string };
 }
 
+/** ลบรูปพนักงาน (ไฟล์ใน storage + photo_url) */
+export async function deleteEmployeePhoto(
+  repCode: string
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`/api/employees/admin/photo?repCode=${encodeURIComponent(repCode)}`, {
+    method: "DELETE",
+  });
+  return (await res.json()) as { ok: boolean; error?: string };
+}
+
 /* ---------------- Area / Coach ของร้าน ---------------- */
 
 export type SupervisorRole = "manager" | "coach";

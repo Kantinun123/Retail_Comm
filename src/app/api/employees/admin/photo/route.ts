@@ -112,3 +112,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
+
+/**
+ * ลบรูปพนักงาน
+ * - DELETE /api/employees/admin/photo?repCode=SR0001
+ * - ลบไฟล์ใน bucket (ทุกนามสกุลที่เป็นไปได้ของ repCode) แล้วตั้ง sale_reps.photo_url = null
+ */
+export async function DELETE(req: NextRequest) {
+  const adm = await verifyAdmin();
+  if (!adm.ok)
+    return NextResponse.json({ ok: false, error: adm.error }, { status: 403 });
+
+  const repCode = req.nextUrl.searchParams.get("repCode")?.trim() ?? "";
+  // รหัสพนักงานรูปแบบ SR#### เท่านั้น กันการลบไฟล์อื่นใน bucket
+  if (!/^SR\d{3,6}$/.test(repCode))
+    return NextResponse.json({ ok: false, error: "invalid repCode" }, { status: 400 });
+
+  try {
+    const sb = createServiceClient();
+    const paths = Object.values(EXT).map((ext) => `${repCode}.${ext}`);
+    const { error: rmErr } = await sb.storage.from(BUCKET).remove(paths);
+    if (rmErr)
+      return NextResponse.json({ ok: false, error: rmErr.message }, { status: 500 });
+
+    const { error: updErr } = await sb
+      .from("sale_reps")
+      .update({ photo_url: null })
+      .eq("rep_code", repCode);
+    if (updErr)
+      return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "server error";
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
