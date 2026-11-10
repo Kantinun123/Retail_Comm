@@ -252,6 +252,17 @@ export function AdminHomeScreen() {
         <section>
           <h3 className="text-[12px] font-bold text-[#5b21b6] mb-2 px-1">จัดการระบบ</h3>
           <div className="space-y-2.5">
+            <Link href="/app/data-center" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 hover:-translate-y-0.5 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
+                <Icon name="cloud_sync" className="text-2xl" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14.5px] font-bold text-slate-900">ศูนย์ข้อมูล</p>
+                <p className="text-[11px] text-slate-500">สถานะ sync รายวัน · ความครบรายเดือน · อัปโหลดไฟล์</p>
+              </div>
+              <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
+            </Link>
+
             <Link href="/app/database" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 transition">
               <div className="w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
                 <Icon name="database" className="text-2xl" />

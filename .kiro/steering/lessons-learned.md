@@ -727,3 +727,11 @@ export const dynamic = "force-dynamic";
 - ❌ `import-service-sales.mjs` (LHS) เดิมล้างตารางแล้ว insert ใหม่ — ถ้ารันอัตโนมัติแล้วพังกลางทาง ข้อมูลหาย + rep_code หาย → ✅ เปลี่ยนเป็น diff ด้วย "ลายเซ็นทั้งแถว + จำนวนครั้ง" (project_number ซ้ำได้) + guard ลดเกิน 30%
 - สคริปต์ลูก exit 2 = guard (ข้อมูลลดผิดปกติ) → runner บันทึก `guard` ไม่อัปเดต state รอบหน้าจะลองใหม่ ; log ที่ `logs/sync-YYYY-MM-DD.log` (gitignored, เก็บ 30 วัน) + ตาราง `sync_runs`
 - VBScript อ่านไฟล์เป็น ANSI → อย่าใส่ภาษาไทยในไฟล์ .vbs
+
+### ศูนย์ข้อมูล + อัปโหลด BA Commission ผ่านเว็บ
+- หน้า `/app/database` เดิมเป็นเดโม localStorage (ไม่ได้ต่อ Supabase) — อย่าสับสน ; หน้าจริงคือ `/app/data-center` (admin session จริงเท่านั้น, API 401 ในโหมดเดโม)
+- สคริปต์ import เดิมพึ่ง `commission-app/Master_*.csv` ที่อยู่แค่ในเครื่อง (gitignored) → บน Vercel ไม่มีไฟล์ → ย้ายเป็นตาราง `master_aliases` (seed ด้วย `scripts/seed-master-aliases.mjs`, ชนกันใช้ค่าหลังสุดให้ตรงกับ Map.set เดิม) ; win_date ใช้ `ba_service_sales_lines` แทนไฟล์ Pending
+- แทนที่ทั้งเดือนต้องทำใน transaction เดียว → RPC `replace_ba_incentive_period` (delete + insert จาก jsonb_populate_recordset) ; supabase-js ทำ transaction เองไม่ได้
+- ตัวอ่านไฟล์ (`src/lib/server/ba-commission-parse.ts`) ไม่ import อะไรจาก DB/alias `@/` → ทดสอบตรงด้วย `node` (Node 24 strip types) เทียบกับข้อมูลจริงได้: ก.ย. 510/510 ตรง ร้าน/CR/rep, ไฟล์รวม มิ.ย. 877 แถวยอดตรง
+- สคริปต์เดิมอ่านวันที่ string รูปแบบ `YYYY-MM-DD` ไม่ได้ (เก็บเป็น null 17 แถวใน ก.ย.) — ตัวอ่านใหม่รองรับ serial / d/m/yyyy / ISO
+- Vercel จำกัด body ~4.5 MB → ตรวจขนาดรวมทั้งฝั่ง client และ server (4 MB)
