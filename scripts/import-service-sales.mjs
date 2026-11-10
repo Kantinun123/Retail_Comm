@@ -60,7 +60,11 @@ function groupOf(h3u, h5u) {
 }
 
 /* ---- อ่านไฟล์ ---- */
-const wb = XLSX.read(readFileSync(join(DIR, FILE)), { type: "buffer" });
+// --file <path> = อ่านจากไฟล์อื่น (เช่น โฟลเดอร์ SharePoint ที่ sync ลงเครื่อง) ; ไม่ใส่ = ไฟล์เดิมใน commission-app
+const fileIdx = process.argv.indexOf("--file");
+const SRC = fileIdx > -1 ? process.argv[fileIdx + 1] : join(DIR, FILE);
+console.log(`ไฟล์: ${SRC}`);
+const wb = XLSX.read(readFileSync(SRC), { type: "buffer" });
 const d = XLSX.utils.sheet_to_json(wb.Sheets["Sheet1"], { header: 1, blankrows: false, defval: null });
 const H = {}; d[0].forEach((c, i) => (H[String(c).trim()] = i));
 const S = (row, k) => String(row[H[k]] ?? "").trim();
