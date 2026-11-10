@@ -26,6 +26,15 @@ import { fetchDesignIntake, type DiSummary } from "@/lib/commission/design-intak
 import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
+import {
+  AttentionList,
+  MonthOverview,
+  PerformanceCards,
+  buildAttention,
+  perfStatus,
+  useLatestEvalFails,
+  type PeriodAmount,
+} from "./home-performance";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -245,6 +254,9 @@ export function HomeHubScreen() {
     };
   }, [dealerCode]);
 
+  // ข้อที่ตกในการตรวจล่าสุด (เฉพาะดูร้านเดียว) — ใช้ในเรื่องที่ควรดู
+  const evalFails = useLatestEvalFails(dealerCode, evalSum);
+
   if (!ready || !session) return null;
 
   // Back Margin + LHS Channel Discount = เฉพาะร้าน Housing Expert (SCG Home ซ่อน)
@@ -293,14 +305,6 @@ export function HomeHubScreen() {
   const pctOf = (v: number | null, base: number | null) =>
     v == null || base == null || base <= 0 ? null : (v / base) * 100;
 
-  // ผลตรวจประเมินร้าน (แสดงเฉพาะร้านที่มีผลตรวจ)
-  const evalLatest = evalSum?.latest ?? null;
-  const showEval = (evalSum?.count ?? 0) > 0;
-
-  // ความพึงพอใจของลูกค้า (แสดงเฉพาะร้านที่มีข้อมูล)
-  const showCustSat = (csSum?.count ?? 0) > 0;
-  const custSatPct = csSum?.avgPct ?? 0;
-
   // ยอดขายงานบริการ (แยกหัวข้อยอดขาย) — ยอดตามปีที่เลือก
   const showServiceSales = (ssSum?.count ?? 0) > 0;
   const serviceSalesTotal = ssSum ? sumByYear(ssSum.months, activeYear, (m) => m.amount) : null;
@@ -323,12 +327,23 @@ export function HomeHubScreen() {
   const productSalesTotal = prodSales ? sumByYear(prodSales.months, activeYear, (m) => m.amount) : null;
   const productSalesSource = (prodSales?.sources ?? []).map((x) => (x === "di" ? "DI" : "Odoo")).join(" + ");
 
-  // แบบรับเข้า (Material / Solution) ตามปีที่เลือก — แสดงเมื่อมีข้อมูล
-  const diMaterial = di ? sumByYear(di.months, activeYear, (m) => m.material) : null;
-  const diSolution = di ? sumByYear(di.months, activeYear, (m) => m.solution) : null;
-  const showDesign = (di?.months.length ?? 0) > 0;
+  // ---- ภาพรวมเดือนล่าสุด + ผลงานร้าน + เรื่องที่ควรดู (ไม่ขึ้นกับปีที่เลือก) ----
+  const benefitMonths: PeriodAmount[] = [
+    ...(showBackMargin ? (bm?.months ?? []).map((m) => ({ period: m.period, amount: m.payoutTotal ?? m.lineTotal })) : []),
+    ...(ps?.months ?? []).map((m) => ({ period: m.period, amount: m.profitShare })),
+    ...(showLhsDiscount ? (pd?.months ?? []).map((m) => ({ period: m.period, amount: m.discount })) : []),
+  ].reduce<PeriodAmount[]>((acc, m) => {
+    const cur = acc.find((x) => x.period === m.period);
+    if (cur) cur.amount += m.amount;
+    else acc.push({ ...m });
+    return acc;
+  }, []);
+  const attention = adminAllStores ? [] : buildAttention({ evalSum, evalFails, csSum, di });
+  const hasPerf = (evalSum?.count ?? 0) > 0 || (csSum?.count ?? 0) > 0 || (di?.months.length ?? 0) > 0;
+  const status = adminAllStores ? null : perfStatus(attention, hasPerf);
+  const attentionLoading = loading || (!!dealerCode && !!evalSum?.latest && evalFails === null);
 
-  // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
+  // กลุ่มร้านค้า = ยอดเงินล้วน (ผลงานร้าน แยกเป็นหัวข้อของตัวเองด้านบน)
   const storeCards: CardData[] = [
     ...(showBackMargin
       ? [{ key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading, pct: pctOf(backMargin, storeTotal) } as CardData]
@@ -336,43 +351,6 @@ export function HomeHubScreen() {
     { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading, pct: pctOf(profitBa, storeTotal) },
     ...(showLhsDiscount
       ? [{ key: "lhs-pd", href: "/app/lhs-purchase-discount", icon: "sell", label: "LHS Channel Discount", sub: "ส่วนลดช่องทาง 7% งานหลังคา (HE)", total: purchaseDiscount, loading, pct: pctOf(purchaseDiscount, storeTotal) } as CardData]
-      : []),
-    ...(showEval
-      ? [{
-          key: "store-eval",
-          href: "/app/store-eval",
-          icon: "fact_check",
-          label: "ผลตรวจประเมินร้านค้า",
-          sub: "มาตรฐานการให้บริการ (ล่าสุด)",
-          total: null,
-          loading,
-          display: evalLatest ? `${Math.round(evalLatest.pct * 100)}%` : "—",
-          badge: evalLatest?.result ? { text: evalLatest.result, pass: evalLatest.result === "ผ่าน" } : null,
-        } as CardData]
-      : []),
-    ...(showCustSat
-      ? [{
-          key: "cust-sat",
-          href: "/app/cust-sat",
-          icon: "sentiment_satisfied",
-          label: "ความพึงพอใจของลูกค้า",
-          sub: "คะแนนเฉลี่ยจากแบบประเมิน",
-          total: null,
-          loading,
-          display: `${Math.round(custSatPct * 100)}%`,
-        } as CardData]
-      : []),
-    ...(showDesign
-      ? [{
-          key: "design-intake",
-          href: "/app/design-intake",
-          icon: "architecture",
-          label: "แบบรับเข้า",
-          sub: `Material ${(diMaterial ?? 0).toLocaleString("th-TH")} · Solution ${(diSolution ?? 0).toLocaleString("th-TH")}`,
-          total: null,
-          loading,
-          display: `${((diMaterial ?? 0) + (diSolution ?? 0)).toLocaleString("th-TH")} แบบ`,
-        } as CardData]
       : []),
   ];
 
@@ -423,7 +401,20 @@ export function HomeHubScreen() {
 
         <ProfileCard />
 
-        {/* เลือกปี */}
+        {/* ภาพรวมเดือนล่าสุด → ผลงานร้าน → เรื่องที่ควรดู (ค่าล่าสุด ไม่ขึ้นกับปีที่เลือก) */}
+        <MonthOverview
+          loading={loading}
+          benefitMonths={benefitMonths}
+          productMonths={(prodSales?.months ?? []).map((m) => ({ period: m.period, amount: m.amount }))}
+          serviceMonths={(ssSum?.months ?? []).map((m) => ({ period: m.period, amount: m.amount }))}
+          status={status}
+          attention={attention}
+          scopeAll={adminAllStores}
+        />
+        <PerformanceCards loading={loading} evalSum={evalSum} csSum={csSum} di={di} scopeAll={adminAllStores} />
+        {!adminAllStores && hasPerf && <AttentionList loading={attentionLoading} items={attention} />}
+
+        {/* เลือกปี (มีผลกับยอดผลประโยชน์และยอดขายด้านล่าง) */}
         {years.length > 0 && (
           <YearChips years={years} activeYear={activeYear} onSelect={(y) => setYear(y)} />
         )}

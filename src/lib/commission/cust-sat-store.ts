@@ -11,6 +11,7 @@ export interface CsMonth {
   overall: number;       // เฉลี่ย 0-10
   reviewCount: number;
   improveCount: number;  // จำนวนรีวิวที่มีข้อเสนอให้แก้ไขในเดือนนั้น
+  lowCount: number;      // จำนวนรีวิวที่มีด้านใดได้คะแนน < 7
 }
 
 export interface CsInsight {
@@ -87,7 +88,7 @@ export function getCachedCustSatSummary(dealerCode: string | null): CsSummary | 
 }
 
 /* ---------------- map helpers ---------------- */
-type RawMonth = { period: string; pct: number | string; overall: number | string; review_count: number | string; improve_count?: number | string };
+type RawMonth = { period: string; pct: number | string; overall: number | string; review_count: number | string; improve_count?: number | string; low_count?: number | string };
 function mapMonth(r: RawMonth): CsMonth {
   return {
     period: r.period,
@@ -95,6 +96,7 @@ function mapMonth(r: RawMonth): CsMonth {
     overall: Number(r.overall ?? 0),
     reviewCount: Number(r.review_count ?? 0),
     improveCount: Number(r.improve_count ?? 0),
+    lowCount: Number(r.low_count ?? 0),
   };
 }
 
