@@ -654,3 +654,15 @@ export const dynamic = "force-dynamic";
 - **จับคู่ตามตำแหน่งผิด 8 คน** (สไลด์ที่กล่องร้านซ้อนกัน/รูปวางข้ามคอลัมน์) แม้หลายรายได้ "ความมั่นใจสูง" -> ต้องสร้างภาพรวมพร้อมชื่อ (`--sheet`) ให้ผู้ใช้ตรวจด้วยตาก่อน apply เสมอ ; ผลการตรวจเก็บเป็น `OVERRIDE`/`EXCLUDE` ในสคริปต์ให้รันซ้ำได้
 - สคริปต์: `scripts/import-se-photos-pptx.mjs` (dry-run เป็นค่าเริ่มต้น, ไม่เขียนทับรูปเดิมเว้นแต่ `--overwrite`, `--include-review` เมื่อผู้ใช้ยืนยันภาพรวมแล้ว) ; อัปโหลด 61 คน -> bucket `employee-photos/<rep_code>.jpg` (≤800px)
 - PowerShell: ห้ามส่งสตรีม progress ของ `Expand-Archive` ปน stdout (ตั้ง `$ProgressPreference='SilentlyContinue'`) ; อ่านผลจากไฟล์ log แทน console เมื่อ output ยาว/มีภาษาไทย
+
+---
+
+## 🔄 BA ยอดขายงานบริการ: ต้นทางคือ Google Sheet → sync ด้วย job_id (ไม่ลบทั้งตาราง)
+
+- ไฟล์ `Pending B2C Offline.xlsx` มาจาก Google Sheet (ผู้ใช้ยืนยัน) ; ลิงก์ export CSV เก็บใน `.env` = `BA_GSHEET_CSV_URL` ; สคริปต์ `scripts/sync-ba-service-sales-gsheet.mjs` (dry-run ค่าเริ่มต้น)
+- ต้นทางแก้ย้อนหลังได้ (งานหายจาก win, ย้ายเดือน, ยอดเปลี่ยน) -> ต้อง sync เพิ่ม/แก้/ลบ ด้วย `job_id` (มี unique index `uq_ba_service_sales_jobid`) ; upsert ก่อนแล้วค่อยลบ ; กันพังถ้ายอด/จำนวนลด >30% (exit 2)
+- Google Sheet CSV มีค่า error ของสูตร (`#N/A`) -> ต้องแปลงเป็น null ไม่งั้นทับค่าว่างในฐานข้อมูล (เจอใน region 8 งาน)
+- วันที่ใน Sheet เป็น "YYYY-MM-DD HH:MM:SS" ใช้ส่วนวันที่ตรง ๆ จะตรงกับ period ที่นำเข้าจาก xlsx เดิม (ตรวจแล้วเดือน ธ.ค.25–ส.ค.26 ตรงกันทุกเดือน)
+- web_fetch: export CSV ของ Google Sheet redirect ไป `*.googleusercontent.com` (ต้องอนุมัติ origin แยก) ; ใน node ใช้ `fetch(..., {redirect:"follow"})` ได้ตรง
+- Sheet ตอนนี้แชร์แบบ "ทุกคนที่มีลิงก์" ทั้งที่มีชื่อลูกค้า -> แจ้งผู้ใช้ให้จำกัดสิทธิ์ แล้วเปลี่ยนไปอ่านด้วย Google service account
+- ผล sync ครั้งแรก (2026-11-08): เพิ่ม 86 (พ.ย.) แก้ 4 ลบ 3 -> 7,119 งาน ยอด 202,590,627.69 ; รันซ้ำได้ 0/0/0 (idempotent)
