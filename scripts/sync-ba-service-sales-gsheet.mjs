@@ -233,3 +233,5 @@ for (let i = 0; i < delIds.length; i += CHUNK) {
 }
 const { count } = await sb.from("ba_service_sales_lines").select("id", { count: "exact", head: true });
 console.log(`\nDONE: เพิ่ม ${toInsert.length} | แก้ ${toUpdate.length} | ลบ ${toDelete.length} | ในตารางตอนนี้ ${count} งาน`);
+// ผูกพนักงาน (rep_code/sales_name จาก ba_incentive_lines ด้วย job_code) ให้งานใหม่
+{ const { data, error } = await sb.rpc("refresh_service_sales_reps"); console.log(error ? `refresh reps ไม่สำเร็จ: ${error.message}` : `refresh reps: ${JSON.stringify(data)}`); }

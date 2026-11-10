@@ -711,3 +711,11 @@ export const dynamic = "force-dynamic";
 - ❌ จับคู่ด้วยชื่อต้นอย่างเดียวพลาด: "วิจิตรา ฐิติพลธำรง" ถูกจับเป็น "วิจิตรา ไตรพิมพ์" → ✅ ถ้าชื่อในไฟล์มีนามสกุล (token ≥5 ตัว) ที่ไม่ตรงนามสกุลในระบบ (เทียบ 2 ตัวอักษรแรก เผื่อสะกดต่าง) ให้ปฏิเสธ
 - ตรวจหลัง sync: query rep_code ที่มีหลาย salesperson string เพื่อหาคู่ที่น่าสงสัย
 - ร้าน HE บางร้าน (5100119, 5100163, 5100967, 5100968, 5100974) มีทั้ง Odoo (ถึง ~มี.ค. 2026) และ DI → เป็นการย้ายระบบ POS ไม่ใช่ยอดซ้ำ รวมกันได้
+
+### Service Sales detail (LHS/Rudy + BA): ผูกพนักงาน + RPC ใหม่
+- BA (`ba_service_sales_lines`) **ไม่มีคอลัมน์พนักงานร้าน** (Google Sheet มีแค่ `assignee_sales_team` = ทีมขาย Q-Chang ส่วนกลาง) → ผูกผ่าน `job_code` กับ `ba_incentive_lines` (rep_code + sale_rep_name) ได้ 93.6% ของยอด
+- LHS/Rudy `sales_name` (ผู้สร้างโครงการ) ตรงชื่อเต็มกับ sale_reps ในร้านเดียวกันได้ ~51% ของยอด (ที่เหลือเช่น "housing", "sfg-solution" = บัญชีกลาง)
+- ฟังก์ชัน `refresh_service_sales_reps()` ต้องเรียกหลัง import/sync ทุกครั้ง (import-service-sales ล้างทั้งตาราง → rep_code หาย) — ใส่ไว้ใน import-service-sales, import-ba-service-sales, sync-ba-service-sales-gsheet, backfill-rep-code แล้ว
+- ❌ ฟังก์ชัน `STABLE` ใช้ temp table (create/insert) ไม่ได้ ("INSERT is not allowed in a non-volatile function") → ✅ เขียนเป็น `language sql` + CTE หลายชั้นแทน
+- เปลี่ยน signature RPC (เพิ่ม param) ต้อง `drop function` ของเดิมก่อน ไม่งั้นเกิด overload; ตั้ง default ให้ param ใหม่ทุกตัว → โค้ด production เดิมที่เรียกด้วยชื่อ param เดิมยังทำงานได้ (DB ใช้ร่วมกับ production)
+- `/api/service-sales` เดิมไม่มีการเช็คสิทธิ์เลย (ร้านที่ล็อกอินจริงส่ง dealerCode ว่าง = เห็นทุกร้าน) → เพิ่ม getAuthContext: sales บังคับ repCode ตัวเอง, ร้านต้องส่ง dealerCode ของตัวเอง

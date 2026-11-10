@@ -70,3 +70,5 @@ async function applyUpdates(table, idToRep) {
   await applyUpdates("commission_product_lines", idToRep);
 }
 console.log("DONE backfill rep_code");
+/* ---- ยอดขายงานบริการ: LHS/Rudy (ชื่อ) + BA (job_code -> ba_incentive_lines) ---- */
+{ const { data, error } = await sb.rpc("refresh_service_sales_reps"); console.log(error ? `refresh service sales reps ไม่สำเร็จ: ${error.message}` : `refresh service sales reps: ${JSON.stringify(data)}`); }

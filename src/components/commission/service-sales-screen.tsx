@@ -1,12 +1,13 @@
 "use client";
 
 /* =============================================================
-   หน้ายอดขายงานบริการ (Service Sales)
-   - hero: ยอดรวมของปีที่เลือก + จำนวนงาน + 3 กลุ่ม (สรุปปี)
-   - เลือกปีได้ (default = ปีล่าสุด)
-   - รายเดือนของปีนั้น -> ใต้แต่ละเดือนมี 3 กลุ่มงานบริการ
-   - กดกลุ่มในเดือน -> เปิด modal ดูราย job (ตัด PII ชื่อลูกค้า)
-   - dealer เห็นเฉพาะร้านตัวเอง ; admin เห็นรวมทุกร้าน + ยอดไม่ระบุร้าน
+   หน้ายอดขายงานบริการ (Service Sales) — LHS/Rudy · BA · รวม
+   - hero: ยอดสะสมปีที่เลือก + เทียบปีก่อน + เดือนล่าสุดที่ครบ / เฉลี่ย / กลุ่มอันดับ 1
+   - กราฟรายเดือน (ไฮไลต์เดือนล่าสุดที่มีข้อมูลเป็นค่าเริ่มต้น ; กดแท่งเพื่อเลือกเดือน)
+   - ทั้งปี: 3 กลุ่มงาน (+หมวดย่อย) · พนักงานขาย (มุมมองร้าน) · อันดับร้าน (admin ทุกร้าน)
+   - เดือนที่เลือก: 3 กลุ่มงาน (+หมวดย่อย) · พนักงานขาย · ปุ่มดูรายการงานทั้งเดือน
+   - ทุกแถวกดได้ -> หน้าต่างรายการงาน (รูปแบบเดิม) กรองตามกลุ่ม/หมวดย่อย/พนักงาน/ร้าน
+   - ขอบเขต: ร้านเห็นร้านตัวเอง ; พนักงานเห็นเฉพาะงานที่ตัวเองขาย ; admin ทุกร้าน (+ไม่ระบุร้าน)
    ============================================================= */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,13 +23,20 @@ import {
   fetchServiceSalesMonths,
   fetchServiceSalesJobs,
   fetchServiceSalesSources,
+  fetchServiceSalesBreakdown,
+  ssPersonLabel,
   type SsSummary,
   type SsGroup,
   type SsMonthDetail,
   type SsJob,
+  type SsJobQuery,
+  type SsJobsResult,
   type SsSource,
   type SsSourceAmount,
+  type SsBreakdown,
+  type SsPersonRow,
 } from "@/lib/commission/service-sales-store";
+import { cn } from "@/lib/utils";
 
 /** ข้อมูลประจำแหล่งข้อมูล (หัวข้อ + ลิงก์หน้า detail) */
 const SOURCE_META: Record<SsSource, { label: string; short: string; icon: string; href: string }> = {
@@ -36,14 +44,18 @@ const SOURCE_META: Record<SsSource, { label: string; short: string; icon: string
   ba: { label: "ยอดขาย BA", short: "BA", icon: "home_repair_service", href: "/app/service-sales/ba" },
 };
 
+const TH_MONTH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const monthFull = (p: string) => { const [y, m] = p.split("-").map(Number); return `${TH_MONTH[m - 1]} ${y + 543}`; };
+const monthShort = (p: string) => { const [, m] = p.split("-").map(Number); return TH_SHORT[m - 1]; };
+const prevPeriod = (p: string) => { const [y, m] = p.split("-").map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`; };
+const lyPeriod = (p: string) => { const [y, m] = p.split("-").map(Number); return `${y - 1}-${String(m).padStart(2, "0")}`; };
+const curPeriod = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const yearLabelOf = (y: string | null) => (y ? `ปี ${Number(y) + 543}` : "ทุกปี");
 function baht(n: number): string {
   return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 0 });
 }
-const MONTH_TH = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-function periodLabel(period: string): string {
-  const [y, m] = period.split("-");
-  return `${MONTH_TH[Number(m)] ?? m} ${Number(y) + 543}`;
-}
+const mil = (v: number) => (Math.abs(v) >= 1e6 ? `฿${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e3 ? `฿${(v / 1e3).toFixed(0)}K` : baht(v));
 function fmtDate(iso: string | null): string {
   if (!iso) return "-";
   try {
@@ -52,116 +64,207 @@ function fmtDate(iso: string | null): string {
     return iso;
   }
 }
+const pctText = (cur: number, base: number | null | undefined) =>
+  base == null || base === 0 ? null : ((cur - base) / Math.abs(base)) * 100;
 
 /* สีประจำกลุ่ม */
-const GROUP_META: Record<string, { icon: string; color: string; bar: string; soft: string }> = {
-  "ROOF SERVICE": { icon: "roofing", color: "text-[#d32029]", bar: "bg-[#d32029]", soft: "bg-red-50" },
-  "SMART SOLUTION": { icon: "bolt", color: "text-sky-600", bar: "bg-sky-500", soft: "bg-sky-50" },
-  "Qchang": { icon: "handyman", color: "text-amber-600", bar: "bg-amber-500", soft: "bg-amber-50" },
+const GROUP_META: Record<string, { icon: string; color: string; bar: string; soft: string; ring: string }> = {
+  "ROOF SERVICE": { icon: "roofing", color: "text-[#d32029]", bar: "bg-[#d32029]", soft: "bg-red-50", ring: "border-red-100" },
+  "SMART SOLUTION": { icon: "bolt", color: "text-sky-600", bar: "bg-sky-500", soft: "bg-sky-50", ring: "border-sky-100" },
+  "Qchang": { icon: "handyman", color: "text-amber-600", bar: "bg-amber-500", soft: "bg-amber-50", ring: "border-amber-100" },
 };
-function groupMeta(k: string) {
-  return GROUP_META[k] ?? { icon: "category", color: "text-slate-600", bar: "bg-slate-400", soft: "bg-slate-50" };
+function groupMeta(k: string | null | undefined) {
+  return (k && GROUP_META[k]) || { icon: "category", color: "text-slate-600", bar: "bg-slate-400", soft: "bg-slate-50", ring: "border-slate-100" };
+}
+const GROUP_SHORT: Record<string, string> = { "ROOF SERVICE": "ROOF", "SMART SOLUTION": "SMART", Qchang: "Qchang" };
+
+/* ---------------- หน้าต่างรายการงาน ---------------- */
+interface JobsView {
+  query: SsJobQuery;
+  title: string;
+  /** ช่วงเวลา/ขอบเขต เช่น "พ.ศ. 2569" หรือ "ก.ย. 2569" */
+  scope: string;
+  icon: string;
+  group: string | null;
+}
+const PAGE = 100;
+
+function JobCard({ j, showSource }: { j: SsJob; showSource: boolean }) {
+  const meta = groupMeta(j.group3);
+  return (
+    <div className="rounded-xl border border-slate-100 p-2.5">
+      {j.customerName && (
+        <p className="text-[12.5px] font-bold text-slate-900 flex items-center gap-1 mb-0.5">
+          <Icon name="person" style={{ fontSize: 14 }} className="text-slate-400" />
+          <span className="truncate">{j.customerName}</span>
+        </p>
+      )}
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[12px] font-semibold text-slate-700 flex-1 min-w-0">{j.subSolutionName || j.solutionName || j.subGroup || "-"}</p>
+        <span className="tnum text-[13px] font-bold text-[#a11119] shrink-0">{baht(j.amount)}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-slate-400">
+        {showSource && (
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-500">{SOURCE_META[j.source].short}</span>
+        )}
+        {j.typeOfJob && (
+          <span className={"inline-flex items-center rounded-full px-1.5 py-0.5 font-semibold " + (j.typeOfJob === "I" ? "bg-emerald-50 text-emerald-600" : "bg-sky-50 text-sky-600")}>
+            {j.typeOfJob === "I" ? "I · ติดตั้ง" : "S · สำรวจ"}
+          </span>
+        )}
+        {j.subGroup && <span className={"inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold " + meta.soft + " " + meta.color}>{j.subGroup}</span>}
+        {j.provinceName && (
+          <span className="inline-flex items-center gap-0.5">
+            <Icon name="location_on" style={{ fontSize: 11 }} />
+            {j.provinceName}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-0.5">
+          <Icon name="event" style={{ fontSize: 11 }} />
+          {fmtDate(j.closeDate)}
+        </span>
+        {j.projectNumber && <span className="text-slate-300">{j.projectNumber}</span>}
+      </div>
+      {j.salesName && (
+        <p className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
+          <Icon name="badge" style={{ fontSize: 12 }} />
+          พนักงานขาย: <span className="text-slate-600 font-medium truncate">{j.salesName}</span>
+        </p>
+      )}
+    </div>
+  );
 }
 
-/* ---------------- modal ราย job ของเดือน+กลุ่ม ---------------- */
-function JobsModal({
-  dealerCode,
-  period,
-  group,
-  source,
-  onClose,
-}: {
-  dealerCode: string | null;
-  period: string;
-  group: string;
-  source: SsSource | null;
-  onClose: () => void;
-}) {
-  const [jobs, setJobs] = useState<SsJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const meta = groupMeta(group);
+function JobsModal({ view, showSource, onClose }: { view: JobsView; showSource: boolean; onClose: () => void }) {
+  const isYear = !view.query.period;
+  const [sub, setSub] = useState<string | null>(view.query.sub ?? null);
+  const [order, setOrder] = useState<"amount" | "date">(isYear ? "date" : "amount");
+  const [res, setRes] = useState<{ key: string; r: SsJobsResult } | null>(null);
+  const [more, setMore] = useState(false);
+  const query = view.query;
+  const key = JSON.stringify([query, sub, order]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchServiceSalesJobs(dealerCode, period, group, source)
-      .then((j) => { if (!cancelled) setJobs(j); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [dealerCode, period, group, source]);
+    fetchServiceSalesJobs({ ...query, sub, order, offset: 0, limit: PAGE })
+      .then((r) => !cancelled && setRes({ key, r }))
+      .catch(() => !cancelled && setRes({ key, r: { jobs: [], total: 0, totalAmount: 0, subs: [] } }));
+    return () => {
+      cancelled = true;
+    };
+  }, [query, sub, order, key]);
 
-  const total = jobs.reduce((s, j) => s + j.amount, 0);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const loading = !res || res.key !== key;
+  const r = !loading ? res!.r : null;
+  const jobs = r?.jobs ?? [];
+  const meta = groupMeta(view.group);
+  const subs = r?.subs ?? [];
+
+  const loadMore = async () => {
+    if (!r || more) return;
+    setMore(true);
+    try {
+      const next = await fetchServiceSalesJobs({ ...query, sub, order, offset: jobs.length, limit: PAGE });
+      setRes((cur) => (cur && cur.key === key ? { key, r: { ...cur.r, jobs: [...cur.r.jobs, ...next.jobs] } } : cur));
+    } finally {
+      setMore(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between z-10">
-          <div className="min-w-0 flex items-center gap-2">
-            <div className={"w-8 h-8 rounded-lg flex items-center justify-center shrink-0 " + meta.soft + " " + meta.color}>
-              <Icon name={meta.icon} style={{ fontSize: 17 }} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={view.title}
+        className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[88vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 z-10">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex items-center gap-2">
+              <div className={"w-8 h-8 rounded-lg flex items-center justify-center shrink-0 " + meta.soft + " " + meta.color}>
+                <Icon name={view.icon} style={{ fontSize: 17 }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-slate-900 truncate">{view.title}</p>
+                <p className="text-[11px] text-slate-400">
+                  {view.scope}
+                  {r ? ` · ${r.total.toLocaleString("th-TH")} งาน · ${baht(r.totalAmount)}` : ""}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-[14px] font-bold text-slate-900 truncate">{group}</p>
-              <p className="text-[11px] text-slate-400">{periodLabel(period)} · {jobs.length} งาน · {baht(total)}</p>
-            </div>
+            <button type="button" onClick={onClose} aria-label="ปิด" className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 shrink-0">
+              <Icon name="close" style={{ fontSize: 18 }} />
+            </button>
           </div>
-          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-95 shrink-0">
-            <Icon name="close" style={{ fontSize: 18 }} />
-          </button>
+          {(subs.length > 1 || sub) && (
+            <div className="flex gap-1.5 overflow-x-auto no-scrollbar mt-2.5 -mx-1 px-1">
+              {[{ label: null as string | null, jobCount: subs.reduce((a, s) => a + s.jobCount, 0) }, ...subs].map((s) => {
+                const active = s.label === sub;
+                return (
+                  <button
+                    key={s.label ?? "__all__"}
+                    type="button"
+                    onClick={() => setSub(s.label)}
+                    aria-pressed={active}
+                    className={cn(
+                      "shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-bold transition",
+                      active ? "bg-[#d32029] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    )}
+                  >
+                    {s.label ?? "ทั้งหมด"} <span className={active ? "text-red-100" : "text-slate-400"}>{s.jobCount}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex items-center gap-1 mt-2 text-[10.5px]">
+            <span className="text-slate-400 mr-0.5">เรียงตาม:</span>
+            {(["amount", "date"] as const).map((o) => (
+              <button
+                key={o}
+                type="button"
+                onClick={() => setOrder(o)}
+                aria-pressed={order === o}
+                className={cn("rounded-full px-2 py-0.5 font-semibold", order === o ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100")}
+              >
+                {o === "amount" ? "ยอดเงิน" : "วันที่ล่าสุด"}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="p-3 space-y-2">
           {loading ? (
             <p className="text-[12px] text-slate-400 text-center py-6">กำลังโหลด...</p>
           ) : jobs.length === 0 ? (
-            <p className="text-[12px] text-slate-400 text-center py-6">ไม่มีงานในกลุ่มนี้</p>
+            <p className="text-[12px] text-slate-400 text-center py-6">ไม่มีงาน</p>
           ) : (
-            jobs.map((j, i) => (
-              <div key={i} className="rounded-xl border border-slate-100 p-2.5">
-                {j.customerName && (
-                  <p className="text-[12.5px] font-bold text-slate-900 flex items-center gap-1 mb-0.5">
-                    <Icon name="person" style={{ fontSize: 14 }} className="text-slate-400" />
-                    <span className="truncate">{j.customerName}</span>
-                  </p>
-                )}
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-[12px] font-semibold text-slate-700 flex-1 min-w-0">
-                    {j.subSolutionName || j.solutionName || j.subGroup || "-"}
-                  </p>
-                  <span className="tnum text-[13px] font-bold text-[#a11119] shrink-0">{baht(j.amount)}</span>
+            jobs.map((j, i) => {
+              const divider = isYear && order === "date" && j.period && j.period !== jobs[i - 1]?.period;
+              return (
+                <div key={`${j.projectNumber ?? ""}|${i}`}>
+                  {divider && <p className="text-[11px] font-bold text-slate-500 pt-2 pb-1 px-0.5">{monthFull(j.period!)}</p>}
+                  <JobCard j={j} showSource={showSource} />
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-slate-400">
-                  {source === null && (
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-500">
-                      {SOURCE_META[j.source].short}
-                    </span>
-                  )}
-                  {j.typeOfJob && (
-                    <span
-                      className={
-                        "inline-flex items-center rounded-full px-1.5 py-0.5 font-semibold " +
-                        (j.typeOfJob === "I" ? "bg-emerald-50 text-emerald-600" : "bg-sky-50 text-sky-600")
-                      }
-                    >
-                      {j.typeOfJob === "I" ? "I · ติดตั้ง" : "S · สำรวจ"}
-                    </span>
-                  )}
-                  {j.subGroup && (
-                    <span className={"inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold " + meta.soft + " " + meta.color}>
-                      {j.subGroup}
-                    </span>
-                  )}
-                  {j.provinceName && <span className="inline-flex items-center gap-0.5"><Icon name="location_on" style={{ fontSize: 11 }} />{j.provinceName}</span>}
-                  <span className="inline-flex items-center gap-0.5"><Icon name="event" style={{ fontSize: 11 }} />{fmtDate(j.closeDate)}</span>
-                  {j.projectNumber && <span className="text-slate-300">{j.projectNumber}</span>}
-                </div>
-                {j.salesName && (
-                  <p className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
-                    <Icon name="badge" style={{ fontSize: 12 }} />
-                    พนักงานขาย: <span className="text-slate-600 font-medium truncate">{j.salesName}</span>
-                  </p>
-                )}
-              </div>
-            ))
+              );
+            })
+          )}
+          {r && jobs.length < r.total && (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={more}
+              className="w-full rounded-xl bg-[#fee2e2]/60 py-2.5 text-[12px] font-bold text-[#c3161c] active:scale-[0.99] transition disabled:opacity-60"
+            >
+              {more ? "กำลังโหลด..." : `โหลดเพิ่ม (แสดง ${jobs.length.toLocaleString("th-TH")} จาก ${r.total.toLocaleString("th-TH")} งาน)`}
+            </button>
           )}
         </div>
       </div>
@@ -169,74 +272,155 @@ function JobsModal({
   );
 }
 
-/* ---------------- การ์ดเดือน + 3 กลุ่มใต้เดือน ---------------- */
-function MonthCard({
-  month,
-  onOpenJobs,
-}: {
-  month: SsMonthDetail;
-  onOpenJobs: (period: string, group: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
+/* ---------------- ส่วนประกอบหน้า ---------------- */
+function Bar({ value, max, className }: { value: number; max: number; className?: string }) {
+  const w = max > 0 ? Math.max(0, (value / max) * 100) : 0;
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full text-left p-3.5 active:scale-[0.99] transition">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center shrink-0">
-              <Icon name="calendar_month" className="text-xl" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[14px] font-bold text-slate-900">{periodLabel(month.period)}</p>
-              <p className="text-[11px] text-slate-400">{month.jobCount.toLocaleString("th-TH")} งาน · {month.groups.length} กลุ่ม</p>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="tnum text-[16px] font-bold text-slate-900 leading-none">{baht(month.amount)}</p>
-            <div className="flex items-center justify-end gap-0.5 mt-1 text-[10px] font-semibold text-slate-400">
-              {open ? "ซ่อนกลุ่มงาน" : "ดูกลุ่มงาน"}
-              <Icon name={open ? "expand_less" : "expand_more"} style={{ fontSize: 14 }} />
-            </div>
-          </div>
-        </div>
-      </button>
-
-      {open && (
-        <div className="border-t border-slate-100 px-3 py-2.5 space-y-2 bg-slate-50/50">
-          {month.groups.length === 0 ? (
-            <p className="text-[11px] text-slate-400 text-center py-2">ไม่มีกลุ่มงาน</p>
-          ) : (
-            month.groups.map((g) => {
-              const meta = groupMeta(g.group3);
-              const ratio = month.amount > 0 ? g.amount / month.amount : 0;
-              return (
-                <button
-                  key={g.group3}
-                  type="button"
-                  onClick={() => onOpenJobs(month.period, g.group3)}
-                  className="w-full text-left rounded-xl bg-white border border-slate-100 p-2.5 active:scale-[0.99] hover:border-red-200 transition"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={"w-7 h-7 rounded-lg flex items-center justify-center shrink-0 " + meta.soft + " " + meta.color}>
-                      <Icon name={meta.icon} style={{ fontSize: 15 }} />
-                    </div>
-                    <p className="text-[12px] font-bold text-slate-800 flex-1 min-w-0 truncate">{g.group3}</p>
-                    <span className="tnum text-[12.5px] font-bold text-slate-900 shrink-0">{baht(g.amount)}</span>
-                    <Icon name="chevron_right" className="text-slate-300 shrink-0" style={{ fontSize: 16 }} />
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div className={"h-full rounded-full " + meta.bar} style={{ width: `${Math.max(3, ratio * 100)}%` }} />
-                    </div>
-                    <span className="text-[10px] text-slate-400 shrink-0">{g.jobCount.toLocaleString("th-TH")} งาน</span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
+    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true">
+      <div className={cn("h-full rounded-full transition-all duration-500", className ?? "bg-[#d32029]")} style={{ width: `${Math.max(w, value > 0 ? 2 : 0)}%` }} />
     </div>
+  );
+}
+
+/** 3 กลุ่มงาน + หมวดย่อย — กดกลุ่ม/หมวดย่อยเพื่อดูงาน */
+function GroupsBlock({ groups, total, onOpen }: { groups: SsGroup[]; total: number; onOpen: (group: string, sub: string | null) => void }) {
+  if (groups.length === 0) return <p className="text-[12px] text-slate-400 text-center py-3">ไม่มีข้อมูล</p>;
+  return (
+    <div className="space-y-2">
+      {groups.map((g) => {
+        const meta = groupMeta(g.group3);
+        const maxSub = Math.max(1, ...g.subs.map((s) => s.amount));
+        return (
+          <div key={g.group3} className={cn("rounded-xl border overflow-hidden", meta.ring)}>
+            <button
+              type="button"
+              onClick={() => onOpen(g.group3, null)}
+              aria-label={`ดูงานกลุ่ม ${g.group3}`}
+              className={cn("w-full text-left px-3 py-2.5 flex items-center gap-2 active:scale-[0.99] transition", meta.soft)}
+            >
+              <div className={"w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-white " + meta.color}>
+                <Icon name={meta.icon} style={{ fontSize: 15 }} />
+              </div>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[12.5px] font-bold text-slate-900 truncate">{g.group3}</span>
+                <span className="block text-[10px] text-slate-500">{g.jobCount.toLocaleString("th-TH")} งาน</span>
+              </span>
+              <span className="text-right shrink-0">
+                <span className="block tnum text-[13px] font-bold text-slate-900">{mil(g.amount)}</span>
+                <span className="block text-[10px] text-slate-500">{total ? ((g.amount / total) * 100).toFixed(0) : 0}%</span>
+              </span>
+              <Icon name="chevron_right" className="text-slate-300 shrink-0" style={{ fontSize: 16 }} />
+            </button>
+            {g.subs.length > 0 && (
+              <ul className="px-3 py-1.5 bg-white divide-y divide-slate-50">
+                {g.subs.map((s) => (
+                  <li key={s.label}>
+                    <button
+                      type="button"
+                      onClick={() => onOpen(g.group3, s.label)}
+                      aria-label={`ดูงาน ${s.label}`}
+                      className="w-full text-left py-1.5 hover:bg-slate-50 rounded-md transition"
+                    >
+                      <div className="flex items-center justify-between gap-2 text-[11.5px]">
+                        <span className="truncate text-slate-700">{s.label}</span>
+                        <span className="shrink-0 text-slate-500 inline-flex items-center">
+                          <span className="tnum font-semibold text-slate-800">{mil(s.amount)}</span>
+                          <span className="ml-1">· {s.jobCount} งาน</span>
+                          <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 14 }} />
+                        </span>
+                      </div>
+                      <div className="mt-1"><Bar value={s.amount} max={maxSub} className={meta.bar} /></div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface PersonAgg {
+  key: string;
+  repCode: string | null;
+  salesName: string | null;
+  label: string;
+  amount: number;
+  jobs: number;
+  byGroup: Map<string, number>;
+}
+function aggregatePeople(rows: SsPersonRow[]): PersonAgg[] {
+  const m = new Map<string, PersonAgg>();
+  rows.forEach((r) => {
+    const key = r.repCode ? `rep:${r.repCode}` : r.salesName ? `name:${r.salesName}` : "none";
+    let a = m.get(key);
+    if (!a) {
+      a = { key, repCode: r.repCode, salesName: r.salesName, label: ssPersonLabel(r), amount: 0, jobs: 0, byGroup: new Map() };
+      m.set(key, a);
+    }
+    a.amount += r.amount;
+    a.jobs += r.jobCount;
+    a.byGroup.set(r.group3, (a.byGroup.get(r.group3) ?? 0) + r.jobCount);
+  });
+  // พนักงานในระบบ -> ชื่ออื่น -> ไม่ระบุ ; แต่ละกลุ่มเรียงตามยอด
+  const rank = (a: PersonAgg) => (a.repCode ? 0 : a.salesName ? 1 : 2);
+  return [...m.values()].sort((a, b) => rank(a) - rank(b) || b.amount - a.amount);
+}
+
+function PeopleBlock({ people, total, onOpen }: { people: PersonAgg[]; total: number; onOpen: (p: PersonAgg) => void }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? people : people.slice(0, 8);
+  return (
+    <>
+      <ul className="divide-y divide-slate-50">
+        {shown.map((p, i) => {
+          const unknown = !p.repCode && !p.salesName;
+          const groupsText = [...p.byGroup.entries()].sort((a, b) => b[1] - a[1]).map(([g, n]) => `${GROUP_SHORT[g] ?? g} ${n}`).join(" · ");
+          return (
+            <li key={p.key}>
+              <button
+                type="button"
+                onClick={() => onOpen(p)}
+                aria-label={`ดูงานของ ${p.label}`}
+                className="w-full flex items-center gap-2.5 py-2 text-left hover:bg-slate-50 rounded-lg -mx-1.5 px-1.5 transition"
+              >
+                <span
+                  className={cn(
+                    "w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold",
+                    unknown || !p.repCode ? "border border-dashed border-slate-300 text-slate-400" : i === 0 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
+                  )}
+                >
+                  {p.repCode ? i + 1 : "?"}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className={cn("block truncate text-[12.5px]", p.repCode ? "text-slate-800 font-semibold" : "text-slate-500")}>
+                    {p.label}
+                    {p.repCode && <Icon name="verified" className="text-[#d32029] align-[-2px] ml-1" style={{ fontSize: 13 }} />}
+                  </span>
+                  <span className="block text-[10.5px] text-slate-400 truncate">{p.jobs.toLocaleString("th-TH")} งาน · {groupsText}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block tnum text-[13px] font-bold text-slate-900">{mil(p.amount)}</span>
+                  <span className="block text-[10.5px] text-slate-400">{total ? ((p.amount / total) * 100).toFixed(0) : 0}%</span>
+                </span>
+                <Icon name="chevron_right" className="text-slate-300 shrink-0" style={{ fontSize: 16 }} />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {people.length > 8 && (
+        <button type="button" onClick={() => setAll((v) => !v)} className="mt-2 w-full text-[12px] font-bold text-[#c3161c] bg-[#fee2e2]/60 rounded-xl py-2">
+          {all ? "ย่อ" : `ดูทั้งหมด ${people.length} คน`}
+        </button>
+      )}
+      <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
+        <Icon name="verified" className="text-[#d32029]" style={{ fontSize: 12 }} />
+        = พนักงานในระบบ · ชื่ออื่นเป็นชื่อตามระบบต้นทาง · กดชื่อเพื่อดูงาน
+      </p>
+    </>
   );
 }
 
@@ -245,82 +429,155 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const { session, ready } = useSession();
   const homeHref = useHomeHref();
   const router = useRouter();
-  const [summary, setSummary] = useState<SsSummary | null>(null);
-  const [groups, setGroups] = useState<SsGroup[]>([]);
-  const [months, setMonths] = useState<SsMonthDetail[]>([]);
-  const [sources, setSources] = useState<SsSourceAmount[]>([]);
   const pageTitle = source ? SOURCE_META[source].label : "ยอดขายงานบริการ (รวม)";
-  const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(true);
+  const [sumState, setSumState] = useState<{ key: string; s: SsSummary | null } | null>(null);
+  const [detail, setDetail] = useState<{
+    key: string;
+    groups: SsGroup[];
+    months: SsMonthDetail[];
+    breakdown: SsBreakdown;
+    sources: SsSourceAmount[];
+  } | null>(null);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
-  const [jobsView, setJobsView] = useState<{ period: string; group: string } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [jobsView, setJobsView] = useState<JobsView | null>(null);
+  const [allStores, setAllStores] = useState(false);
 
+  // ขอบเขต: ร้าน / พนักงาน (เฉพาะงานตัวเอง) / admin (ทุกร้าน, เจาะร้าน, มุมมองร้าน/พนักงาน)
+  const isAdmin = !!session?.isAdmin;
+  const adminStoreView = isAdmin && session?.adminViewMode === "store" && !!session.adminViewDealer;
+  const adminStaffView = isAdmin && session?.adminViewMode === "staff" && !!session.adminViewRep;
+  const isSales = !!session?.isSales || adminStaffView;
   const dealerCode = session
-    ? session.isAdmin
-      ? session.storeFilter
-      : session.isSales
-        ? null
-        : session.dealer.code
+    ? isAdmin
+      ? adminStaffView ? null : adminStoreView ? session.adminViewDealer : session.storeFilter
+      : isSales ? null : session.dealer.code || null
     : null;
+  const repCode = adminStaffView ? session?.adminViewRep ?? null : isSales ? session?.repCode ?? session?.empId ?? null : null;
+  const adminAll = isAdmin && !dealerCode && !repCode;
+  const canFetch = !!session && (isAdmin || !!dealerCode || !!repCode);
+  const sumKey = `${dealerCode ?? ""}|${repCode ?? ""}|${source ?? ""}`;
 
-  // พนักงานขายไม่เกี่ยวกับยอดขายงานบริการร้าน -> พาออก
+  // สรุปรวม + รายเดือน (ทุกปี) สำหรับคำนวณปี / เทียบปีก่อน
   useEffect(() => {
-    if (ready && session && session.isSales) router.replace("/app/member");
-  }, [ready, session, router]);
-
-  // สรุปรวม + รายเดือน (ทุกปี) สำหรับคำนวณปี
-  useEffect(() => {
+    if (!ready || !canFetch) return;
     let cancelled = false;
-    setLoading(true);
-    fetchServiceSalesSummary(dealerCode, source)
-      .then((s) => { if (!cancelled) setSummary(s); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [dealerCode, source]);
+    fetchServiceSalesSummary(dealerCode, source, repCode)
+      .then((s) => !cancelled && setSumState({ key: sumKey, s }))
+      .catch(() => !cancelled && setSumState({ key: sumKey, s: null }));
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, canFetch, dealerCode, source, repCode, sumKey]);
 
-  const years = useMemo(() => yearsOf((summary?.months ?? []).map((m) => m.period)), [summary]);
+  const summary = sumState && sumState.key === sumKey ? sumState.s : null;
+  const summaryLoaded = !!sumState && sumState.key === sumKey;
+  const allMonths = useMemo(() => summary?.months ?? [], [summary]);
+  const years = useMemo(() => yearsOf(allMonths.map((m) => m.period)), [allMonths]);
   const curYear = String(new Date().getFullYear());
-  const activeYear =
-    year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
+  const activeYear = year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
+  const detailKey = `${sumKey}|${activeYear ?? ""}`;
 
-  // 3 กลุ่มใหญ่ (สรุปปี) + รายเดือน+กลุ่ม ตามปีที่เลือก
+  // 3 กลุ่ม (ปี) + รายเดือน+กลุ่ม + แยกพนักงาน/ร้าน + แยกแหล่ง ตามปีที่เลือก
   useEffect(() => {
-    if (!ready || !session || session.isSales) return;
+    if (!ready || !canFetch || !summaryLoaded) return;
     let cancelled = false;
-    setDetailLoading(true);
     Promise.allSettled([
-      fetchServiceSalesGroups(dealerCode, activeYear, source),
-      fetchServiceSalesMonths(dealerCode, activeYear, source),
-      source === null ? fetchServiceSalesSources(dealerCode, activeYear) : Promise.resolve([] as SsSourceAmount[]),
+      fetchServiceSalesGroups(dealerCode, activeYear, source, repCode),
+      fetchServiceSalesMonths(dealerCode, activeYear, source, repCode),
+      repCode ? Promise.resolve({ people: [], stores: [] } as SsBreakdown) : fetchServiceSalesBreakdown(dealerCode, activeYear, source),
+      source === null ? fetchServiceSalesSources(dealerCode, activeYear, repCode) : Promise.resolve([] as SsSourceAmount[]),
     ]).then((res) => {
       if (cancelled) return;
-      if (res[0].status === "fulfilled") setGroups(res[0].value);
-      if (res[1].status === "fulfilled") setMonths(res[1].value);
-      if (res[2].status === "fulfilled") setSources(res[2].value);
-      setDetailLoading(false);
+      setDetail({
+        key: detailKey,
+        groups: res[0].status === "fulfilled" ? res[0].value : [],
+        months: res[1].status === "fulfilled" ? res[1].value : [],
+        breakdown: res[2].status === "fulfilled" ? res[2].value : { people: [], stores: [] },
+        sources: res[3].status === "fulfilled" ? res[3].value : [],
+      });
     });
-    return () => { cancelled = true; };
-  }, [dealerCode, activeYear, source, ready, session]);
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, canFetch, summaryLoaded, dealerCode, activeYear, source, repCode, detailKey]);
+
+  const d = detail && detail.key === detailKey ? detail : null;
+  const detailLoading = !d;
+  const months = useMemo(() => d?.months ?? [], [d]); // ใหม่ -> เก่า
+  const byPeriodAll = useMemo(() => new Map(allMonths.map((m) => [m.period, m])), [allMonths]);
 
   if (!ready || !session) return null;
-  if (session.isSales) return null;
 
+  const groups = [...(d?.groups ?? [])].sort((a, b) => b.amount - a.amount);
   const yearTotal = groups.reduce((s, g) => s + g.amount, 0);
   const yearJobs = groups.reduce((s, g) => s + g.jobCount, 0);
-  const isAdminAll = session.isAdmin && !session.storeFilter;
+  const nowP = curPeriod();
+  const fullMonths = months.filter((m) => m.period !== nowP);
+  const ytdFull = fullMonths.reduce((a, m) => a + m.amount, 0);
+  const hasLy = fullMonths.length > 0 && fullMonths.every((m) => byPeriodAll.has(lyPeriod(m.period)));
+  const lyBase = fullMonths.reduce((a, m) => a + (byPeriodAll.get(lyPeriod(m.period))?.amount ?? 0), 0);
+  const yoy = activeYear && hasLy ? pctText(ytdFull, lyBase) : null;
+  const lastFull = fullMonths[0];
+  const avg = fullMonths.length ? ytdFull / fullMonths.length : 0;
+  const top = groups[0];
+
+  // เดือนที่เลือก: ค่าเริ่มต้น = เดือนล่าสุดที่มีข้อมูล
+  const focus = (selected && months.find((m) => m.period === selected)) || months[0];
+  const chart = [...months].reverse();
+  const maxAmt = Math.max(1, ...chart.map((m) => m.amount));
+  const unitM = maxAmt >= 1e6;
+
+  const showPeople = !!dealerCode && !repCode;
+  const peopleYear = showPeople ? aggregatePeople(d?.breakdown.people ?? []) : [];
+  const peopleMonth = showPeople && focus ? aggregatePeople((d?.breakdown.people ?? []).filter((p) => p.period === focus.period)) : [];
+  const storesYear = adminAll
+    ? (() => {
+        const m = new Map<string, { code: string | null; name: string; model: string | null; amount: number; jobs: number }>();
+        (d?.breakdown.stores ?? []).forEach((s) => {
+          const k = s.dealerCode ?? "__none__";
+          const a = m.get(k) ?? { code: s.dealerCode, name: s.dealerName ?? (s.dealerCode ? s.dealerCode : "ไม่ระบุร้าน"), model: s.model, amount: 0, jobs: 0 };
+          a.amount += s.amount;
+          a.jobs += s.jobCount;
+          m.set(k, a);
+        });
+        return [...m.values()].sort((a, b) => (a.code ? 0 : 1) - (b.code ? 0 : 1) || b.amount - a.amount);
+      })()
+    : [];
+  const maxStore = Math.max(1, ...storesYear.filter((s) => s.code).map((s) => s.amount));
+
+  const scopeQuery: SsJobQuery = { dealerCode, repCode, source };
+  const yScope = activeYear ? `พ.ศ. ${Number(activeYear) + 543}` : "ทุกปี";
+  // ทุกปี -> ใช้ปีของแต่ละเดือนไม่ได้ จึงเปิดรายการงานได้เฉพาะเมื่อเลือกปี
+  const openYear = (v: Omit<JobsView, "scope" | "query"> & { query: SsJobQuery }) => {
+    if (!activeYear) return;
+    setJobsView({ ...v, scope: yScope, query: { ...scopeQuery, ...v.query, year: activeYear } });
+  };
+  const openMonth = (period: string, v: Omit<JobsView, "scope" | "query"> & { query: SsJobQuery }) =>
+    setJobsView({ ...v, scope: monthFull(period), query: { ...scopeQuery, ...v.query, period } });
+  const personQuery = (p: PersonAgg): SsJobQuery =>
+    p.repCode ? { repCode: p.repCode } : p.salesName ? { sales: p.salesName } : { unassigned: true };
+
+  const unitNote = source === "rudy" ? "รวม VAT" : source === "ba" ? "ยอด gmv" : "LHS/Rudy รวม VAT · BA ยอด gmv";
+  const scopeLabel = isSales ? "ยอดที่คุณขาย" : dealerCode ? "ยอดขายของร้าน" : "ทุกร้าน";
+  const latestDate = summary?.latestDate ? fmtDate(summary.latestDate) : null;
+  const prevFocus = focus ? byPeriodAll.get(prevPeriod(focus.period)) : undefined;
+  const focusDelta = focus && focus.period !== nowP ? pctText(focus.amount, prevFocus?.amount) : null;
 
   return (
     <>
       <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
         <div className="flex items-center space-x-2.5">
-          <Link href={homeHref} className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#a11119] active:scale-95 transition">
+          <Link href={homeHref} aria-label="กลับ" className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#a11119] active:scale-95 transition">
             <Icon name="arrow_back" className="text-xl" />
           </Link>
           <span className="font-bold text-[16px] text-[#231313]">{pageTitle}</span>
         </div>
         <button
-          onClick={() => { doLogout(); router.replace("/"); }}
+          onClick={() => {
+            doLogout();
+            router.replace("/");
+          }}
           className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
         >
           <Icon name="logout" style={{ fontSize: 16 }} />
@@ -331,51 +588,62 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
       <div className="space-y-4 pb-4">
         <ProfileCard />
 
-        {/* Hero: ยอดรวมของปีที่เลือก */}
+        {/* Hero: ยอดสะสมของปีที่เลือก */}
         <section className="rounded-3xl bg-gradient-to-br from-[#8f1114] to-[#d32029] p-5 text-white shadow-lg shadow-[#d32029]/25 relative overflow-hidden animate-fade-up">
           <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
           <div className="relative">
             <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
-              <Icon name="construction" style={{ fontSize: 16 }} />
-              {source ? SOURCE_META[source].label : "ยอดขายงานบริการ (รวม)"} {activeYear ? `ปี ${Number(activeYear) + 543}` : "ทุกปี"}
-              {isAdminAll ? " · ทุกร้าน" : ""}
+              <Icon name={source ? SOURCE_META[source].icon : "construction"} style={{ fontSize: 16 }} />
+              {scopeLabel} · ยอดสะสม{yearLabelOf(activeYear)} ({unitNote})
             </p>
-            <p className="tnum text-[32px] font-bold leading-none mt-1">
-              {detailLoading ? "…" : baht(yearTotal)}
-            </p>
-            <p className="text-[11px] text-red-100/80 mt-1">
-              {detailLoading
-                ? ""
-                : `${yearJobs.toLocaleString("th-TH")} งาน · ${
-                    source === "rudy" ? "รวม VAT" : source === "ba" ? "ยอด gmv" : "LHS/Rudy รวม VAT · BA ยอด gmv"
-                  }`}
-            </p>
+            <p className="tnum text-[32px] font-bold leading-none mt-1">{detailLoading ? "…" : baht(yearTotal)}</p>
+            {!detailLoading && (
+              <p className="text-[11px] text-red-50 mt-1.5 flex flex-wrap items-center gap-x-1">
+                {yoy != null ? (
+                  <span className="inline-flex items-center gap-0.5">
+                    <Icon name={yoy >= 0 ? "arrow_upward" : "arrow_downward"} style={{ fontSize: 13 }} />
+                    <span className="tnum font-bold">{Math.abs(yoy).toFixed(1)}%</span> เทียบช่วงเดียวกันปีก่อน
+                  </span>
+                ) : (
+                  <span className="text-red-100/70">เทียบปีก่อน: -</span>
+                )}
+                <span className="text-red-100/70">· {yearJobs.toLocaleString("th-TH")} งาน</span>
+              </p>
+            )}
             <div className="grid grid-cols-3 gap-2 mt-4">
-              {["ROOF SERVICE", "SMART SOLUTION", "Qchang"].map((k) => {
-                const g = groups.find((x) => x.group3 === k);
-                return (
-                  <div key={k} className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2">
-                    <p className="text-[10px] text-red-100/80 truncate">{k === "SMART SOLUTION" ? "SMART" : k === "ROOF SERVICE" ? "ROOF" : "Qchang"}</p>
-                    <p className="tnum text-[12.5px] font-bold">{detailLoading ? "…" : baht(g?.amount ?? 0)}</p>
-                  </div>
-                );
-              })}
+              <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2">
+                <p className="text-[10.5px] text-red-100/80">เดือนล่าสุดที่ครบ</p>
+                <p className="tnum text-[14px] font-bold leading-tight mt-0.5">{lastFull ? mil(lastFull.amount) : "-"}</p>
+                <p className="text-[10px] text-red-100/70">{lastFull ? monthFull(lastFull.period) : ""}</p>
+              </div>
+              <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2">
+                <p className="text-[10.5px] text-red-100/80">เฉลี่ย/เดือน</p>
+                <p className="tnum text-[14px] font-bold leading-tight mt-0.5">{avg ? mil(avg) : "-"}</p>
+                <p className="text-[10px] text-red-100/70">{fullMonths.length} เดือน</p>
+              </div>
+              <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2 min-w-0">
+                <p className="text-[10.5px] text-red-100/80">กลุ่มอันดับ 1</p>
+                <p className="text-[12.5px] font-bold leading-tight mt-0.5 truncate">{top?.group3 ?? "-"}</p>
+                <p className="text-[10px] text-red-100/70">{top && yearTotal ? `${((top.amount / yearTotal) * 100).toFixed(0)}% ของยอด` : ""}</p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* โหมดรวม: การ์ดย่อยแยกตามแหล่งข้อมูล (กดเข้าดูรายละเอียดของแต่ละแหล่ง) */}
+        <div className="rounded-xl bg-white border border-slate-100 px-3 py-2 text-[11px] text-slate-500 leading-relaxed">
+          แหล่งข้อมูล <b className="text-slate-700">{source === "rudy" ? "Rudy (win contract)" : source === "ba" ? "BA App (win)" : "LHS/Rudy + BA"}</b>
+          {latestDate && <> · ข้อมูลถึง {latestDate}</>} · อัปเดตทุกเช้า
+          {isSales && <> · นับเฉพาะงานที่ผูกกับชื่อของคุณ</>}
+        </div>
+
+        {/* โหมดรวม: การ์ดย่อยแยกตามแหล่งข้อมูล */}
         {source === null && (
           <section className="grid grid-cols-2 gap-2.5">
             {(["rudy", "ba"] as SsSource[]).map((k) => {
               const meta = SOURCE_META[k];
-              const s = sources.find((x) => x.source === k);
+              const s = d?.sources.find((x) => x.source === k);
               return (
-                <Link
-                  key={k}
-                  href={meta.href}
-                  className="rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 active:scale-[0.98] hover:border-red-200 transition"
-                >
+                <Link key={k} href={meta.href} className="rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 active:scale-[0.98] hover:border-red-200 hover:-translate-y-0.5 transition-all">
                   <div className="flex items-start justify-between">
                     <div className="w-9 h-9 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center">
                       <Icon name={meta.icon} style={{ fontSize: 19 }} />
@@ -391,68 +659,234 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
           </section>
         )}
 
-        {isAdminAll && (
+        {adminAll && (
           <p className="text-[10.5px] text-slate-400 flex items-center gap-1 px-1">
             <Icon name="info" style={{ fontSize: 13 }} />
             ยอดรวมนี้รวมงานที่ยังระบุร้านไม่ได้ (เช่น Onetime / SCG Home / ร้าน Q-CHANG ที่ไม่อยู่ในระบบ)
           </p>
         )}
 
-        {/* เลือกปี */}
         {years.length > 0 && (
-          <YearChips years={years} activeYear={activeYear} onSelect={(y) => setYear(y)} />
+          <YearChips
+            years={years}
+            activeYear={activeYear}
+            onSelect={(y) => {
+              setYear(y);
+              setSelected(null);
+              setAllStores(false);
+            }}
+          />
         )}
 
-        {/* รายเดือน -> 3 กลุ่มใต้เดือน -> ราย job */}
-        <section>
-          <h3 className="text-[15px] font-bold text-slate-900 mb-2.5 flex items-center gap-1.5">
-            <Icon name="calendar_month" className="text-lg text-[#d32029]" />
+        {/* กราฟรายเดือน */}
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+          <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-3">
+            <Icon name="bar_chart" className="text-lg text-[#d32029]" />
             ยอดขายรายเดือน
-            {activeYear && <span className="text-[12px] font-semibold text-slate-400">· ปี {Number(activeYear) + 543}</span>}
           </h3>
-
           {detailLoading ? (
-            <div className="py-8 text-center text-slate-300">
-              <Icon name="progress_activity" className="animate-spin text-3xl" />
-            </div>
-          ) : months.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
+            <div className="py-8 text-center text-slate-300"><Icon name="progress_activity" className="animate-spin text-3xl" /></div>
+          ) : chart.length === 0 ? (
+            <div className="py-6 text-center">
               <div className="w-12 h-12 mx-auto rounded-2xl bg-red-50 text-[#d32029] flex items-center justify-center">
                 <Icon name="construction" className="text-2xl" />
               </div>
               <p className="mt-2 text-[13px] text-slate-500">ยังไม่มียอดขายงานบริการในปีนี้</p>
             </div>
           ) : (
-            <div className="space-y-2.5">
-              {months.map((m) => (
-                <MonthCard
-                  key={m.period}
-                  month={m}
-                  onOpenJobs={(period, group) => setJobsView({ period, group })}
-                />
-              ))}
-            </div>
+            <>
+              <div className="flex items-end gap-1 h-36 overflow-x-auto no-scrollbar">
+                {chart.map((m) => {
+                  const active = m.period === focus?.period;
+                  const partial = m.period === nowP;
+                  const h = Math.max(3, (m.amount / maxAmt) * 100);
+                  const v = unitM ? m.amount / 1e6 : m.amount / 1e3;
+                  return (
+                    <button
+                      key={m.period}
+                      type="button"
+                      onClick={() => setSelected(m.period)}
+                      aria-pressed={active}
+                      aria-label={`${monthFull(m.period)} ${baht(m.amount)}`}
+                      className="flex-1 min-w-[26px] h-full flex flex-col justify-end items-center group"
+                    >
+                      <span className={cn("tnum text-[9px] mb-0.5", active ? "text-[#a11119] font-bold" : "text-slate-400")}>
+                        {v.toFixed(unitM ? (v >= 10 ? 0 : 1) : 0)}
+                      </span>
+                      <span
+                        className={cn(
+                          "w-full rounded-t-md transition-all duration-500",
+                          active ? "bg-[#d32029]" : partial ? "bg-red-200 border border-dashed border-red-300" : "bg-red-300/80 group-hover:bg-red-400"
+                        )}
+                        style={{ height: `${h}%` }}
+                      />
+                      <span className={cn("text-[10px] mt-1", active ? "text-[#a11119] font-bold" : "text-slate-500")}>{monthShort(m.period)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10.5px] text-slate-400 mt-2">
+                หน่วย: {unitM ? "ล้านบาท" : "พันบาท"} · แท่งสีเข้ม = เดือนที่กำลังดู (เริ่มที่เดือนล่าสุด) · กดแท่งเพื่อเปลี่ยนเดือน
+                {chart.some((m) => m.period === nowP) ? " · เส้นประ = เดือนปัจจุบัน (ยังไม่ครบเดือน)" : ""}
+              </p>
+            </>
           )}
         </section>
 
+        {!detailLoading && months.length > 0 && (
+          <>
+            {/* ===== ทั้งปี ===== */}
+            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+                <Icon name="category" className="text-lg text-[#d32029]" />
+                สัดส่วน 3 กลุ่มงาน · {yearLabelOf(activeYear)}
+              </h3>
+              <div className="h-3 rounded-full bg-slate-100 overflow-hidden flex my-2.5" aria-hidden="true">
+                {groups.map((g) => (
+                  <div key={g.group3} className={groupMeta(g.group3).bar} style={{ width: `${yearTotal ? (g.amount / yearTotal) * 100 : 0}%` }} />
+                ))}
+              </div>
+              <GroupsBlock
+                groups={groups}
+                total={yearTotal}
+                onOpen={(group, sub) => openYear({ title: sub ?? group, icon: groupMeta(group).icon, group, query: { group, sub } })}
+              />
+              {!activeYear && <p className="text-[10px] text-slate-400 mt-2">เลือกปีด้านบนเพื่อกดดูรายการงาน</p>}
+            </section>
+
+            {showPeople && peopleYear.length > 0 && (
+              <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-1.5">
+                  <Icon name="groups" className="text-lg text-[#d32029]" />
+                  พนักงานขาย · {yearLabelOf(activeYear)}
+                </h3>
+                <PeopleBlock
+                  people={peopleYear}
+                  total={yearTotal}
+                  onOpen={(p) => openYear({ title: p.label, icon: "badge", group: null, query: personQuery(p) })}
+                />
+              </section>
+            )}
+
+            {adminAll && storesYear.length > 0 && (
+              <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-2.5">
+                  <Icon name="storefront" className="text-lg text-[#d32029]" />
+                  อันดับร้าน · {yearLabelOf(activeYear)}
+                </h3>
+                <ul className="space-y-1">
+                  {(allStores ? storesYear : storesYear.slice(0, 10)).map((s, i) => (
+                    <li key={s.code ?? "__none__"}>
+                      <button
+                        type="button"
+                        disabled={!s.code}
+                        onClick={() => s.code && openYear({ title: s.name, icon: "storefront", group: null, query: { dealerCode: s.code } })}
+                        aria-label={`ดูงานของ ${s.name}`}
+                        className="w-full text-left rounded-lg -mx-1.5 px-1.5 py-1.5 hover:bg-slate-50 active:bg-slate-100 transition disabled:hover:bg-transparent"
+                      >
+                        <div className="flex items-center justify-between gap-2 text-[12px]">
+                          <span className="truncate text-slate-800">
+                            <span className="tnum text-slate-400 w-6 inline-block">{s.code ? i + 1 : "–"}</span>
+                            <span className={s.code ? "font-semibold" : "text-slate-400"}>{s.name}</span>
+                          </span>
+                          <span className="shrink-0 tnum font-bold text-slate-900 inline-flex items-center">
+                            {mil(s.amount)}
+                            <span className="text-[10px] font-normal text-slate-400 ml-1">{s.jobs} งาน</span>
+                            {s.code && <Icon name="chevron_right" className="text-slate-300 text-lg ml-0.5" />}
+                          </span>
+                        </div>
+                        {s.code && <div className="mt-1 pl-6"><Bar value={s.amount} max={maxStore} className={s.model === "SCG Home" ? "bg-blue-500" : "bg-[#d32029]"} /></div>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {storesYear.length > 10 && (
+                  <button type="button" onClick={() => setAllStores((v) => !v)} className="mt-2 w-full text-[12px] font-bold text-[#c3161c] bg-[#fee2e2]/60 rounded-xl py-2">
+                    {allStores ? "ย่อ" : `ดูทั้งหมด ${storesYear.length} ร้าน`}
+                  </button>
+                )}
+              </section>
+            )}
+
+            {/* ===== เดือนที่เลือก ===== */}
+            {focus && (
+              <>
+                <div className="flex items-end justify-between px-0.5 pt-1">
+                  <div>
+                    <p className="text-[11px] text-slate-500">รายละเอียดเดือน</p>
+                    <h3 className="text-[16px] font-bold text-slate-900">{monthFull(focus.period)}</h3>
+                  </div>
+                  <div className="text-right">
+                    <p className="tnum text-[16px] font-bold text-slate-900">{baht(focus.amount)}</p>
+                    <p className="text-[10.5px] text-slate-500">
+                      {focus.jobCount.toLocaleString("th-TH")} งาน
+                      {focusDelta != null && (
+                        <span className={cn("ml-1 font-semibold", focusDelta >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                          {focusDelta >= 0 ? "▲" : "▼"} {Math.abs(focusDelta).toFixed(1)}% จากเดือนก่อน
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5">
+                      <Icon name="category" className="text-lg text-[#d32029]" />
+                      กลุ่มงานบริการ
+                    </h3>
+                    <span className="text-[10.5px] text-slate-400">กดกลุ่มเพื่อดูงาน</span>
+                  </div>
+                  <GroupsBlock
+                    groups={[...focus.groups].sort((a, b) => b.amount - a.amount)}
+                    total={focus.amount}
+                    onOpen={(group, sub) => openMonth(focus.period, { title: sub ?? group, icon: groupMeta(group).icon, group, query: { group, sub } })}
+                  />
+                </section>
+
+                {showPeople && peopleMonth.length > 0 && (
+                  <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-1.5">
+                      <Icon name="groups" className="text-lg text-[#d32029]" />
+                      พนักงานขาย · {monthFull(focus.period)}
+                    </h3>
+                    <PeopleBlock
+                      people={peopleMonth}
+                      total={focus.amount}
+                      onOpen={(p) => openMonth(focus.period, { title: p.label, icon: "badge", group: null, query: personQuery(p) })}
+                    />
+                  </section>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => openMonth(focus.period, { title: "รายการงานทั้งหมด", icon: "receipt_long", group: null, query: {} })}
+                  className="w-full rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 flex items-center gap-3 text-left hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.99] transition-all"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center shrink-0">
+                    <Icon name="receipt_long" style={{ fontSize: 19 }} />
+                  </div>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-bold text-slate-900">ดูรายการงานทั้งหมด</span>
+                    <span className="block text-[10.5px] text-slate-400">{monthFull(focus.period)} · {focus.jobCount.toLocaleString("th-TH")} งาน</span>
+                  </span>
+                  <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
+                </button>
+              </>
+            )}
+          </>
+        )}
+
         <p className="text-[11px] text-slate-400 text-center">
           {source === "ba"
-            ? "ยอดขายงานบริการ BA รายวัน (gmv รวมค่าสำรวจ+ติดตั้ง) · รายเดือน แบ่ง 3 กลุ่มงาน · กดกลุ่มเพื่อดูราย job"
+            ? "ยอดขายงานบริการ BA รายวัน (gmv รวมค่าสำรวจ+ติดตั้ง) · พนักงานจาก BA Incentive"
             : source === "rudy"
-              ? "ยอดขายงานบริการ LHS/Rudy (รวม VAT) · รายเดือน แบ่ง 3 กลุ่มงาน · กดกลุ่มเพื่อดูราย job"
-              : "ยอดขายงานบริการรวม 2 แหล่ง (LHS/Rudy รวม VAT · BA ยอด gmv) · กดกลุ่มเพื่อดูราย job"}
+              ? "ยอดขายงานบริการ LHS/Rudy (รวม VAT) · พนักงาน = ผู้สร้างโครงการใน Rudy"
+              : "ยอดขายงานบริการรวม 2 แหล่ง (LHS/Rudy รวม VAT · BA ยอด gmv)"}
         </p>
       </div>
 
-      {jobsView && (
-        <JobsModal
-          dealerCode={dealerCode}
-          period={jobsView.period}
-          group={jobsView.group}
-          source={source}
-          onClose={() => setJobsView(null)}
-        />
-      )}
+      {jobsView && <JobsModal view={jobsView} showSource={source === null} onClose={() => setJobsView(null)} />}
 
       <BottomNav active="serviceSales" />
     </>
