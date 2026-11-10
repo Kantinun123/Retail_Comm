@@ -24,17 +24,24 @@ import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-s
 import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
 import { fetchDesignIntake, type DiSummary } from "@/lib/commission/design-intake-store";
 import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
-import { YearChips, yearsOf, sumByYear } from "./year-filter";
+import { yearsOf } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
+import { AttentionList, MonthOverview, PerformanceCards, buildAttention, perfStatus, useLatestEvalFails } from "./home-performance";
+import { PeriodBar, defaultPick, toView, type PeriodPick } from "./hub-period";
 import {
-  AttentionList,
-  MonthOverview,
-  PerformanceCards,
-  buildAttention,
-  perfStatus,
-  useLatestEvalFails,
-  type PeriodAmount,
-} from "./home-performance";
+  currentPeriod,
+  fetchFreshness,
+  freshText,
+  monthlyValue,
+  periodShort,
+  prevPeriod,
+  viewLabel,
+  type DailyJob,
+  type Freshness,
+  type HubView,
+  type MonthlySource,
+  type SourceValue,
+} from "@/lib/commission/freshness-store";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -57,9 +64,48 @@ interface CardData {
   display?: string | null;
   /** ป้ายสถานะ เช่น ผ่าน/ไม่ผ่าน */
   badge?: { text: string; pass: boolean } | null;
+  /** ไฟล์ของช่วงที่เลือกยังไม่มา -> แสดง "รอข้อมูล" + ยอดล่าสุดของร้าน */
+  waiting?: { label: string; latest: { period: string; amount: number } | null } | null;
+  /** ข้อความใต้ยอด ฿0 (เช่น "ไม่มียอดของร้านเดือนนี้") */
+  zeroNote?: string | null;
+  /** บรรทัดเล็กท้ายการ์ด: ข้อมูลถึง / อัปเดต */
+  foot?: { text: string; warn?: boolean } | null;
+}
+
+function CardFoot({ foot }: { foot: CardData["foot"] }) {
+  if (!foot) return null;
+  return (
+    <p className={"text-[9px] leading-tight mt-1.5 flex items-center gap-0.5 " + (foot.warn ? "text-amber-600 font-semibold" : "text-slate-400")}>
+      <Icon name={foot.warn ? "warning" : "schedule"} style={{ fontSize: 11 }} />
+      {foot.text}
+    </p>
+  );
 }
 
 function HubCard({ c }: { c: CardData }) {
+  if (c.waiting && !c.loading) {
+    return (
+      <Link
+        href={c.href}
+        className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-3.5 flex flex-col justify-between min-h-[118px] active:scale-[0.98] hover:border-slate-400 hover:-translate-y-0.5 transition-all"
+      >
+        <div className="flex items-start justify-between">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-white text-slate-400">
+            <Icon name={c.icon} style={{ fontSize: 19 }} />
+          </div>
+          <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
+        </div>
+        <div className="mt-2">
+          <p className="text-[12.5px] font-bold leading-tight text-slate-600">{c.label}</p>
+          <span className="inline-block mt-1 rounded-full bg-amber-100 px-2 py-0.5 text-[9.5px] font-bold text-amber-800">⏳ {c.waiting.label}</span>
+          <p className="text-[10px] text-slate-500 mt-1">
+            {c.waiting.latest ? <>ล่าสุด {periodShort(c.waiting.latest.period)} <b className="tnum text-slate-700">{baht(c.waiting.latest.amount)}</b></> : "ร้านนี้ยังไม่มียอด"}
+          </p>
+          <CardFoot foot={c.foot} />
+        </div>
+      </Link>
+    );
+  }
   return (
     <Link
       href={c.href}
@@ -128,8 +174,10 @@ function HubCard({ c }: { c: CardData }) {
                 <span className="tnum text-[10px] font-bold text-[#d32029] shrink-0">{Math.round(c.pct)}%</span>
               </div>
             )}
+            {!c.loading && c.total === 0 && c.zeroNote && <p className="text-[9.5px] text-slate-400 mt-0.5">{c.zeroNote}</p>}
           </>
         ) : null}
+        {!c.loading && <CardFoot foot={c.foot} />}
       </div>
     </Link>
   );
@@ -143,6 +191,8 @@ function SummaryBar({
   loading,
   note,
   href,
+  display,
+  fresh,
 }: {
   icon: string;
   label: string;
@@ -150,6 +200,10 @@ function SummaryBar({
   loading: boolean;
   note?: string;
   href: string;
+  /** ข้อความแทนยอด (เช่น "รอข้อมูล") */
+  display?: string | null;
+  /** ข้อมูลถึง / อัปเดต */
+  fresh?: { text: string; stale: boolean } | null;
 }) {
   return (
     <Link
@@ -165,10 +219,16 @@ function SummaryBar({
           <div className="min-w-0">
             <p className="text-[11px] text-red-100/90 leading-tight">{label}</p>
             {note && <p className="text-[9.5px] text-red-100/70 leading-tight">{note}</p>}
+            {fresh && (
+              <p className={"text-[9.5px] leading-tight mt-0.5 flex items-center gap-0.5 " + (fresh.stale ? "text-amber-200 font-semibold" : "text-red-100/80")}>
+                <Icon name={fresh.stale ? "warning" : "schedule"} style={{ fontSize: 11 }} />
+                {fresh.text}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <p className="tnum text-[22px] font-bold leading-none">{loading ? "…" : baht(total)}</p>
+          <p className="tnum text-[22px] font-bold leading-none">{loading ? "…" : display ?? baht(total)}</p>
           <Icon name="chevron_right" className="text-white/70" style={{ fontSize: 20 }} />
         </div>
       </div>
@@ -213,7 +273,17 @@ export function HomeHubScreen() {
   const [di, setDi] = useState<DiSummary | null>(null);
   const [prodSales, setProdSales] = useState<PsSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
+  // ช่วงเวลาเดียวคุมทั้งหน้า: ค่าเริ่มต้น = เดือนที่ครบล่าสุด
+  const [pick, setPick] = useState<PeriodPick>(defaultPick);
+  const [fresh, setFresh] = useState<Freshness | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFreshness().then((f) => !cancelled && setFresh(f));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -266,101 +336,108 @@ export function HomeHubScreen() {
   const showLhsDiscount = adminAllStores || isHousingExpert;
   const showBackMargin = adminAllStores || isHousingExpert;
 
-  // รวมทุก period จากทุกระบบ -> รายการปีที่มีข้อมูล
-  const allPeriods = [
-    ...(bm?.months ?? []),
-    ...(ps?.months ?? []),
-    ...(cp?.months ?? []),
-    ...(ba?.months ?? []),
-    ...(lhsSum?.months ?? []),
-    ...(showLhsDiscount ? pd?.months ?? [] : []),
-    ...(ssSum?.months ?? []),
-  ].map((m) => m.period);
-  const years = yearsOf(allPeriods);
-  // ปีตั้งต้น = ปีปัจจุบัน ถ้ามีข้อมูล ไม่งั้นปีล่าสุด (null = ทุกปี เมื่อผู้ใช้เลือกเอง)
-  const curYear = String(new Date().getFullYear());
-  const activeYear =
-    year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
-  const yearLabel = activeYear ? `ปี ${Number(activeYear) + 543}` : "ทุกปี";
+  // ---- ช่วงเวลาที่เลือก (เดือน / สะสมปี) คุมทุกการ์ด ----
+  const view = toView(pick);
+  const viewTitle = viewLabel(view); // "ต.ค. 2569" | "สะสมปี 2569"
+  const curP = currentPeriod();
+  const fm = fresh?.monthly ?? {};
+  const years = yearsOf([
+    curP,
+    ...(bm?.months ?? []), ...(ps?.months ?? []), ...(cp?.months ?? []), ...(ba?.months ?? []), ...(lhsSum?.months ?? []),
+    ...(ssSum?.months ?? []), ...(prodSales?.months ?? []),
+  ].map((m) => (typeof m === "string" ? m : m.period)));
 
-  // ยอดแต่ละระบบ ตามปีที่เลือก (จ่ายจริง)
-  const backMarginRaw = bm ? sumByYear(bm.months, activeYear, (m) => m.payoutTotal ?? m.lineTotal) : null;
-  const backMargin = showBackMargin ? backMarginRaw : null;
-  const profitBa = ps ? sumByYear(ps.months, activeYear, (m) => m.profitShare) : null;
-  const commProduct = cp ? sumByYear(cp.months, activeYear, (m) => m.net) : null;
-  const baInc = ba ? sumByYear(ba.months, activeYear, (m) => m.incentive) : null;
-  const lhs = lhsSum ? sumByYear(lhsSum.months, activeYear, (m) => m.payment) : null;
-  const purchaseDiscount = pd ? sumByYear(pd.months, activeYear, (m) => m.discount) : null;
-  const pdValue = showLhsDiscount ? purchaseDiscount : null;
+  // แหล่งรายเดือน (ผลประโยชน์) -> ค่าในช่วงที่เลือก / รอข้อมูล / ฿0
+  type Src = { key: MonthlySource; months: { period: string; amount: number }[] } | null;
+  const srcBm: Src = showBackMargin ? { key: "back-margin", months: (bm?.months ?? []).map((m) => ({ period: m.period, amount: m.payoutTotal ?? m.lineTotal })) } : null;
+  const srcPs: Src = { key: "profit-share-ba", months: (ps?.months ?? []).map((m) => ({ period: m.period, amount: m.profitShare })) };
+  const srcPd: Src = showLhsDiscount ? { key: "lhs-discount", months: (pd?.months ?? []).map((m) => ({ period: m.period, amount: m.discount })) } : null;
+  const srcCp: Src = { key: "product-commission", months: (cp?.months ?? []).map((m) => ({ period: m.period, amount: m.net })) };
+  const srcBa: Src = { key: "ba-commission", months: (ba?.months ?? []).map((m) => ({ period: m.period, amount: m.incentive })) };
+  const srcLhs: Src = { key: "lhs-commission", months: (lhsSum?.months ?? []).map((m) => ({ period: m.period, amount: m.payment })) };
+  const valueOf = (s: Src, v: HubView = view): SourceValue | null => (s ? monthlyValue(s.months, v, fm[s.key]) : null);
+  const agg = (vals: (SourceValue | null)[]) => {
+    const live = vals.filter((v): v is SourceValue => !!v);
+    const waiting = live.filter((v) => v.waiting).length;
+    return { amount: live.length && waiting === live.length ? null : live.reduce((a, v) => a + (v.amount ?? 0), 0), waiting };
+  };
+  const pctChange = (cur: number | null, base: number | null) => (cur == null || !base ? null : ((cur - base) / Math.abs(base)) * 100);
+  const prevView: HubView | null = view.mode === "month" ? { mode: "month", period: prevPeriod(view.period) } : null;
 
-  const storeTotal =
-    backMargin === null && profitBa === null && pdValue === null
-      ? null
-      : (backMargin ?? 0) + (profitBa ?? 0) + (pdValue ?? 0);
-  const empTotal =
-    commProduct === null && baInc === null && lhs === null
-      ? null
-      : (commProduct ?? 0) + (baInc ?? 0) + (lhs ?? 0);
+  const vBm = valueOf(srcBm), vPs = valueOf(srcPs), vPd = valueOf(srcPd);
+  const vCp = valueOf(srcCp), vBa = valueOf(srcBa), vLhs = valueOf(srcLhs);
+  const storeAgg = agg([vBm, vPs, vPd]);
+  const empAgg = agg([vCp, vBa, vLhs]);
+  const storePrev = prevView ? agg([valueOf(srcBm, prevView), valueOf(srcPs, prevView), valueOf(srcPd, prevView)]) : null;
+  const storeDelta = storeAgg.waiting === 0 && storePrev && storePrev.waiting === 0 ? pctChange(storeAgg.amount, storePrev.amount) : null;
 
   const pctOf = (v: number | null, base: number | null) =>
     v == null || base == null || base <= 0 ? null : (v / base) * 100;
+  const waitLabel = view.mode === "month" ? `รอข้อมูล ${periodShort(view.period)}` : "รอข้อมูล";
+  const benCard = (key: string, href: string, icon: string, label: string, sub: string, v: SourceValue | null, base: number | null): CardData | null =>
+    v && {
+      key, href, icon, label, sub, loading,
+      total: v.amount,
+      pct: pctOf(v.amount, base),
+      waiting: v.waiting ? { label: waitLabel, latest: v.latest } : null,
+      zeroNote: view.mode === "month" ? "ไม่มียอดของร้านเดือนนี้" : "ไม่มียอดในปีนี้",
+      foot: v.dataUntil ? { text: `ข้อมูลถึงเดือน ${periodShort(v.dataUntil)}` } : null,
+    };
 
-  // ยอดขายงานบริการ (แยกหัวข้อยอดขาย) — ยอดตามปีที่เลือก
+  // ยอดขาย (รายวัน) ในช่วงที่เลือก
+  const amountIn = (months: { period: string; amount: number }[] | undefined, v: HubView) =>
+    (months ?? []).filter((m) => (v.mode === "month" ? m.period === v.period : m.period.startsWith(v.year + "-"))).reduce((a, m) => a + m.amount, 0);
+  const prodJobs: DailyJob[] = (prodSales?.sources ?? []).map((s) => (s === "di" ? "product-di" : "product-odoo"));
+  const showProductSales = (prodSales?.months.length ?? 0) > 0;
   const showServiceSales = (ssSum?.count ?? 0) > 0;
-  const serviceSalesTotal = ssSum ? sumByYear(ssSum.months, activeYear, (m) => m.amount) : null;
-  const salesRudy = ssRudy ? sumByYear(ssRudy.months, activeYear, (m) => m.amount) : null;
-  const salesBa = ssBa ? sumByYear(ssBa.months, activeYear, (m) => m.amount) : null;
-  const pctOfSales = (v: number | null) =>
-    v == null || serviceSalesTotal == null || serviceSalesTotal <= 0 ? null : (v / serviceSalesTotal) * 100;
-  // การ์ดย่อยแยกตามแหล่งข้อมูล (แสดงเฉพาะแหล่งที่มีข้อมูล)
+  const productSalesTotal = amountIn(prodSales?.months, view);
+  const serviceSalesTotal = amountIn(ssSum?.months, view);
+  const salesRudy = amountIn(ssRudy?.months, view);
+  const salesBa = amountIn(ssBa?.months, view);
+  const salesPrevTotal = prevView ? amountIn(prodSales?.months, prevView) + amountIn(ssSum?.months, prevView) : null;
+  // เดือนปัจจุบันยังไม่ครบ -> ไม่เทียบเดือนก่อน
+  const salesDelta = view.mode === "month" && view.period !== curP ? pctChange(productSalesTotal + serviceSalesTotal, salesPrevTotal) : null;
+  const productSalesSource = (prodSales?.sources ?? []).map((x) => (x === "di" ? "DI" : "Odoo")).join(" + ");
+  const fr = (jobs: DailyJob[]) => freshText(fresh, jobs);
+  const pctOfSales = (v: number) => (serviceSalesTotal > 0 ? (v / serviceSalesTotal) * 100 : null);
+  const toFoot = (f: { text: string; stale: boolean } | null) => (f ? { text: f.text, warn: f.stale } : null);
   const salesCards: CardData[] = [
     ...((ssRudy?.count ?? 0) > 0
-      ? [{ key: "sales-lhs", href: "/app/service-sales/lhs", icon: "roofing", label: "ยอดขาย LHS/Rudy", sub: "งานบริการหลังคาและโซลูชัน (รวม VAT)", total: salesRudy, loading, pct: pctOfSales(salesRudy) } as CardData]
+      ? [{ key: "sales-lhs", href: "/app/service-sales/lhs", icon: "roofing", label: "ยอดขาย LHS/Rudy", sub: "งานบริการหลังคาและโซลูชัน (รวม VAT)", total: salesRudy, loading, pct: pctOfSales(salesRudy), foot: toFoot(fr(["lhs"])), zeroNote: "ไม่มียอดในช่วงนี้" } as CardData]
       : []),
     ...((ssBa?.count ?? 0) > 0
-      ? [{ key: "sales-ba", href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง รายวัน (gmv)", total: salesBa, loading, pct: pctOfSales(salesBa) } as CardData]
+      ? [{ key: "sales-ba", href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง รายวัน (gmv)", total: salesBa, loading, pct: pctOfSales(salesBa), foot: toFoot(fr(["ba"])), zeroNote: "ไม่มียอดในช่วงนี้" } as CardData]
       : []),
   ];
 
-  // ยอดขายสินค้า (DI / Odoo) ตามปีที่เลือก — แสดงเมื่อมีข้อมูล
-  const showProductSales = (prodSales?.months.length ?? 0) > 0;
-  const productSalesTotal = prodSales ? sumByYear(prodSales.months, activeYear, (m) => m.amount) : null;
-  const productSalesSource = (prodSales?.sources ?? []).map((x) => (x === "di" ? "DI" : "Odoo")).join(" + ");
-
-  // ---- ภาพรวมเดือนล่าสุด + ผลงานร้าน + เรื่องที่ควรดู (ไม่ขึ้นกับปีที่เลือก) ----
-  const benefitMonths: PeriodAmount[] = [
-    ...(showBackMargin ? (bm?.months ?? []).map((m) => ({ period: m.period, amount: m.payoutTotal ?? m.lineTotal })) : []),
-    ...(ps?.months ?? []).map((m) => ({ period: m.period, amount: m.profitShare })),
-    ...(showLhsDiscount ? (pd?.months ?? []).map((m) => ({ period: m.period, amount: m.discount })) : []),
-  ].reduce<PeriodAmount[]>((acc, m) => {
-    const cur = acc.find((x) => x.period === m.period);
-    if (cur) cur.amount += m.amount;
-    else acc.push({ ...m });
-    return acc;
-  }, []);
+  // ---- ผลงานร้าน + เรื่องที่ควรดู (เรื่องที่ควรดูอิงข้อมูลล่าสุดเสมอ) ----
   const attention = adminAllStores ? [] : buildAttention({ evalSum, evalFails, csSum, di });
   const hasPerf = (evalSum?.count ?? 0) > 0 || (csSum?.count ?? 0) > 0 || (di?.months.length ?? 0) > 0;
   const status = adminAllStores ? null : perfStatus(attention, hasPerf);
   const attentionLoading = loading || (!!dealerCode && !!evalSum?.latest && evalFails === null);
 
-  // กลุ่มร้านค้า = ยอดเงินล้วน (ผลงานร้าน แยกเป็นหัวข้อของตัวเองด้านบน)
-  const storeCards: CardData[] = [
-    ...(showBackMargin
-      ? [{ key: "back-margin", href: "/app/back-margin", icon: "savings", label: "Back Margin", sub: "จากการขายสินค้าที่หน้าร้าน", total: backMargin, loading, pct: pctOf(backMargin, storeTotal) } as CardData]
-      : []),
-    { key: "profit-ba", href: "/app/ba-profit-share", icon: "storefront", label: "Profit Share BA", sub: "จากการขายงานบริการคิวช่าง", total: profitBa, loading, pct: pctOf(profitBa, storeTotal) },
-    ...(showLhsDiscount
-      ? [{ key: "lhs-pd", href: "/app/lhs-purchase-discount", icon: "sell", label: "LHS Channel Discount", sub: "ส่วนลดช่องทาง 7% งานหลังคา (HE)", total: purchaseDiscount, loading, pct: pctOf(purchaseDiscount, storeTotal) } as CardData]
-      : []),
-  ];
+  // จุดความครบของแต่ละเดือนในตัวเลือกเดือน (นับเฉพาะแหล่งที่ร้านนี้ใช้)
+  const monthlyKeys = [srcBm, srcPs, srcPd, srcCp, srcBa, srcLhs].filter((s): s is NonNullable<Src> => !!s).map((s) => s.key);
+  const completeness = fresh
+    ? (p: string) => ({ total: monthlyKeys.length, have: monthlyKeys.filter((k) => !!fm[k] && p <= (fm[k] as string)).length })
+    : undefined;
 
-  // กลุ่มพนักงาน (หน้า "รวมผลประโยชน์พนักงาน" ย้ายไปอยู่ bottom-nav แล้ว)
+  // กลุ่มร้านค้า = ยอดเงินล้วน
+  const storeCards: CardData[] = [
+    benCard("back-margin", "/app/back-margin", "savings", "Back Margin", "จากการขายสินค้าที่หน้าร้าน", vBm, storeAgg.amount),
+    benCard("profit-ba", "/app/ba-profit-share", "storefront", "Profit Share BA", "จากการขายงานบริการคิวช่าง", vPs, storeAgg.amount),
+    benCard("lhs-pd", "/app/lhs-purchase-discount", "sell", "LHS Channel Discount", "ส่วนลดช่องทาง 7% งานหลังคา (HE)", vPd, storeAgg.amount),
+  ].filter((c): c is CardData => !!c);
+
+  // กลุ่มพนักงาน
   const empCards: CardData[] = [
-    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading, pct: pctOf(commProduct, empTotal) },
-    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง", total: baInc, loading, pct: pctOf(baInc, empTotal) },
-    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex", total: lhs, loading, pct: pctOf(lhs, empTotal) },
+    benCard("comm-product", "/app/commission-product", "payments", "Product Commission", "จากการขายสินค้าที่หน้าร้าน", vCp, empAgg.amount),
+    benCard("ba-inc", "/app/ba-incentive", "home_repair_service", "BA Commission", "จากการขายงานบริการคิวช่าง", vBa, empAgg.amount),
+    benCard("lhs", "/app/lhs-commission", "roofing", "LHS Commission", "จากการขายงานบริการหลังคา SCG & Onnex", vLhs, empAgg.amount),
     { key: "points", href: "/app/points", icon: "emoji_events", label: "แต้มกิจกรรม", sub: "แต้มสะสม", total: null, loading: false },
-  ];
+  ].filter((c): c is CardData => !!c);
+  const groupNote = (a: { waiting: number }) =>
+    view.mode === "month" ? `${viewTitle}${a.waiting ? ` · รอข้อมูล ${a.waiting} แหล่ง` : ""}` : `ยอด${viewTitle}`;
 
   return (
     <>
@@ -401,31 +478,37 @@ export function HomeHubScreen() {
 
         <ProfileCard />
 
-        {/* ภาพรวมเดือนล่าสุด → ผลงานร้าน → เรื่องที่ควรดู (ค่าล่าสุด ไม่ขึ้นกับปีที่เลือก) */}
+        {/* ช่วงเวลาเดียวคุมทั้งหน้า (ติดด้านบนเวลาเลื่อน) */}
+        <PeriodBar pick={pick} onChange={setPick} years={years} completeness={completeness} />
+
+        {/* ภาพรวม → ผลงานร้าน → เรื่องที่ควรดู */}
         <MonthOverview
           loading={loading}
-          benefitMonths={benefitMonths}
-          productMonths={(prodSales?.months ?? []).map((m) => ({ period: m.period, amount: m.amount }))}
-          serviceMonths={(ssSum?.months ?? []).map((m) => ({ period: m.period, amount: m.amount }))}
+          title={viewTitle}
+          benefit={{ amount: storeAgg.amount, waiting: storeAgg.waiting, deltaPct: storeDelta }}
+          sales={{ product: productSalesTotal, service: serviceSalesTotal, deltaPct: salesDelta, fresh: fr([...prodJobs, "lhs", "ba"]) }}
           status={status}
           attention={attention}
           scopeAll={adminAllStores}
         />
-        <PerformanceCards loading={loading} evalSum={evalSum} csSum={csSum} di={di} scopeAll={adminAllStores} />
+        <PerformanceCards loading={loading} view={view} evalSum={evalSum} csSum={csSum} di={di} scopeAll={adminAllStores} />
         {!adminAllStores && hasPerf && <AttentionList loading={attentionLoading} items={attention} />}
 
-        {/* เลือกปี (มีผลกับยอดผลประโยชน์และยอดขายด้านล่าง) */}
-        {years.length > 0 && (
-          <YearChips years={years} activeYear={activeYear} onSelect={(y) => setYear(y)} />
-        )}
-
-        {/* กลุ่มร้านค้า */}
-        <section>
+        {/* กลุ่มร้านค้า (เงินล้วน) */}
+        <section id="store-benefits" className="scroll-mt-28">
           <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
             <Icon name="storefront" style={{ fontSize: 16 }} />
-            ผลประโยชน์ร้านค้า
+            ผลประโยชน์ร้านค้า · {view.mode === "month" ? periodShort(view.period) : viewTitle}
           </h3>
-          <SummaryBar icon="store" label="รวมผลประโยชน์ร้านค้า" total={storeTotal} loading={loading} note={`ยอดสะสม ${yearLabel}`} href="/app/benefit-store" />
+          <SummaryBar
+            icon="store"
+            label={storeAgg.waiting ? "รวมที่มาแล้ว" : "รวมผลประโยชน์ร้านค้า"}
+            total={storeAgg.amount}
+            display={storeAgg.amount == null ? "รอข้อมูล" : null}
+            loading={loading}
+            note={groupNote(storeAgg)}
+            href="/app/benefit-store"
+          />
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {storeCards.map((c) => (
               <HubCard key={c.key} c={c} />
@@ -437,9 +520,17 @@ export function HomeHubScreen() {
         <section>
           <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
             <Icon name="groups" style={{ fontSize: 16 }} />
-            ผลประโยชน์พนักงานของร้าน
+            ผลประโยชน์พนักงานของร้าน · {view.mode === "month" ? periodShort(view.period) : viewTitle}
           </h3>
-          <SummaryBar icon="groups" label="รวมผลประโยชน์พนักงาน" total={empTotal} loading={loading} note={`ยอดสะสม ${yearLabel} · จ่ายจริง`} href="/app/benefit-staff" />
+          <SummaryBar
+            icon="groups"
+            label={empAgg.waiting ? "รวมที่มาแล้ว" : "รวมผลประโยชน์พนักงาน"}
+            total={empAgg.amount}
+            display={empAgg.amount == null ? "รอข้อมูล" : null}
+            loading={loading}
+            note={`${groupNote(empAgg)} · จ่ายจริง`}
+            href="/app/benefit-staff"
+          />
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {empCards.map((c) => (
               <HubCard key={c.key} c={c} />
@@ -447,12 +538,13 @@ export function HomeHubScreen() {
           </div>
         </section>
 
-        {/* กลุ่มยอดขาย (แยกหัวข้อ) */}
+        {/* กลุ่มยอดขาย */}
         {(showServiceSales || showProductSales) && (
-          <section>
+          <section id="sales" className="scroll-mt-28">
             <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
               <Icon name="trending_up" style={{ fontSize: 16 }} />
-              ยอดขาย
+              ยอดขาย · {view.mode === "month" ? periodShort(view.period) : viewTitle}
+              {view.mode === "month" && view.period === curP && <span className="text-[10.5px] font-normal text-slate-400">(ถึงวันนี้)</span>}
             </h3>
             {showProductSales && (
               <div className={showServiceSales ? "mb-2.5" : ""}>
@@ -461,20 +553,22 @@ export function HomeHubScreen() {
                   label="ยอดขายสินค้า"
                   total={productSalesTotal}
                   loading={loading}
-                  note={`${yearLabel} · ${productSalesSource} · แยกกลุ่มสินค้า/พนักงาน`}
+                  note={`${productSalesSource} · แยกกลุ่มสินค้า/พนักงาน`}
+                  fresh={fr(prodJobs)}
                   href="/app/product-sales"
                 />
               </div>
             )}
             {showServiceSales && (
-            <SummaryBar
-              icon="construction"
-              label="รวมยอดขายงานบริการ"
-              total={serviceSalesTotal}
-              loading={loading}
-              note={`${yearLabel} · LHS/Rudy + BA · 3 กลุ่มงานบริการ`}
-              href="/app/service-sales"
-            />
+              <SummaryBar
+                icon="construction"
+                label="รวมยอดขายงานบริการ"
+                total={serviceSalesTotal}
+                loading={loading}
+                note="LHS/Rudy + BA · 3 กลุ่มงานบริการ"
+                fresh={fr(["lhs", "ba"])}
+                href="/app/service-sales"
+              />
             )}
             {showServiceSales && salesCards.length > 0 && (
               <div className="grid grid-cols-2 gap-2.5 mt-2.5">
@@ -487,7 +581,7 @@ export function HomeHubScreen() {
         )}
 
         <p className="text-[11px] text-slate-400 text-center">
-          เลือกดูผลประโยชน์แต่ละระบบ · ยอดบนการ์ดคือยอดสะสมของร้านนี้
+          ทุกการ์ดแสดงตามช่วงเวลาด้านบน ({viewTitle}) · &quot;รอข้อมูล&quot; = ไฟล์ของช่วงนี้ยังไม่มา
         </p>
       </div>
 

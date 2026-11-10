@@ -25,6 +25,7 @@ import {
   type PsSummary,
 } from "@/lib/commission/product-sales-store";
 import { cn } from "@/lib/utils";
+import { fetchFreshness, freshText, type Freshness } from "@/lib/commission/freshness-store";
 
 const TH_MONTH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -195,6 +196,14 @@ export function ProductSalesScreen() {
   const [tab, setTab] = useState<PsSource | null>(null);
   const [drill, setDrill] = useState<Drill | null>(null);
   const [allStores, setAllStores] = useState(false);
+  const [fresh, setFresh] = useState<Freshness | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchFreshness().then((f) => !cancelled && setFresh(f));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isAdmin = !!session?.isAdmin;
   // admin ที่ดู "มุมมองร้านค้า" / "มุมมองพนักงาน" ให้เห็นเหมือนร้าน/พนักงานคนนั้น
@@ -369,7 +378,10 @@ export function ProductSalesScreen() {
 
         <div className="rounded-xl bg-white border border-slate-100 px-3 py-2 text-[11px] text-slate-500 leading-relaxed">
           แหล่งข้อมูล <b className="text-slate-700">{sourceText || "-"}</b>
-          {latestDate && <> · ข้อมูลถึง {latestDate}</>} · อัปเดตทุกเช้า
+          {(() => {
+            const ft = freshText(fresh, (s?.sources ?? []).map((x) => (x === "di" ? "product-di" : "product-odoo")));
+            return ft ? <> · <span className={ft.stale ? "text-amber-600 font-semibold" : ""}>{ft.text}</span></> : latestDate ? <> · ข้อมูลถึง {latestDate}</> : null;
+          })()}
           {isSales && <> · นับเฉพาะรายการที่ชื่อผู้ขายในระบบร้านตรงกับชื่อของคุณ</>}
         </div>
 

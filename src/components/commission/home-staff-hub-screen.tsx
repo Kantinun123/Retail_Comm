@@ -1,9 +1,11 @@
 "use client";
 
 /* =============================================================
-   หน้าหลัก (Hub) พนักงานขาย — เห็นเฉพาะผลประโยชน์ของตัวเอง (scope ด้วย repCode)
-   การ์ด: Product Commission (ผู้รับเงิน) · BA Commission · LHS Commission · แต้มกิจกรรม
-   + แถบรวม "ผลประโยชน์ของฉัน" (จ่ายจริง)
+   หน้าหลัก (Hub) พนักงานขาย — เห็นเฉพาะผลประโยชน์/ยอดขายของตัวเอง (scope ด้วย repCode)
+   - ช่วงเวลาเดียวคุมทั้งหน้า (เดือนที่ครบล่าสุด เป็นค่าเริ่มต้น / สะสมปี) — แบบเดียวกับหน้าหลักร้าน
+   - การ์ด: Product Commission (ผู้รับเงิน) · BA Commission · LHS Commission · แต้มกิจกรรม
+     ไฟล์ของช่วงที่เลือกยังไม่มา -> "รอข้อมูล" + ยอดล่าสุด (ไม่ขึ้น ฿0)
+   - ยอดขายของฉัน: สินค้า / LHS/Rudy / BA + ข้อมูลถึง · อัปเดต
    ============================================================= */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,8 +19,22 @@ import { fetchBaSummary, type BaSummary } from "@/lib/commission/ba-incentive-st
 import { fetchLhsSummary, type LhsSummary } from "@/lib/commission/lhs-commission-store";
 import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
 import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
-import { YearChips, yearsOf, sumByYear } from "./year-filter";
+import { yearsOf } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
+import { PeriodBar, defaultPick, toView, type PeriodPick } from "./hub-period";
+import {
+  currentPeriod,
+  fetchFreshness,
+  freshText,
+  monthlyValue,
+  periodShort,
+  viewLabel,
+  type DailyJob,
+  type Freshness,
+  type HubView,
+  type MonthlySource,
+  type SourceValue,
+} from "@/lib/commission/freshness-store";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -34,13 +50,39 @@ interface CardData {
   total: number | null;
   loading: boolean;
   pct?: number | null;
+  waiting?: { label: string; latest: { period: string; amount: number } | null } | null;
+  zeroNote?: string | null;
+  foot?: string | null;
 }
 
 function HubCard({ c }: { c: CardData }) {
+  if (c.waiting && !c.loading) {
+    return (
+      <Link
+        href={c.href}
+        className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-3.5 flex flex-col justify-between min-h-[118px] active:scale-[0.98] hover:border-slate-400 hover:-translate-y-0.5 transition-all"
+      >
+        <div className="flex items-start justify-between">
+          <div className="w-9 h-9 rounded-xl bg-white text-slate-400 flex items-center justify-center shrink-0">
+            <Icon name={c.icon} style={{ fontSize: 19 }} />
+          </div>
+          <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
+        </div>
+        <div className="mt-2">
+          <p className="text-[12.5px] font-bold leading-tight text-slate-600">{c.label}</p>
+          <span className="inline-block mt-1 rounded-full bg-amber-100 px-2 py-0.5 text-[9.5px] font-bold text-amber-800">⏳ {c.waiting.label}</span>
+          <p className="text-[10px] text-slate-500 mt-1">
+            {c.waiting.latest ? <>ล่าสุด {periodShort(c.waiting.latest.period)} <b className="tnum text-slate-700">{baht(c.waiting.latest.amount)}</b></> : "ยังไม่มียอด"}
+          </p>
+          {c.foot && <p className="text-[9px] text-slate-400 mt-1.5">{c.foot}</p>}
+        </div>
+      </Link>
+    );
+  }
   return (
     <Link
       href={c.href}
-      className="rounded-2xl border border-slate-100 bg-white shadow-sm p-3.5 flex flex-col justify-between min-h-[118px] active:scale-[0.98] hover:border-red-200 transition"
+      className="rounded-2xl border border-slate-100 bg-white shadow-sm p-3.5 flex flex-col justify-between min-h-[118px] active:scale-[0.98] hover:border-red-200 hover:-translate-y-0.5 transition-all"
     >
       <div className="flex items-start justify-between">
         <div className="w-9 h-9 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center shrink-0">
@@ -64,8 +106,10 @@ function HubCard({ c }: { c: CardData }) {
                 <span className="tnum text-[10px] font-bold text-[#d32029] shrink-0">{Math.round(c.pct)}%</span>
               </div>
             )}
+            {!c.loading && c.total === 0 && c.zeroNote && <p className="text-[9.5px] text-slate-400 mt-0.5">{c.zeroNote}</p>}
           </>
         )}
+        {!c.loading && c.foot && <p className="text-[9px] text-slate-400 mt-1.5">{c.foot}</p>}
       </div>
     </Link>
   );
@@ -85,15 +129,23 @@ export function HomeStaffHubScreen() {
   const [ssRudy, setSsRudy] = useState<SsSummary | null>(null);
   const [ssBa, setSsBa] = useState<SsSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [year, setYear] = useState<string | null | undefined>(undefined);
+  const [pick, setPick] = useState<PeriodPick>(defaultPick);
+  const [fresh, setFresh] = useState<Freshness | null>(null);
 
   // หน้านี้เฉพาะพนักงานขาย (หรือ admin ที่กำลังดูมุมมองพนักงาน); role อื่นกลับหน้าของตัวเอง
-  // admin ที่ออกจากมุมมองพนักงาน -> กลับหน้าหลัก admin (/app/home = การ์ด launcher)
   useEffect(() => {
     if (ready && session && !session.isSales && !adminStaffView) {
       router.replace("/app/home");
     }
   }, [ready, session, router, adminStaffView]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFreshness().then((f) => !cancelled && setFresh(f));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!repCode) return;
@@ -124,43 +176,55 @@ export function HomeStaffHubScreen() {
   if (!ready || !session) return null;
   if (!session.isSales && !adminStaffView) return null;
 
-  const years = yearsOf([
-    ...(cp?.months ?? []),
-    ...(ba?.months ?? []),
-    ...(lhsSum?.months ?? []),
-  ].map((m) => m.period));
-  const curYear = String(new Date().getFullYear());
-  const activeYear = year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
-  const yearLabel = activeYear ? `ปี ${Number(activeYear) + 543}` : "ทุกปี";
+  const view = toView(pick);
+  const viewTitle = viewLabel(view);
+  const curP = currentPeriod();
+  const fm = fresh?.monthly ?? {};
+  const years = yearsOf([curP, ...[...(cp?.months ?? []), ...(ba?.months ?? []), ...(lhsSum?.months ?? [])].map((m) => m.period)]);
 
-  const commProduct = cp ? sumByYear(cp.months, activeYear, (m) => m.net) : null;
-  const baInc = ba ? sumByYear(ba.months, activeYear, (m) => m.incentive) : null;
-  const lhs = lhsSum ? sumByYear(lhsSum.months, activeYear, (m) => m.payment) : null;
-
-  const myTotal =
-    commProduct === null && baInc === null && lhs === null
-      ? null
-      : (commProduct ?? 0) + (baInc ?? 0) + (lhs ?? 0);
-
-  const pctOf = (v: number | null) =>
-    v == null || myTotal == null || myTotal <= 0 ? null : (v / myTotal) * 100;
-
-  // ยอดขายสินค้าที่ตัวเองขาย (DI / Odoo) — ไม่ใช่ผลประโยชน์ จึงแยกหัวข้อ "ยอดขายของฉัน"
-  // + ยอดขายงานบริการ LHS/Rudy / BA ที่ผูกกับชื่อตัวเอง
-  const salesRows = [
-    { data: prodSales?.months, href: "/app/product-sales", icon: "shopping_cart", label: "ยอดขายสินค้า", sub: "แยกกลุ่มสินค้า" },
-    { data: ssRudy?.months, href: "/app/service-sales/lhs", icon: "roofing", label: "ยอดขาย LHS/Rudy", sub: "งานบริการหลังคา (รวม VAT)" },
-    { data: ssBa?.months, href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง (gmv)" },
-  ]
-    .filter((r) => (r.data?.length ?? 0) > 0)
-    .map((r) => ({ ...r, total: sumByYear<{ period: string; amount: number }>(r.data, activeYear, (m) => m.amount) }));
-
+  // ผลประโยชน์ (ไฟล์รายเดือน)
+  const src: { key: MonthlySource; months: { period: string; amount: number }[] }[] = [
+    { key: "product-commission", months: (cp?.months ?? []).map((m) => ({ period: m.period, amount: m.net })) },
+    { key: "ba-commission", months: (ba?.months ?? []).map((m) => ({ period: m.period, amount: m.incentive })) },
+    { key: "lhs-commission", months: (lhsSum?.months ?? []).map((m) => ({ period: m.period, amount: m.payment })) },
+  ];
+  const vals: SourceValue[] = src.map((s) => monthlyValue(s.months, view, fm[s.key]));
+  const waiting = vals.filter((v) => v.waiting).length;
+  const myTotal = waiting === vals.length ? null : vals.reduce((a, v) => a + (v.amount ?? 0), 0);
+  const pctOf = (v: number | null) => (v == null || myTotal == null || myTotal <= 0 ? null : (v / myTotal) * 100);
+  const waitLabel = view.mode === "month" ? `รอข้อมูล ${periodShort(view.period)}` : "รอข้อมูล";
+  const meta = [
+    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน" },
+    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง" },
+    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex" },
+  ];
   const cards: CardData[] = [
-    { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading, pct: pctOf(commProduct) },
-    { key: "ba-inc", href: "/app/ba-incentive", icon: "home_repair_service", label: "BA Commission", sub: "จากการขายงานบริการคิวช่าง", total: baInc, loading, pct: pctOf(baInc) },
-    { key: "lhs", href: "/app/lhs-commission", icon: "roofing", label: "LHS Commission", sub: "จากการขายงานบริการหลังคา SCG & Onnex", total: lhs, loading, pct: pctOf(lhs) },
+    ...meta.map((m, i) => ({
+      ...m,
+      loading,
+      total: vals[i].amount,
+      pct: pctOf(vals[i].amount),
+      waiting: vals[i].waiting ? { label: waitLabel, latest: vals[i].latest } : null,
+      zeroNote: view.mode === "month" ? "ไม่มียอดเดือนนี้" : "ไม่มียอดในปีนี้",
+      foot: vals[i].dataUntil ? `ข้อมูลถึงเดือน ${periodShort(vals[i].dataUntil!)}` : null,
+    })),
     { key: "points", href: "/app/points", icon: "emoji_events", label: "แต้มกิจกรรม", sub: "แต้มสะสม", total: null, loading: false },
   ];
+  const completeness = fresh
+    ? (p: string) => ({ total: src.length, have: src.filter((s) => !!fm[s.key] && p <= (fm[s.key] as string)).length })
+    : undefined;
+
+  // ยอดขายของฉัน (รายวัน)
+  const amountIn = (months: { period: string; amount: number }[] | undefined, v: HubView) =>
+    (months ?? []).filter((m) => (v.mode === "month" ? m.period === v.period : m.period.startsWith(v.year + "-"))).reduce((a, m) => a + m.amount, 0);
+  const prodJobs: DailyJob[] = (prodSales?.sources ?? []).map((s) => (s === "di" ? "product-di" : "product-odoo"));
+  const salesRows = [
+    { data: prodSales?.months, jobs: prodJobs, href: "/app/product-sales", icon: "shopping_cart", label: "ยอดขายสินค้า", sub: "แยกกลุ่มสินค้า" },
+    { data: ssRudy?.months, jobs: ["lhs"] as DailyJob[], href: "/app/service-sales/lhs", icon: "roofing", label: "ยอดขาย LHS/Rudy", sub: "งานบริการหลังคา (รวม VAT)" },
+    { data: ssBa?.months, jobs: ["ba"] as DailyJob[], href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง (gmv)" },
+  ]
+    .filter((r) => (r.data?.length ?? 0) > 0)
+    .map((r) => ({ ...r, total: amountIn(r.data, view), fresh: freshText(fresh, r.jobs) }));
 
   return (
     <>
@@ -179,7 +243,6 @@ export function HomeStaffHubScreen() {
       </header>
 
       <div className="space-y-5 pb-4">
-        {/* แถบมุมมอง admin (เฉพาะ admin ที่กำลังดูมุมมองพนักงาน) */}
         {session.isAdmin && <ViewModeBar />}
 
         {adminStaffView && session.adminViewRepName && (
@@ -191,27 +254,24 @@ export function HomeStaffHubScreen() {
 
         <ProfileCard />
 
-        {years.length > 0 && (
-          <YearChips years={years} activeYear={activeYear} onSelect={(y) => setYear(y)} />
-        )}
+        <PeriodBar pick={pick} onChange={setPick} years={years} completeness={completeness} />
 
         <section>
           <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
             <Icon name="account_circle" style={{ fontSize: 16 }} />
-            ผลประโยชน์ของฉัน
+            ผลประโยชน์ของฉัน · {view.mode === "month" ? periodShort(view.period) : viewTitle}
           </h3>
 
-          {/* แถบรวม */}
           <div className="rounded-2xl bg-gradient-to-br from-[#8f1114] to-[#d32029] text-white p-4 shadow-md shadow-[#d32029]/20 relative overflow-hidden">
             <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-2xl" />
             <div className="relative flex items-center justify-between">
               <div className="min-w-0">
-                <p className="text-[11px] text-red-100/90 leading-tight">รวมผลประโยชน์ของฉัน</p>
-                <p className="text-[9.5px] text-red-100/70 leading-tight">ยอดสะสม {yearLabel} · จ่ายจริง</p>
+                <p className="text-[11px] text-red-100/90 leading-tight">{waiting ? "รวมที่มาแล้ว" : "รวมผลประโยชน์ของฉัน"}</p>
+                <p className="text-[9.5px] text-red-100/70 leading-tight">
+                  {view.mode === "month" ? viewTitle : `ยอด${viewTitle}`} · จ่ายจริง{waiting ? ` · รอข้อมูล ${waiting} แหล่ง` : ""}
+                </p>
               </div>
-              <p className="tnum text-[22px] font-bold leading-none shrink-0">
-                {loading ? "…" : baht(myTotal)}
-              </p>
+              <p className="tnum text-[22px] font-bold leading-none shrink-0">{loading ? "…" : myTotal == null ? "รอข้อมูล" : baht(myTotal)}</p>
             </div>
           </div>
 
@@ -226,7 +286,8 @@ export function HomeStaffHubScreen() {
           <section>
             <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
               <Icon name="trending_up" style={{ fontSize: 16 }} />
-              ยอดขายของฉัน
+              ยอดขายของฉัน · {view.mode === "month" ? periodShort(view.period) : viewTitle}
+              {view.mode === "month" && view.period === curP && <span className="text-[10.5px] font-normal text-slate-400">(ถึงวันนี้)</span>}
             </h3>
             <div className="space-y-2">
               {salesRows.map((r) => (
@@ -240,9 +301,12 @@ export function HomeStaffHubScreen() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-bold text-slate-900 leading-tight">{r.label}</p>
-                    <p className="text-[10px] text-slate-400 leading-tight mt-0.5">ยอดสะสม {yearLabel} · {r.sub}</p>
+                    <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{r.sub}</p>
+                    {r.fresh && (
+                      <p className={"text-[9.5px] leading-tight mt-0.5 " + (r.fresh.stale ? "text-amber-600 font-semibold" : "text-slate-400")}>{r.fresh.text}</p>
+                    )}
                   </div>
-                  <p className="tnum text-[16px] font-bold text-[#a11119] shrink-0">{loading ? "…" : baht(r.total)}</p>
+                  <p className={"tnum text-[16px] font-bold shrink-0 " + (!loading && r.total === 0 ? "text-slate-300" : "text-[#a11119]")}>{loading ? "…" : baht(r.total)}</p>
                   <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
                 </Link>
               ))}
@@ -251,7 +315,7 @@ export function HomeStaffHubScreen() {
         )}
 
         <p className="text-[11px] text-slate-400 text-center">
-          แสดงเฉพาะผลประโยชน์ของคุณ · ยอดบนการ์ดคือยอดสะสมรายคน
+          แสดงเฉพาะของคุณ · ทุกการ์ดตามช่วงเวลาด้านบน ({viewTitle})
         </p>
       </div>
 

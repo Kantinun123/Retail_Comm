@@ -1,10 +1,12 @@
 "use client";
 
 /* =============================================================
-   หน้าหลักร้านค้า — ส่วนบน
-   - MonthOverview : ภาพรวมเดือนล่าสุด (ผลประโยชน์ร้าน · ยอดขายสินค้า+บริการ · ผลงานร้าน)
+   หน้าหลักร้านค้า — ส่วนบน (ตามช่วงเวลาที่เลือกด้านบน: เดือน / สะสมปี)
+   - MonthOverview : ภาพรวม (ผลประโยชน์ร้าน · ยอดขายสินค้า+บริการ · ผลงานร้าน)
    - PerformanceCards : ผลงานร้าน 3 การ์ด (ตรวจประเมิน · ความพึงพอใจ · แบบรับเข้า)
-   - AttentionList : เรื่องที่ควรดู (สูงสุด 3 เรื่อง) — เฉพาะเมื่อดูร้านเดียว
+       เดือน: ค่าของเดือนนั้น (ถ้าเดือนนั้นยังไม่มี -> ค่าล่าสุดก่อนหน้า + ป้ายบอกเดือน)
+       สะสมปี: ค่าเฉลี่ย/ยอดรวมทั้งปี
+   - AttentionList : เรื่องที่ควรดู (อิงข้อมูลล่าสุดเสมอ ไม่ขึ้นกับช่วงเวลา)
    กติกาเรื่องที่ควรดู (ตกลงกับผู้ใช้):
      ผลตรวจล่าสุดไม่ผ่าน / คะแนนตรวจลด ≥ 5 จุด / ข้อที่ตกในการตรวจล่าสุด /
      ยังไม่มีผลตรวจเดือนที่แล้ว (หลังวันที่ 15, ร้านตรวจทุกเดือน) /
@@ -16,18 +18,13 @@ import { Icon } from "./icon";
 import { fetchEvalItems, fetchEvalMonthLines, type EvalSummary } from "@/lib/commission/store-eval-store";
 import type { CsSummary } from "@/lib/commission/cust-sat-store";
 import type { DiSummary } from "@/lib/commission/design-intake-store";
+import { currentPeriod, periodShort, prevPeriod, type HubView } from "@/lib/commission/freshness-store";
 import { cn } from "@/lib/utils";
 
-const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-const pad = (n: number) => String(n).padStart(2, "0");
-const monthShort = (p: string) => { const [y, m] = p.split("-").map(Number); return `${TH_SHORT[m - 1]} ${String(y + 543).slice(-2)}`; };
-const prevPeriod = (p: string) => { const [y, m] = p.split("-").map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`; };
-const curPeriod = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 const short = (v: number) => (Math.abs(v) >= 1e6 ? `฿${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e3 ? `฿${(v / 1e3).toFixed(1)}K` : `฿${Math.round(v).toLocaleString("th-TH")}`);
 const pctChange = (cur: number, base: number | null | undefined) => (base ? ((cur - base) / Math.abs(base)) * 100 : null);
 const fmtDate = (iso: string | null) => (iso ? new Date(iso + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short" }) : "-");
-
-export interface PeriodAmount { period: string; amount: number }
+const monOnly = (p: string) => periodShort(p).split(" ")[0];
 
 export interface AttentionItem {
   key: string;
@@ -64,7 +61,16 @@ export function useLatestEvalFails(dealerCode: string | null, evalSum: EvalSumma
   return state && state.key === key ? state.fails : null;
 }
 
-/** รวมเรื่องที่ควรดู เรียงตามความสำคัญ */
+/** เดือนของแบบรับเข้าที่ใช้ในเรื่องที่ควรดู: เดือนที่ครบล่าสุด (ถ้ามี) ไม่งั้นเดือนล่าสุด */
+function diLatestFull(di: DiSummary | null, now: Date) {
+  if (!di || !di.months.length) return null;
+  const byP = new Map(di.months.map((m) => [m.period, m]));
+  const m = byP.get(prevPeriod(currentPeriod(now))) ?? di.months[0];
+  const pm = byP.get(prevPeriod(m.period));
+  return { period: m.period, total: m.material + m.solution, prev: pm ? prevPeriod(m.period) : null, prevTotal: pm ? pm.material + pm.solution : 0 };
+}
+
+/** รวมเรื่องที่ควรดู เรียงตามความสำคัญ (อิงข้อมูลล่าสุด) */
 export function buildAttention(opts: {
   evalSum: EvalSummary | null;
   evalFails: string[] | null;
@@ -89,48 +95,26 @@ export function buildAttention(opts: {
       const [first, ...rest] = opts.evalFails;
       out.push({ key: "eval-items", severity: 2, icon: "cancel", title: `ตกข้อ "${first.length > 40 ? first.slice(0, 40) + "…" : first}"${rest.length ? ` +${rest.length} ข้อ` : ""}`, sub: `ในการตรวจล่าสุด ${fmtDate(latest.evalDate)}`, href: "/app/store-eval" });
     }
-    const lastMonth = prevPeriod(curPeriod(now));
-    const hasLastMonth = ev.months.some((m) => m.period >= lastMonth);
-    if (now.getDate() > 15 && !hasLastMonth) {
-      out.push({ key: "eval-missing", severity: 2, icon: "event_busy", title: `ยังไม่มีผลตรวจประเมินเดือน ${monthShort(lastMonth)}`, sub: `ตรวจล่าสุด ${fmtDate(latest.evalDate)} · ร้านตรวจทุกเดือน`, href: "/app/store-eval" });
+    const lastMonth = prevPeriod(currentPeriod(now));
+    if (now.getDate() > 15 && !ev.months.some((m) => m.period >= lastMonth)) {
+      out.push({ key: "eval-missing", severity: 2, icon: "event_busy", title: `ยังไม่มีผลตรวจประเมินเดือน ${periodShort(lastMonth)}`, sub: `ตรวจล่าสุด ${fmtDate(latest.evalDate)} · ร้านตรวจทุกเดือน`, href: "/app/store-eval" });
     }
   }
   const cs = opts.csSum;
   if (cs && cs.count > 0 && cs.months.length) {
     const [m0, m1] = cs.months; // ใหม่ -> เก่า
     if (m0.lowCount > 0) {
-      out.push({ key: "cs-low", severity: 2, icon: "sentiment_dissatisfied", title: `รีวิวคะแนนต่ำกว่า 7 · ${m0.lowCount} รายการ (${monthShort(m0.period)})`, sub: "กดเพื่ออ่านความเห็นที่ลูกค้าอยากให้ปรับปรุง", href: "/app/cust-sat" });
+      out.push({ key: "cs-low", severity: 2, icon: "sentiment_dissatisfied", title: `รีวิวคะแนนต่ำกว่า 7 · ${m0.lowCount} รายการ (${periodShort(m0.period)})`, sub: "กดเพื่ออ่านความเห็นที่ลูกค้าอยากให้ปรับปรุง", href: "/app/cust-sat" });
     }
     if (m1 && (m1.pct - m0.pct) * 100 >= 5) {
-      out.push({ key: "cs-drop", severity: 1, icon: "trending_down", title: `ความพึงพอใจลดลง ${((m1.pct - m0.pct) * 100).toFixed(1)} จุด`, sub: `${monthShort(m1.period)} ${(m1.pct * 100).toFixed(1)}% → ${monthShort(m0.period)} ${(m0.pct * 100).toFixed(1)}%`, href: "/app/cust-sat" });
+      out.push({ key: "cs-drop", severity: 1, icon: "trending_down", title: `ความพึงพอใจลดลง ${((m1.pct - m0.pct) * 100).toFixed(1)} จุด`, sub: `${periodShort(m1.period)} ${(m1.pct * 100).toFixed(1)}% → ${periodShort(m0.period)} ${(m0.pct * 100).toFixed(1)}%`, href: "/app/cust-sat" });
     }
   }
-  const dm = diFocus(opts.di, now);
+  const dm = diLatestFull(opts.di, now);
   if (dm && dm.prev && dm.prevTotal > 0 && (dm.prevTotal - dm.total) / dm.prevTotal > 0.2) {
-    out.push({ key: "di-drop", severity: 1, icon: "architecture", title: `แบบรับเข้าลดลง ${Math.round(((dm.prevTotal - dm.total) / dm.prevTotal) * 100)}%`, sub: `${monthShort(dm.prev)} ${dm.prevTotal} → ${monthShort(dm.period)} ${dm.total} แบบ`, href: "/app/design-intake" });
+    out.push({ key: "di-drop", severity: 1, icon: "architecture", title: `แบบรับเข้าลดลง ${Math.round(((dm.prevTotal - dm.total) / dm.prevTotal) * 100)}%`, sub: `${periodShort(dm.prev)} ${dm.prevTotal} → ${periodShort(dm.period)} ${dm.total} แบบ`, href: "/app/design-intake" });
   }
   return out.sort((a, b) => b.severity - a.severity);
-}
-
-/** เดือนของแบบรับเข้าที่ใช้แสดง: เดือนที่ครบล่าสุด (ถ้ามี) ไม่งั้นเดือนล่าสุด */
-function diFocus(di: DiSummary | null, now: Date) {
-  if (!di || !di.months.length) return null;
-  const byP = new Map(di.months.map((m) => [m.period, m]));
-  const cur = curPeriod(now);
-  const lastFull = prevPeriod(cur);
-  const m = byP.get(lastFull) ?? di.months[0];
-  const prevP = prevPeriod(m.period);
-  const pm = byP.get(prevP);
-  const curM = m.period !== cur ? byP.get(cur) : undefined;
-  return {
-    period: m.period,
-    material: m.material,
-    solution: m.solution,
-    total: m.material + m.solution,
-    prev: pm ? prevP : null,
-    prevTotal: pm ? pm.material + pm.solution : 0,
-    toDate: curM ? curM.material + curM.solution : null,
-  };
 }
 
 export type PerfStatus = { label: string; tone: "good" | "ok" | "warn"; sub: string };
@@ -141,40 +125,27 @@ export function perfStatus(items: AttentionItem[], hasAny: boolean): PerfStatus 
   return { label: "ปกติ", tone: "ok", sub: "1 เรื่องที่ควรดู" };
 }
 
-/* ---------------- ภาพรวมเดือนล่าสุด ---------------- */
+/* ---------------- ภาพรวม ---------------- */
 export function MonthOverview({
   loading,
-  benefitMonths,
-  productMonths,
-  serviceMonths,
+  title,
+  benefit,
+  sales,
   status,
   attention,
   scopeAll,
 }: {
   loading: boolean;
-  benefitMonths: PeriodAmount[];
-  productMonths: PeriodAmount[];
-  serviceMonths: PeriodAmount[];
+  /** "ต.ค. 2569" หรือ "สะสมปี 2569" */
+  title: string;
+  benefit: { amount: number | null; waiting: number; deltaPct: number | null };
+  sales: { product: number; service: number; deltaPct: number | null; fresh: { text: string; stale: boolean } | null };
   status: PerfStatus | null;
   attention: AttentionItem[];
   scopeAll: boolean;
 }) {
-  // ผลประโยชน์: เดือนล่าสุดที่มียอด (ไฟล์รายเดือนมาช้ากว่า)
-  const ben = [...benefitMonths].filter((m) => m.amount !== 0).sort((a, b) => b.period.localeCompare(a.period));
-  const benLatest = ben[0];
-  const benPrev = benLatest ? benefitMonths.find((m) => m.period === prevPeriod(benLatest.period)) : undefined;
-  const benDelta = benLatest ? pctChange(benLatest.amount, benPrev?.amount) : null;
-  // ยอดขาย: เดือนที่ครบล่าสุด (ยอดขายเป็นรายวัน เดือนปัจจุบันยังไม่ครบ)
-  const sumAt = (arr: PeriodAmount[], p: string) => arr.filter((m) => m.period === p).reduce((a, m) => a + m.amount, 0);
-  const periods = [...new Set([...productMonths, ...serviceMonths].map((m) => m.period))].sort((a, b) => b.localeCompare(a));
-  const lastFull = prevPeriod(curPeriod());
-  const salesP = periods.includes(lastFull) ? lastFull : periods.find((p) => p < curPeriod()) ?? periods[0];
-  const prod = salesP ? sumAt(productMonths, salesP) : 0;
-  const svc = salesP ? sumAt(serviceMonths, salesP) : 0;
-  const salesTotal = prod + svc;
-  const salesPrev = salesP ? sumAt(productMonths, prevPeriod(salesP)) + sumAt(serviceMonths, prevPeriod(salesP)) : 0;
-  const salesDelta = pctChange(salesTotal, salesPrev);
-  const prodShare = salesTotal > 0 ? (prod / salesTotal) * 100 : 0;
+  const total = sales.product + sales.service;
+  const prodShare = total > 0 ? (sales.product / total) * 100 : 0;
   const delta = (v: number | null) =>
     v == null ? null : <span className="text-red-50">{v >= 0 ? "▲" : "▼"} {Math.abs(v).toFixed(0)}%</span>;
 
@@ -184,37 +155,43 @@ export function MonthOverview({
       <div className="relative">
         <p className="text-[12px] text-red-100/90 flex items-center gap-1.5">
           <Icon name="insights" style={{ fontSize: 16 }} />
-          ภาพรวมเดือนล่าสุด{scopeAll ? " · ทุกร้าน" : ""}
+          ภาพรวม {title}{scopeAll ? " · ทุกร้าน" : ""}
         </p>
         <div className="grid grid-cols-3 gap-2 mt-2.5">
-          <div className="rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2 min-w-0">
+          <a href="#store-benefits" className="rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2 min-w-0 hover:bg-white/15 transition">
             <p className="text-[10px] text-red-100/80 leading-tight">ผลประโยชน์ร้าน</p>
-            <p className="tnum text-[16px] font-bold leading-tight mt-1">{loading ? "…" : benLatest ? short(benLatest.amount) : "-"}</p>
-            <p className="text-[9.5px] text-red-100/80 mt-0.5 truncate">{benLatest ? <>{monthShort(benLatest.period)} {delta(benDelta)}</> : ""}</p>
-          </div>
-          <div className="rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2 min-w-0">
+            <p className="tnum text-[16px] font-bold leading-tight mt-1">{loading ? "…" : benefit.amount == null ? "รอข้อมูล" : short(benefit.amount)}</p>
+            <p className="text-[9.5px] mt-0.5 truncate">
+              {benefit.waiting > 0 ? <span className="text-amber-200">⏳ รอข้อมูล {benefit.waiting} แหล่ง</span> : delta(benefit.deltaPct)}
+            </p>
+          </a>
+          <a href="#sales" className="rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2 min-w-0 hover:bg-white/15 transition">
             <p className="text-[10px] text-red-100/80 leading-tight">ยอดขายรวม</p>
-            <p className="tnum text-[16px] font-bold leading-tight mt-1">{loading ? "…" : salesP ? short(salesTotal) : "-"}</p>
-            <p className="text-[9.5px] text-red-100/80 mt-0.5 truncate">{salesP ? <>{monthShort(salesP)} {delta(salesDelta)}</> : ""}</p>
-          </div>
-          <div className="rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2 min-w-0">
+            <p className="tnum text-[16px] font-bold leading-tight mt-1">{loading ? "…" : short(total)}</p>
+            <p className="text-[9.5px] mt-0.5 truncate">{delta(sales.deltaPct)}</p>
+          </a>
+          <a href="#store-performance" className="rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2 min-w-0 hover:bg-white/15 transition">
             <p className="text-[10px] text-red-100/80 leading-tight">ผลงานร้าน</p>
             <p className="text-[16px] font-bold leading-tight mt-1">{loading || !status ? "…" : status.label}</p>
             <p className="text-[9.5px] text-red-100/80 mt-0.5 truncate">{status?.sub ?? ""}</p>
-          </div>
+          </a>
         </div>
-        {/* แยกยอดขาย สินค้า / บริการ */}
-        {!loading && salesP && salesTotal > 0 && (
+        {!loading && total > 0 && (
           <div className="mt-2.5 rounded-xl bg-black/10 px-3 py-2">
             <div className="flex justify-between text-[10.5px] text-red-50">
-              <span>สินค้า <b className="tnum">{short(prod)}</b></span>
-              <span>บริการ <b className="tnum">{short(svc)}</b></span>
+              <span>สินค้า <b className="tnum">{short(sales.product)}</b></span>
+              <span>บริการ <b className="tnum">{short(sales.service)}</b></span>
             </div>
             <div className="h-1.5 rounded-full bg-white/20 overflow-hidden mt-1 flex" aria-hidden="true">
               <div className="h-full bg-white" style={{ width: `${prodShare}%` }} />
               <div className="h-full bg-amber-300" style={{ width: `${100 - prodShare}%` }} />
             </div>
-            <p className="text-[9px] text-red-100/70 mt-1">ยอดขาย {monthShort(salesP)} · สินค้า DI/Odoo + งานบริการ LHS/Rudy (รวม VAT) + BA (gmv)</p>
+            {sales.fresh && (
+              <p className={cn("text-[9.5px] mt-1 flex items-center gap-1", sales.fresh.stale ? "text-amber-200 font-semibold" : "text-red-100/80")}>
+                <Icon name={sales.fresh.stale ? "warning" : "schedule"} style={{ fontSize: 12 }} />
+                {sales.fresh.text}
+              </p>
+            )}
           </div>
         )}
         {!scopeAll && !loading && attention.length > 0 && (
@@ -244,104 +221,155 @@ function Spark({ values }: { values: number[] }) {
     </svg>
   );
 }
+const Tag = ({ children }: { children: ReactNode }) => (
+  <span className="self-start mt-1 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-500">{children}</span>
+);
+const DeltaLine = ({ v, unit, label }: { v: number | null; unit: string; label: string }) =>
+  v == null ? null : (
+    <span className={cn("text-[9.5px] font-bold mt-0.5", v >= 0 ? "text-emerald-600" : "text-rose-600")}>
+      {v >= 0 ? "▲" : "▼"} {Math.abs(v).toFixed(1)}{unit} {label}
+    </span>
+  );
 
 export function PerformanceCards({
   loading,
+  view,
   evalSum,
   csSum,
   di,
   scopeAll,
 }: {
   loading: boolean;
+  view: HubView;
   evalSum: EvalSummary | null;
   csSum: CsSummary | null;
   di: DiSummary | null;
   scopeAll: boolean;
 }) {
   const cards: ReactNode[] = [];
-  const now = new Date();
+  const cur = currentPeriod();
+  const inView = (p: string) => (view.mode === "month" ? p === view.period : p.startsWith(view.year + "-"));
+  const upTo = view.mode === "month" ? view.period : `${view.year}-12`;
+  const card = "rounded-2xl bg-white border border-slate-100 shadow-sm p-3 flex flex-col hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.98] transition-all animate-fade-up min-w-0";
+
+  /* ตรวจประเมิน */
   if (evalSum && evalSum.count > 0) {
-    const evals = [...evalSum.months].sort((a, b) => String(a.evalDate ?? a.period).localeCompare(String(b.evalDate ?? b.period))).slice(-6);
-    const latest = evalSum.latest;
-    const pass = latest?.result === "ผ่าน";
+    const all = [...evalSum.months].sort((a, b) => String(a.evalDate ?? a.period).localeCompare(String(b.evalDate ?? b.period)));
+    const hits = all.filter((e) => inView(e.period));
+    const before = all.filter((e) => e.period <= upTo);
+    let value: string, sub: ReactNode = null, tag: string | null = null, result: string | null = null;
+    if (view.mode === "year" || scopeAll) {
+      const src = hits.length ? hits : [];
+      value = src.length ? `${Math.round((src.reduce((a, e) => a + e.pct, 0) / src.length) * 100)}%` : "-";
+      sub = <span className="text-[9.5px] text-slate-500 mt-0.5">{src.length ? `เฉลี่ย · ผ่าน ${src.filter((e) => e.result === "ผ่าน").length}/${src.length} ครั้ง` : "ไม่มีการตรวจในช่วงนี้"}</span>;
+    } else {
+      const e = hits[hits.length - 1] ?? before[before.length - 1] ?? null;
+      value = e ? `${Math.round(e.pct * 100)}%` : "-";
+      result = e?.result ?? null;
+      if (e && !hits.length) tag = `ล่าสุด ${fmtDate(e.evalDate)}`;
+    }
+    const spark = before.slice(-6).map((e) => e.pct);
     cards.push(
-      <Link key="eval" href="/app/store-eval" className="rounded-2xl bg-white border border-slate-100 shadow-sm p-3 flex flex-col hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.98] transition-all animate-fade-up stagger-1 min-w-0">
+      <Link key="eval" href="/app/store-eval" className={cn(card, "stagger-1")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="fact_check" style={{ fontSize: 17 }} /></span>
         <span className="text-[11.5px] font-bold text-slate-900 mt-2 leading-tight">ตรวจประเมินร้าน</span>
-        <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">
-          {loading ? "…" : scopeAll ? `${Math.round(evalSum.avgPct * 100)}%` : latest ? `${Math.round(latest.pct * 100)}%` : "-"}
-        </span>
-        {scopeAll ? (
-          <span className="text-[9.5px] text-slate-500 mt-0.5">เฉลี่ย · ผ่าน {evalSum.passCount}/{evalSum.count} ครั้ง</span>
-        ) : latest?.result ? (
-          <span className={cn("self-start mt-0.5 rounded-full px-2 py-0.5 text-[9.5px] font-bold", pass ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-[#d32029]")}>{latest.result}</span>
-        ) : null}
-        <span className="mt-auto pt-2"><Spark values={evals.map((e) => e.pct)} /></span>
-        <span className="text-[9px] text-slate-400">{scopeAll ? `${evalSum.count} ครั้ง` : `${evals.length} ครั้งล่าสุด · ${fmtDate(latest?.evalDate ?? null)}`}</span>
+        {tag && <Tag>{tag}</Tag>}
+        <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">{loading ? "…" : value}</span>
+        {result && (
+          <span className={cn("self-start mt-0.5 rounded-full px-2 py-0.5 text-[9.5px] font-bold", result === "ผ่าน" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-[#d32029]")}>{result}</span>
+        )}
+        {sub}
+        <span className="mt-auto pt-2"><Spark values={spark} /></span>
+        <span className="text-[9px] text-slate-400">{spark.length} ครั้งล่าสุด{view.mode === "month" && !hits.length ? ` · ${monOnly(view.period)} ยังไม่มีผลตรวจ` : ""}</span>
       </Link>
     );
   }
+
+  /* ความพึงพอใจ */
   if (csSum && csSum.count > 0 && csSum.months.length) {
-    const [m0, m1] = csSum.months;
-    const d = m1 ? (m0.pct - m1.pct) * 100 : null;
-    const last3 = [...csSum.months.slice(0, 3)].reverse();
+    const byP = new Map(csSum.months.map((m) => [m.period, m]));
+    let value = "-", tag: string | null = null, d: number | null = null, foot = "";
+    if (view.mode === "year") {
+      const ms = csSum.months.filter((m) => inView(m.period));
+      const n = ms.reduce((a, m) => a + m.reviewCount, 0);
+      if (n) value = `${((ms.reduce((a, m) => a + m.pct * m.reviewCount, 0) / n) * 100).toFixed(1)}%`;
+      foot = `เฉลี่ยทั้งปี · ${n} รีวิว`;
+    } else {
+      const m = byP.get(view.period) ?? csSum.months.find((x) => x.period < view.period) ?? null;
+      if (m) {
+        value = `${(m.pct * 100).toFixed(1)}%`;
+        if (m.period !== view.period) tag = `ล่าสุด ${periodShort(m.period)}`;
+        const pm = byP.get(prevPeriod(m.period));
+        d = pm ? (m.pct - pm.pct) * 100 : null;
+        foot = `${periodShort(m.period)} · ${m.reviewCount} รีวิว`;
+      }
+    }
+    const last3 = csSum.months.filter((m) => m.period <= upTo).slice(0, 3).reverse();
     const maxP = Math.max(...last3.map((m) => m.pct), 0.01);
     cards.push(
-      <Link key="cs" href="/app/cust-sat" className="rounded-2xl bg-white border border-slate-100 shadow-sm p-3 flex flex-col hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.98] transition-all animate-fade-up stagger-2 min-w-0">
+      <Link key="cs" href="/app/cust-sat" className={cn(card, "stagger-2")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="sentiment_satisfied" style={{ fontSize: 17 }} /></span>
         <span className="text-[11.5px] font-bold text-slate-900 mt-2 leading-tight">ความพึงพอใจ</span>
-        <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">{loading ? "…" : `${(m0.pct * 100).toFixed(1)}%`}</span>
-        {d != null && (
-          <span className={cn("text-[9.5px] font-bold mt-0.5", d >= 0 ? "text-emerald-600" : "text-rose-600")}>
-            {d >= 0 ? "▲" : "▼"} {Math.abs(d).toFixed(1)} จุด จาก {monthShort(m1.period).split(" ")[0]}
-          </span>
-        )}
+        {tag && <Tag>{tag}</Tag>}
+        <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">{loading ? "…" : value}</span>
+        <DeltaLine v={d} unit=" จุด" label="จากเดือนก่อน" />
         <span className="mt-auto pt-2 flex items-end gap-1 h-7" aria-hidden="true">
           {last3.map((m, i) => (
             <span key={m.period} className={cn("flex-1 rounded-sm", i === last3.length - 1 ? "bg-[#d32029]" : "bg-red-200")} style={{ height: `${Math.max(20, (m.pct / maxP) * 100)}%` }} />
           ))}
         </span>
-        <span className="text-[9px] text-slate-400 mt-0.5">{monthShort(m0.period)} · {m0.reviewCount} รีวิว</span>
+        <span className="text-[9px] text-slate-400 mt-0.5">{foot}</span>
       </Link>
     );
   }
-  const dm = diFocus(di, now);
-  if (dm) {
-    const delta = dm.prev ? pctChange(dm.total, dm.prevTotal) : null;
-    const mPct = dm.total ? (dm.material / dm.total) * 100 : 0;
+
+  /* แบบรับเข้า */
+  if (di && di.months.length) {
+    const byP = new Map(di.months.map((m) => [m.period, m]));
+    let material = 0, solution = 0, d: number | null = null, foot = "";
+    if (view.mode === "year") {
+      di.months.filter((m) => inView(m.period)).forEach((m) => { material += m.material; solution += m.solution; });
+      foot = `ทั้งปี ${Number(view.year) + 543}`;
+    } else {
+      const m = byP.get(view.period);
+      material = m?.material ?? 0;
+      solution = m?.solution ?? 0;
+      const pm = byP.get(prevPeriod(view.period));
+      d = pm ? pctChange(material + solution, pm.material + pm.solution) : null;
+      foot = view.period === cur ? "เดือนปัจจุบัน · ถึงวันนี้" : periodShort(view.period);
+    }
+    const total = material + solution;
+    const mPct = total ? (material / total) * 100 : 0;
     cards.push(
-      <Link key="di" href="/app/design-intake" className="rounded-2xl bg-white border border-slate-100 shadow-sm p-3 flex flex-col hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.98] transition-all animate-fade-up stagger-3 min-w-0">
+      <Link key="di" href="/app/design-intake" className={cn(card, "stagger-3")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="architecture" style={{ fontSize: 17 }} /></span>
         <span className="text-[11.5px] font-bold text-slate-900 mt-2 leading-tight">แบบรับเข้า</span>
         <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">
-          {loading ? "…" : dm.total.toLocaleString("th-TH")}
+          {loading ? "…" : total.toLocaleString("th-TH")}
           <span className="text-[11px] font-semibold text-slate-500 ml-0.5">แบบ</span>
         </span>
-        {delta != null && (
-          <span className={cn("text-[9.5px] font-bold mt-0.5", delta >= 0 ? "text-emerald-600" : "text-rose-600")}>
-            {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}% จาก {monthShort(dm.prev!).split(" ")[0]}
-          </span>
-        )}
+        <DeltaLine v={view.mode === "month" && view.period === cur ? null : d} unit="%" label="จากเดือนก่อน" />
         <span className="mt-auto pt-2">
           <span className="block h-2 rounded-full bg-slate-100 overflow-hidden flex" aria-hidden="true">
             <span className="h-full bg-[#1e5a7a]" style={{ width: `${mPct}%` }} />
             <span className="h-full bg-[#4fb0b3]" style={{ width: `${100 - mPct}%` }} />
           </span>
-          <span className="block text-[9px] text-slate-500 mt-1">M {dm.material} · S {dm.solution} ({monthShort(dm.period).split(" ")[0]})</span>
+          <span className="block text-[9px] text-slate-500 mt-1">M {material.toLocaleString("th-TH")} · S {solution.toLocaleString("th-TH")}</span>
         </span>
-        <span className="text-[9px] text-slate-400">{dm.toDate != null ? `เดือนนี้ถึงวันนี้ ${dm.toDate}` : "\u00a0"}</span>
+        <span className="text-[9px] text-slate-400">{foot}</span>
       </Link>
     );
   }
   if (!cards.length) return null;
   return (
-    <section>
+    <section id="store-performance" className="scroll-mt-28">
       <div className="flex items-end justify-between mb-2 px-0.5">
         <h3 className="text-[13px] font-bold text-[#8f1114] flex items-center gap-1.5">
           <Icon name="monitoring" style={{ fontSize: 16 }} />
-          ผลงานร้าน{scopeAll ? " · ทุกร้าน" : ""}
+          ผลงานร้าน · {view.mode === "month" ? periodShort(view.period) : `สะสมปี ${Number(view.year) + 543}`}
+          {scopeAll ? " · ทุกร้าน" : ""}
         </h3>
-        <span className="text-[10px] text-slate-400">ล่าสุด · กดเพื่อดูรายละเอียด</span>
+        <span className="text-[10px] text-slate-400">กดเพื่อดูรายละเอียด</span>
       </div>
       <div className={cn("grid gap-2", cards.length === 3 ? "grid-cols-3" : cards.length === 2 ? "grid-cols-2" : "grid-cols-1")}>{cards}</div>
     </section>
@@ -357,13 +385,13 @@ const SEV = {
 
 export function AttentionList({ loading, items }: { loading: boolean; items: AttentionItem[] }) {
   return (
-    <section id="attention" className={cn("rounded-2xl bg-white border shadow-sm p-3.5 scroll-mt-20", items.length ? "border-amber-200" : "border-slate-100")}>
+    <section id="attention" className={cn("rounded-2xl bg-white border shadow-sm p-3.5 scroll-mt-28", items.length ? "border-amber-200" : "border-slate-100")}>
       <div className="flex items-center justify-between gap-2">
         <h3 className={cn("text-[13px] font-bold flex items-center gap-1.5", items.length ? "text-amber-800" : "text-emerald-700")}>
           <Icon name={items.length ? "notifications_active" : "task_alt"} style={{ fontSize: 17 }} />
           {loading ? "กำลังตรวจสอบ…" : items.length ? "เรื่องที่ควรดู" : "ทุกอย่างเรียบร้อย"}
         </h3>
-        <span className="text-[9.5px] text-slate-400">อัปเดตอัตโนมัติจากข้อมูลล่าสุด</span>
+        <span className="text-[9.5px] text-slate-400">อิงข้อมูลล่าสุดเสมอ</span>
       </div>
       {!loading && items.length === 0 && <p className="text-[11px] text-slate-500 mt-1">ไม่มีข้อที่ตก รีวิวคะแนนต่ำ หรือตัวเลขที่ลดลงผิดปกติ</p>}
       {items.length > 0 && (

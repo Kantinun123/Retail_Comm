@@ -37,6 +37,7 @@ import {
   type SsPersonRow,
 } from "@/lib/commission/service-sales-store";
 import { cn } from "@/lib/utils";
+import { fetchFreshness, freshText, type Freshness } from "@/lib/commission/freshness-store";
 
 /** ข้อมูลประจำแหล่งข้อมูล (หัวข้อ + ลิงก์หน้า detail) */
 const SOURCE_META: Record<SsSource, { label: string; short: string; icon: string; href: string }> = {
@@ -442,6 +443,14 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const [selected, setSelected] = useState<string | null>(null);
   const [jobsView, setJobsView] = useState<JobsView | null>(null);
   const [allStores, setAllStores] = useState(false);
+  const [fresh, setFresh] = useState<Freshness | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchFreshness().then((f) => !cancelled && setFresh(f));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   /** ส่วนล่างกราฟ: "month" = เดือนที่เลือก (ค่าเริ่มต้น) | "year" = ทั้งปี */
   const [view, setView] = useState<"month" | "year">("month");
 
@@ -645,7 +654,10 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
 
         <div className="rounded-xl bg-white border border-slate-100 px-3 py-2 text-[11px] text-slate-500 leading-relaxed">
           แหล่งข้อมูล <b className="text-slate-700">{source === "rudy" ? "Rudy (win contract)" : source === "ba" ? "BA App (win)" : "LHS/Rudy + BA"}</b>
-          {latestDate && <> · ข้อมูลถึง {latestDate}</>} · อัปเดตทุกเช้า
+          {(() => {
+            const ft = freshText(fresh, source === "rudy" ? ["lhs"] : source === "ba" ? ["ba"] : ["lhs", "ba"]);
+            return ft ? <> · <span className={ft.stale ? "text-amber-600 font-semibold" : ""}>{ft.text}</span></> : latestDate ? <> · ข้อมูลถึง {latestDate}</> : null;
+          })()}
           {isSales && <> · นับเฉพาะงานที่ผูกกับชื่อของคุณ</>}
         </div>
 
