@@ -104,10 +104,13 @@ export async function fetchDesignIntakeJobs(opts: {
   period: string;
   dealerCode?: string | null;
   repCode?: string | null;
+  /** เฉพาะงานที่จับคู่พนักงาน/ร้านไม่ได้ */
+  unassigned?: "rep" | "store" | null;
 }): Promise<{ jobs: DiJob[]; truncated: boolean; total: number } | null> {
   const p = new URLSearchParams({ mode: "jobs", period: opts.period });
   if (opts.dealerCode) p.set("dealerCode", opts.dealerCode);
   if (opts.repCode) p.set("repCode", opts.repCode);
+  if (opts.unassigned) p.set("unassigned", opts.unassigned);
   const res = await fetch(`/api/design-intake?${p.toString()}`, { cache: "no-store" });
   const raw = (await res.json()) as { ok?: boolean; truncated?: boolean; total?: number; jobs?: Record<string, unknown>[] };
   if (!raw.ok) return null;

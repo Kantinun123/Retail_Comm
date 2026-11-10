@@ -32,6 +32,7 @@ export function DesignIntakeJobsModal({
   dealerCode,
   repCode,
   showStore,
+  unassigned = null,
   initialType = "all",
   onClose,
 }: {
@@ -39,6 +40,8 @@ export function DesignIntakeJobsModal({
   title: string;
   dealerCode: string | null;
   repCode: string | null;
+  /** เฉพาะงานที่จับคู่พนักงาน ("rep") หรือร้าน ("store") ไม่ได้ */
+  unassigned?: "rep" | "store" | null;
   /** แสดงชื่อร้านในแต่ละรายการ (admin ดูทุกร้าน) */
   showStore: boolean;
   initialType?: TypeFilter;
@@ -51,13 +54,13 @@ export function DesignIntakeJobsModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetchDesignIntakeJobs({ period, dealerCode, repCode })
+    fetchDesignIntakeJobs({ period, dealerCode, repCode, unassigned })
       .then((d) => !cancelled && setData(d))
       .catch(() => !cancelled && setData(null));
     return () => {
       cancelled = true;
     };
-  }, [period, dealerCode, repCode]);
+  }, [period, dealerCode, repCode, unassigned]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();

@@ -64,7 +64,9 @@ export function DesignIntakeScreen() {
   const [data, setData] = useState<{ key: string; s: DiSummary | null } | null>(null);
   const [year, setYear] = useState<string | null | undefined>(undefined);
   const [selected, setSelected] = useState<string | null>(null);
-  const [jobsPeriod, setJobsPeriod] = useState<string | null>(null);
+  // เปิดรายการแบบ: ทั้งเดือน หรือเฉพาะพนักงาน/ร้านที่กดในส่วน "แยกตาม..."
+  const [jobs, setJobs] = useState<{ period: string; dealerCode: string | null; repCode: string | null; unassigned: boolean; label: string | null } | null>(null);
+  const openMonth = (period: string) => setJobs({ period, dealerCode, repCode, unassigned: false, label: null });
 
   const isSales = !!session?.isSales;
   const isAdmin = !!session?.isAdmin;
@@ -99,7 +101,7 @@ export function DesignIntakeScreen() {
   const focusPeriod = focus?.period ?? null;
 
   // แยกตามเดือนที่เลือก: ร้านค้า -> รายพนักงาน ; admin ทุกร้าน -> รายร้าน
-  const breakdown = useMemo(() => {
+  const breakdown = (() => {
     if (!s || !focusPeriod) return [];
     const rows = dealerCode
       ? s.reps.filter((r) => r.period === focusPeriod).map((r) => ({
@@ -117,7 +119,7 @@ export function DesignIntakeScreen() {
           muted: !r.dealerCode,
         }));
     return rows.sort((a, b) => b.material + b.solution - (a.material + a.solution));
-  }, [s, focusPeriod, dealerCode]);
+  })();
 
   if (!ready || !session) return null;
 
@@ -221,7 +223,7 @@ export function DesignIntakeScreen() {
                     type="button"
                     onClick={() => {
                       setSelected(m.period);
-                      setJobsPeriod(m.period);
+                      openMonth(m.period);
                     }}
                     aria-pressed={active}
                     aria-label={`ดูรายการแบบรับเข้า ${monthFull(m.period)}`}
@@ -262,7 +264,7 @@ export function DesignIntakeScreen() {
               </h3>
               <button
                 type="button"
-                onClick={() => setJobsPeriod(focusPeriod)}
+                onClick={() => openMonth(focusPeriod)}
                 className="shrink-0 text-[11px] font-bold text-[#c3161c] bg-[#fee2e2] rounded-full px-3 py-1 active:scale-95 transition"
               >
                 ดูรายการแบบ
@@ -271,34 +273,49 @@ export function DesignIntakeScreen() {
             <ul className="space-y-2">
               {breakdown.map((b) => (
                 <li key={b.key}>
-                  <div className="flex items-center justify-between gap-2 text-[12px]">
-                    <span className={cn("truncate", b.muted ? "text-slate-400" : "text-slate-800 font-semibold")}>{b.label}</span>
-                    <span className="shrink-0 text-slate-500">
-                      M {fmt(b.material)} · S {fmt(b.solution)}
-                      <span className="tnum font-bold text-slate-900 ml-1.5">{fmt(b.material + b.solution)}</span>
-                    </span>
-                  </div>
-                  <div className="mt-1">
-                    <SplitBar material={b.material} solution={b.solution} max={maxBreak} />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setJobs(
+                        dealerCode
+                          ? { period: focusPeriod, dealerCode, repCode: b.muted ? null : b.key, unassigned: b.muted, label: b.label }
+                          : { period: focusPeriod, dealerCode: b.muted ? null : b.key, repCode: null, unassigned: b.muted, label: b.label }
+                      )
+                    }
+                    aria-label={`ดูรายการแบบของ ${b.label}`}
+                    className="w-full text-left rounded-lg -mx-1.5 px-1.5 py-1 hover:bg-slate-50 active:bg-slate-100 transition"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-[12px]">
+                      <span className={cn("truncate", b.muted ? "text-slate-400" : "text-slate-800 font-semibold")}>{b.label}</span>
+                      <span className="shrink-0 text-slate-500 inline-flex items-center">
+                        M {fmt(b.material)} · S {fmt(b.solution)}
+                        <span className="tnum font-bold text-slate-900 ml-1.5">{fmt(b.material + b.solution)}</span>
+                        <Icon name="chevron_right" className="text-slate-300 text-lg ml-0.5" />
+                      </span>
+                    </div>
+                    <div className="mt-1">
+                      <SplitBar material={b.material} solution={b.solution} max={maxBreak} />
+                    </div>
+                  </button>
                 </li>
               ))}
             </ul>
             {dealerCode && (
-              <p className="text-[10px] text-slate-400 mt-2">&quot;ไม่ระบุพนักงาน&quot; = ผู้สร้างเอกสารใน CRM ที่จับคู่กับพนักงานในระบบไม่ได้</p>
+              <p className="text-[10px] text-slate-400 mt-2">กดที่ชื่อเพื่อดูรายการแบบของคนนั้น · &quot;ไม่ระบุพนักงาน&quot; = ผู้สร้างเอกสารใน CRM ที่จับคู่กับพนักงานในระบบไม่ได้</p>
             )}
           </section>
         )}
       </div>
 
-      {jobsPeriod && (
+      {jobs && (
         <DesignIntakeJobsModal
-          period={jobsPeriod}
-          title={monthFull(jobsPeriod)}
-          dealerCode={dealerCode}
-          repCode={repCode}
-          showStore={!dealerCode && !repCode}
-          onClose={() => setJobsPeriod(null)}
+          period={jobs.period}
+          title={jobs.label ? `${jobs.label} · ${monthFull(jobs.period)}` : monthFull(jobs.period)}
+          dealerCode={jobs.dealerCode}
+          repCode={jobs.repCode}
+          unassigned={jobs.unassigned ? (dealerCode ? "rep" : "store") : null}
+          showStore={!jobs.dealerCode && !jobs.repCode}
+          onClose={() => setJobs(null)}
         />
       )}
 

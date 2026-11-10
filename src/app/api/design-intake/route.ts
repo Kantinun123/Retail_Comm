@@ -43,6 +43,10 @@ export async function GET(req: NextRequest) {
         .limit(LIMIT); // Supabase ตัดที่ 1,000 แถวอยู่แล้ว ใช้ count เพื่อรู้ว่าถูกตัดหรือไม่
       if (dealerCode) q = q.eq("dealer_code", dealerCode);
       if (repCode) q = q.eq("rep_code", repCode);
+      // แถว "ไม่ระบุพนักงาน" / "ไม่ระบุร้าน" ในส่วนแยกตาม...
+      const unassigned = req.nextUrl.searchParams.get("unassigned");
+      if (unassigned === "rep") q = q.is("rep_code", null);
+      if (unassigned === "store") q = q.is("dealer_code", null);
       const { data: jobs, error: jErr, count } = await q;
       if (jErr) return NextResponse.json({ ok: false, error: jErr.message }, { status: 500 });
       const rows = jobs ?? [];
