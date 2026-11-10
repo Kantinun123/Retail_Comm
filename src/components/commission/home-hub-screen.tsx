@@ -22,6 +22,7 @@ import { fetchPdSummary, type PdSummary } from "@/lib/commission/lhs-purchase-di
 import { fetchEvalSummary, type EvalSummary } from "@/lib/commission/store-eval-store";
 import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-store";
 import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
+import { fetchDesignIntake, type DiSummary } from "@/lib/commission/design-intake-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
 
@@ -199,6 +200,7 @@ export function HomeHubScreen() {
   const [ssSum, setSsSum] = useState<SsSummary | null>(null);
   const [ssRudy, setSsRudy] = useState<SsSummary | null>(null);
   const [ssBa, setSsBa] = useState<SsSummary | null>(null);
+  const [di, setDi] = useState<DiSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
 
@@ -217,6 +219,7 @@ export function HomeHubScreen() {
       fetchServiceSalesSummary(dealerCode),
       fetchServiceSalesSummary(dealerCode, "rudy"),
       fetchServiceSalesSummary(dealerCode, "ba"),
+      fetchDesignIntake({ dealerCode }),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setBm(res[0].value);
@@ -230,6 +233,7 @@ export function HomeHubScreen() {
       if (res[8].status === "fulfilled") setSsSum(res[8].value);
       if (res[9].status === "fulfilled") setSsRudy(res[9].value);
       if (res[10].status === "fulfilled") setSsBa(res[10].value);
+      if (res[11].status === "fulfilled") setDi(res[11].value);
       setLoading(false);
     });
     return () => {
@@ -310,6 +314,11 @@ export function HomeHubScreen() {
       : []),
   ];
 
+  // แบบรับเข้า (Material / Solution) ตามปีที่เลือก — แสดงเมื่อมีข้อมูล
+  const diMaterial = di ? sumByYear(di.months, activeYear, (m) => m.material) : null;
+  const diSolution = di ? sumByYear(di.months, activeYear, (m) => m.solution) : null;
+  const showDesign = (di?.months.length ?? 0) > 0;
+
   // กลุ่มร้านค้า (หน้า "รวมผลประโยชน์ร้านค้า" ย้ายไปอยู่ bottom-nav แล้ว)
   const storeCards: CardData[] = [
     ...(showBackMargin
@@ -342,6 +351,18 @@ export function HomeHubScreen() {
           total: null,
           loading,
           display: `${Math.round(custSatPct * 100)}%`,
+        } as CardData]
+      : []),
+    ...(showDesign
+      ? [{
+          key: "design-intake",
+          href: "/app/design-intake",
+          icon: "architecture",
+          label: "แบบรับเข้า",
+          sub: `Material ${(diMaterial ?? 0).toLocaleString("th-TH")} · Solution ${(diSolution ?? 0).toLocaleString("th-TH")}`,
+          total: null,
+          loading,
+          display: `${((diMaterial ?? 0) + (diSolution ?? 0)).toLocaleString("th-TH")} แบบ`,
         } as CardData]
       : []),
   ];

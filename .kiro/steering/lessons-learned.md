@@ -677,3 +677,15 @@ export const dynamic = "force-dynamic";
 - Sheet "สินค้าและร้าน SCG Home" (`CUSTSAT_GSHEET_SCGHOME_CSV_URL`) เป็นแบบสอบถามคนละชุด -> ตาราง `scghome_sat_lines` แยก (คีย์ `Case_no`, RLS ไม่มี policy) แสดงเป็นส่วนแยกในหน้าความพึงพอใจ (`/api/scghome-sat`, `ScghomeSatSection`) ไม่รวมกับคะแนนงานบริการ ; ไม่เก็บชื่อ/เบอร์ลูกค้าและชื่อพนักงาน
 - ชื่อสาขาใน Sheet อาจเป็นชื่อนิติบุคคล เช่น "บุญทวีโฮมเซ็นเตอร์" = 5102653 เอสซีจีโฮม บุญถาวร (จันทบุรี) -> หาใน Master_Dealer.csv แล้วใส่ OVERRIDE พร้อมเหตุผล
 - PowerShell: ผล node ที่มีภาษาไทยให้ `| Out-File -Encoding utf8` (redirect `>` ทำ mojibake) ; อย่ารัน SQL ตรวจผลขนานกับคำสั่ง apply (อ่านได้ค่ากลางทาง)
+
+---
+
+## 📐 แบบรับเข้า (CRM Opportunity → design_intake_lines)
+
+- ต้นทาง `crm_trn_opportunity.xlsx` (74k แถว ทุก BU ตั้งแต่ 2023) ; คีย์ `id` (OP…) ; เก็บเฉพาะ BU `Housing Expert (GT)` + `SCG Home Retail (JV)` ตั้งแต่ 2025 (ไว้เทียบปีก่อน) ; สคริปต์ `scripts/sync-design-intake.mjs` (dry-run ค่าเริ่มต้น)
+- **เดือนใช้ `crm_created_date`** (ตรงกับ Power BI) — `start_date` ส่วนใหญ่ว่าง/1899/ปี พ.ศ. 2567 ห้ามใช้
+- ภาพ Power BI ที่ผู้ใช้ส่งถูกกรองกลุ่มสินค้า (scg Metal Roof) เหลือ 25 แบบ ทั้งที่จริงมี ~1,300/เดือน — ตรวจ export กับไฟล์ดิบเสมอก่อนเชื่อตัวเลขในภาพ ; ตัวกรองระดับหน้า/visual ไม่ติดมากับ export
+- ประเภท: Material = service_category/sub มี "ถอดแบบประมาณการ"/"ออกแบบประมาณการ" ; Solution = งานบริการอื่นที่มี sub ; ไม่มี service = ไม่นับ (`design_type` null)
+- ร้าน: `created_by_group_name` จับคู่ด้วยชื่อทุกคอลัมน์ใน Master_Dealer + OVERRIDE 9 ชื่อ (ชื่อ+จังหวัดตรงร้านเดียว) -> 98.4% ; ที่เหลือคือร้านที่ไม่อยู่ในแอป (กิจเจริญโฮม อุบลฯ, บุญถาวร เมืองขอนแก่น)
+- พนักงาน: `crm_created_name` = username/อีเมล -> sale_reps.email (เต็มหรือส่วนหน้า @) map ได้ 76%
+- อ่าน xlsx 15MB ใช้เวลาหลายวินาที ; รายงาน dry-run ต้องเขียนผ่าน `[Console]::OutputEncoding=UTF8` + `Out-File -Encoding utf8` ไม่งั้นชื่อร้านไทยเพี้ยน
