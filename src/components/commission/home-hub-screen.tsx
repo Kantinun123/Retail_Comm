@@ -23,6 +23,7 @@ import { fetchEvalSummary, type EvalSummary } from "@/lib/commission/store-eval-
 import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-store";
 import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
 import { fetchDesignIntake, type DiSummary } from "@/lib/commission/design-intake-store";
+import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
 
@@ -201,6 +202,7 @@ export function HomeHubScreen() {
   const [ssRudy, setSsRudy] = useState<SsSummary | null>(null);
   const [ssBa, setSsBa] = useState<SsSummary | null>(null);
   const [di, setDi] = useState<DiSummary | null>(null);
+  const [prodSales, setProdSales] = useState<PsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
 
@@ -220,6 +222,7 @@ export function HomeHubScreen() {
       fetchServiceSalesSummary(dealerCode, "rudy"),
       fetchServiceSalesSummary(dealerCode, "ba"),
       fetchDesignIntake({ dealerCode }),
+      fetchProductSales({ dealerCode, lite: true }),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setBm(res[0].value);
@@ -234,6 +237,7 @@ export function HomeHubScreen() {
       if (res[9].status === "fulfilled") setSsRudy(res[9].value);
       if (res[10].status === "fulfilled") setSsBa(res[10].value);
       if (res[11].status === "fulfilled") setDi(res[11].value);
+      if (res[12].status === "fulfilled") setProdSales(res[12].value);
       setLoading(false);
     });
     return () => {
@@ -313,6 +317,11 @@ export function HomeHubScreen() {
       ? [{ key: "sales-ba", href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง รายวัน (gmv)", total: salesBa, loading, pct: pctOfSales(salesBa) } as CardData]
       : []),
   ];
+
+  // ยอดขายสินค้า (DI / Odoo) ตามปีที่เลือก — แสดงเมื่อมีข้อมูล
+  const showProductSales = (prodSales?.months.length ?? 0) > 0;
+  const productSalesTotal = prodSales ? sumByYear(prodSales.months, activeYear, (m) => m.amount) : null;
+  const productSalesSource = (prodSales?.sources ?? []).map((x) => (x === "di" ? "DI" : "Odoo")).join(" + ");
 
   // แบบรับเข้า (Material / Solution) ตามปีที่เลือก — แสดงเมื่อมีข้อมูล
   const diMaterial = di ? sumByYear(di.months, activeYear, (m) => m.material) : null;
@@ -448,12 +457,25 @@ export function HomeHubScreen() {
         </section>
 
         {/* กลุ่มยอดขาย (แยกหัวข้อ) */}
-        {showServiceSales && (
+        {(showServiceSales || showProductSales) && (
           <section>
             <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
               <Icon name="trending_up" style={{ fontSize: 16 }} />
               ยอดขาย
             </h3>
+            {showProductSales && (
+              <div className={showServiceSales ? "mb-2.5" : ""}>
+                <SummaryBar
+                  icon="shopping_cart"
+                  label="ยอดขายสินค้า"
+                  total={productSalesTotal}
+                  loading={loading}
+                  note={`${yearLabel} · ${productSalesSource} · แยกกลุ่มสินค้า/พนักงาน`}
+                  href="/app/product-sales"
+                />
+              </div>
+            )}
+            {showServiceSales && (
             <SummaryBar
               icon="construction"
               label="รวมยอดขายงานบริการ"
@@ -462,7 +484,8 @@ export function HomeHubScreen() {
               note={`${yearLabel} · LHS/Rudy + BA · 3 กลุ่มงานบริการ`}
               href="/app/service-sales"
             />
-            {salesCards.length > 0 && (
+            )}
+            {showServiceSales && salesCards.length > 0 && (
               <div className="grid grid-cols-2 gap-2.5 mt-2.5">
                 {salesCards.map((c) => (
                   <HubCard key={c.key} c={c} />

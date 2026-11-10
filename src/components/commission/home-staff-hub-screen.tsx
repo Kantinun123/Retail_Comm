@@ -15,6 +15,7 @@ import { ProfileCard } from "./profile-card";
 import { fetchCommissionSummary, type CommissionSummary } from "@/lib/commission/commission-product-store";
 import { fetchBaSummary, type BaSummary } from "@/lib/commission/ba-incentive-store";
 import { fetchLhsSummary, type LhsSummary } from "@/lib/commission/lhs-commission-store";
+import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
 import { YearChips, yearsOf, sumByYear } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
 
@@ -79,6 +80,7 @@ export function HomeStaffHubScreen() {
   const [cp, setCp] = useState<CommissionSummary | null>(null);
   const [ba, setBa] = useState<BaSummary | null>(null);
   const [lhsSum, setLhsSum] = useState<LhsSummary | null>(null);
+  const [prodSales, setProdSales] = useState<PsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string | null | undefined>(undefined);
 
@@ -98,11 +100,13 @@ export function HomeStaffHubScreen() {
       fetchCommissionSummary(null, repCode),
       fetchBaSummary(null, repCode),
       fetchLhsSummary(null, repCode),
+      fetchProductSales({ repCode, lite: true }),
     ]).then((res) => {
       if (cancelled) return;
       if (res[0].status === "fulfilled") setCp(res[0].value);
       if (res[1].status === "fulfilled") setBa(res[1].value);
       if (res[2].status === "fulfilled") setLhsSum(res[2].value);
+      if (res[3].status === "fulfilled") setProdSales(res[3].value);
       setLoading(false);
     });
     return () => {
@@ -133,6 +137,10 @@ export function HomeStaffHubScreen() {
 
   const pctOf = (v: number | null) =>
     v == null || myTotal == null || myTotal <= 0 ? null : (v / myTotal) * 100;
+
+  // ยอดขายสินค้าที่ตัวเองขาย (DI / Odoo) — ไม่ใช่ผลประโยชน์ จึงแยกหัวข้อ "ยอดขายของฉัน"
+  const showProductSales = (prodSales?.months.length ?? 0) > 0;
+  const productSalesTotal = prodSales ? sumByYear(prodSales.months, activeYear, (m) => m.amount) : null;
 
   const cards: CardData[] = [
     { key: "comm-product", href: "/app/commission-product", icon: "payments", label: "Product Commission", sub: "จากการขายสินค้าที่หน้าร้าน", total: commProduct, loading, pct: pctOf(commProduct) },
@@ -200,6 +208,29 @@ export function HomeStaffHubScreen() {
             ))}
           </div>
         </section>
+
+        {showProductSales && (
+          <section>
+            <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
+              <Icon name="trending_up" style={{ fontSize: 16 }} />
+              ยอดขายของฉัน
+            </h3>
+            <Link
+              href="/app/product-sales"
+              className="rounded-2xl border border-slate-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-red-200 hover:-translate-y-0.5 transition-all"
+            >
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center shrink-0">
+                <Icon name="shopping_cart" style={{ fontSize: 20 }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-slate-900 leading-tight">ยอดขายสินค้า</p>
+                <p className="text-[10px] text-slate-400 leading-tight mt-0.5">ยอดสะสม {yearLabel} · แยกกลุ่มสินค้า</p>
+              </div>
+              <p className="tnum text-[16px] font-bold text-[#a11119] shrink-0">{loading ? "…" : baht(productSalesTotal)}</p>
+              <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
+            </Link>
+          </section>
+        )}
 
         <p className="text-[11px] text-slate-400 text-center">
           แสดงเฉพาะผลประโยชน์ของคุณ · ยอดบนการ์ดคือยอดสะสมรายคน

@@ -38,6 +38,52 @@ const { data: dealers, error: dErr } = await sb.from("dealers").select("code,nam
 if (dErr) { console.error("โหลด dealers ไม่สำเร็จ:", dErr.message); process.exit(1); }
 const dealerSet = new Map(dealers.map((d) => [d.code, d]));
 
+/* จับคู่ชื่อพนักงานขายในไฟล์ -> sale_reps.rep_code (เฉพาะภายในร้านเดียวกัน)
+   ลองตามลำดับ: ชื่อเต็ม, ชื่อต้น, ชื่อในวงเล็บ (ชื่อเล่น), ชื่อที่ตัดวงเล็บออก
+   ตัดคำนำหน้า/เบอร์โทร/ช่องว่าง/จุด ; key ที่ชนกันหลายคนในร้านเดียว = ไม่ใช้ (กันจับผิดคน) */
+const { data: reps, error: rErr } = await sb.from("sale_reps").select("rep_code,name,nickname,dealer_code");
+if (rErr) { console.error("โหลด sale_reps ไม่สำเร็จ:", rErr.message); process.exit(1); }
+const TITLE = /^(นาย|นางสาว|นาง|น\.ส\.|คุณ)\s*/;
+const repClean = (s) => String(s ?? "").replace(TITLE, "").replace(/\d[\d\-\s]{6,}\d/g, "").trim();
+const repKey = (s) => String(s ?? "").replace(/[\s.\-()0-9]+/g, "").toLowerCase();
+const repIdx = new Map(); // dealer -> key -> rep_code | "DUP"
+const putRep = (d, key, rep) => {
+  if (!key || key.length < 2) return;
+  const m = repIdx.get(d) ?? new Map(); repIdx.set(d, m);
+  const cur = m.get(key); m.set(key, cur && cur !== rep ? "DUP" : rep);
+};
+for (const r of reps) {
+  if (!r.dealer_code || !r.name || r.name === "N/A") continue;
+  const n = repClean(r.name);
+  putRep(r.dealer_code, repKey(n), r.rep_code);
+  putRep(r.dealer_code, repKey(n.split(/\s+/)[0]), r.rep_code);
+  if (r.nickname) putRep(r.dealer_code, repKey(r.nickname), r.rep_code);
+}
+const repSurname = new Map(reps.map((r) => [r.rep_code, repKey(repClean(r.name).split(/\s+/).slice(1).join(""))]));
+const NOT_SURNAME = new Set(["พนักงานขาย", "ฝ่ายขาย", "โครงการ"]);
+/** ชื่อในไฟล์มี "นามสกุล" ที่ไม่ใช่ของพนักงานคนนี้หรือไม่ (กันจับคู่ชื่อต้นซ้ำกันแต่คนละคน)
+ *  ถือว่าตรงถ้าขึ้นต้น 2 ตัวอักษรเหมือนกัน (เผื่อสะกดต่างเล็กน้อย) */
+function surnameConflict(rep, n) {
+  const sur = repSurname.get(rep);
+  if (!sur) return false;
+  const tokens = n.replace(/\(.*?\)/g, " ").split(/\s+/).slice(1).map(repKey).filter((t) => t.length >= 5 && !NOT_SURNAME.has(t));
+  if (!tokens.length) return false;
+  return !tokens.some((t) => t === sur || t.slice(0, 2) === sur.slice(0, 2));
+}
+function matchRep(dealer, name) {
+  const m = repIdx.get(dealer);
+  if (!m || !name || name === NA) return null;
+  const n = repClean(name), noParen = n.replace(/\(.*?\)/g, "").trim();
+  const full = m.get(repKey(n)) ?? m.get(repKey(noParen));
+  if (full && full !== "DUP") return full;
+  const cands = [repKey(n.split(/\s+/)[0]), ...[...n.matchAll(/\(([^)]+)\)/g)].map((x) => repKey(x[1])), repKey(noParen.split(/\s+/)[0])];
+  for (const c of cands) {
+    const v = m.get(c);
+    if (v && v !== "DUP" && !surnameConflict(v, n)) return v;
+  }
+  return null;
+}
+
 /* รหัสร้านใน Odoo ที่ไม่ตรงกับรหัสในแอป (ผู้ใช้ยืนยันจากชื่อสาขา 2026-11) */
 const OVERRIDE = {
   odoo: {
@@ -72,7 +118,7 @@ function makeAgg(source) {
     const key = [source, period, code ?? `?${dealer ?? ""}`, g, s].join("|");
     let a = map.get(key);
     if (!a) {
-      a = { row_key: key, source, period, dealer_code: code, source_dealer: dealer, product_group: g, salesperson: s, amount: 0, qty: 0, line_count: 0, last_sale_date: null };
+      a = { row_key: key, source, period, dealer_code: code, source_dealer: dealer, product_group: g, salesperson: s, rep_code: code ? matchRep(code, s) : null, amount: 0, qty: 0, line_count: 0, last_sale_date: null };
       map.set(key, a);
     }
     a.amount += amount; a.qty += qty; a.line_count++;
@@ -173,18 +219,21 @@ async function syncSource(source, file, reader) {
   console.log("ยอดต่อเดือน (ล้าน): " + Object.keys(per).sort().map((p) => `${p.slice(2)}:${(per[p] / 1e6).toFixed(1)}`).join(" "));
   const groups = new Set(rows.map((r) => r.product_group)), people = new Set(rows.map((r) => `${r.dealer_code}|${r.salesperson}`));
   console.log(`แถวสรุป ${rows.length.toLocaleString()} | กลุ่มสินค้า ${groups.size} | พนักงาน (ร้าน×ชื่อ) ${people.size}`);
+  const repAmt = rows.filter((r) => r.rep_code).reduce((a, r) => a + r.amount, 0);
+  const repSet = new Set(rows.map((r) => r.rep_code).filter(Boolean));
+  console.log(`จับคู่พนักงานในระบบ: ${repSet.size} คน | ยอดที่จับคู่ได้ ฿${f0(repAmt)} (${((repAmt / (s.amount || 1)) * 100).toFixed(1)}%)`);
 
   // DB
   const db = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from("product_sales_lines").select("id,row_key,amount,qty,line_count,last_sale_date,dealer_code").eq("source", source).order("id").range(from, from + 999);
+    const { data, error } = await sb.from("product_sales_lines").select("id,row_key,amount,qty,line_count,last_sale_date,dealer_code,rep_code").eq("source", source).order("id").range(from, from + 999);
     if (error) throw new Error("อ่านฐานข้อมูลไม่สำเร็จ: " + error.message);
     db.push(...data); if (data.length < 1000) break;
   }
   const dbMap = new Map(db.map((x) => [x.row_key, x]));
   const toUp = rows.filter((r) => {
     const c = dbMap.get(r.row_key);
-    return !c || Number(c.amount) !== r.amount || Number(c.qty) !== r.qty || c.line_count !== r.line_count || c.last_sale_date !== r.last_sale_date || c.dealer_code !== r.dealer_code;
+    return !c || Number(c.amount) !== r.amount || Number(c.qty) !== r.qty || c.line_count !== r.line_count || c.last_sale_date !== r.last_sale_date || c.dealer_code !== r.dealer_code || (c.rep_code ?? null) !== r.rep_code;
   });
   const keys = new Set(rows.map((r) => r.row_key));
   const toDel = db.filter((x) => !keys.has(x.row_key));

@@ -22,3 +22,7 @@ create index if not exists idx_product_sales_dealer_period on public.product_sal
 create index if not exists idx_product_sales_source_period on public.product_sales_lines (source, period);
 alter table public.product_sales_lines enable row level security;
 revoke all on public.product_sales_lines from anon, authenticated;
+
+-- พนักงานในระบบ (sale_reps) ที่จับคู่ได้จากชื่อในไฟล์ (ชื่อเต็ม/ชื่อต้น/ชื่อเล่น ภายในร้านเดียวกัน) ; null = ไม่ใช่พนักงานในระบบ
+alter table public.product_sales_lines add column if not exists rep_code text;
+create index if not exists idx_product_sales_rep_period on public.product_sales_lines (rep_code, period) where rep_code is not null;
