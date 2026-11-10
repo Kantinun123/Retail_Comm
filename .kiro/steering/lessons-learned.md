@@ -689,3 +689,18 @@ export const dynamic = "force-dynamic";
 - ร้าน: `created_by_group_name` จับคู่ด้วยชื่อทุกคอลัมน์ใน Master_Dealer + OVERRIDE 9 ชื่อ (ชื่อ+จังหวัดตรงร้านเดียว) -> 98.4% ; ที่เหลือคือร้านที่ไม่อยู่ในแอป (กิจเจริญโฮม อุบลฯ, บุญถาวร เมืองขอนแก่น)
 - พนักงาน: `crm_created_name` = username/อีเมล -> sale_reps.email (เต็มหรือส่วนหน้า @) map ได้ 76%
 - อ่าน xlsx 15MB ใช้เวลาหลายวินาที ; รายงาน dry-run ต้องเขียนผ่าน `[Console]::OutputEncoding=UTF8` + `Out-File -Encoding utf8` ไม่งั้นชื่อร้านไทยเพี้ยน
+
+---
+
+## 🛒 Product Sales (DI / Odoo) — ไฟล์ใหญ่และไฟล์ที่คอลัมน์เลื่อน
+
+**DI (`hpb_salesout_details.csv`)**:
+- คั่นด้วย `;` (ไม่ใช่ `,`) และภาษาไทยเป็น `windows-874` → ถ้าอ่านเป็น UTF-8 จะได้ mojibake ใช้ `new TextDecoder("windows-874")`
+- ไม่มีคอลัมน์ `GBU` ตามที่ผู้ใช้บอก → ใช้ `MISL5_name` แทน (ตรวจ header ก่อนเสมอ อย่าเชื่อชื่อคอลัมน์จากคำบอกเล่า)
+- ~83k แถวมีคอลัมน์ขาด (field น้อยกว่า header) ทำให้ค่าเลื่อน → ถ้า field สุดท้ายเป็น timestamp ให้ถือว่า 2 ช่องท้ายคือ created/modified และเชื่อเฉพาะ index `< length-2`; ช่องที่เชื่อไม่ได้ให้เป็น "ไม่ระบุ"
+
+**Odoo (`odoo_hpb_vendor_sales_detail.xlsx`)**:
+- SheetJS โหลดไม่ได้ (sheet XML แตกแล้ว ~808 MB เกิน string limit ของ V8) → เขียน streaming reader เอง `scripts/lib/xlsx-stream.mjs` (อ่าน zip central directory + `zlib.createInflateRaw` แล้ว parse `<row>` ทีละชิ้น) อ่านจบ ~13 วินาที ไม่ต้องเพิ่ม dependency
+- รหัสร้านใน Odoo บางตัวไม่ตรงกับรหัสในแอป (สาขา/รหัสภายใน เช่น 8030, 8210) → ต้องมี OVERRIDE map ที่ผู้ใช้ยืนยัน ห้ามเดา map เอง
+
+**Storage**: เก็บแบบ aggregate (เดือน × ร้าน × กลุ่ม × พนักงาน) แทนรายบรรทัด (1.35M แถว) เพราะ DB ใหญ่ 235 MB แล้ว

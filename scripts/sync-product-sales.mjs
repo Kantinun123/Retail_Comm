@@ -38,7 +38,21 @@ const { data: dealers, error: dErr } = await sb.from("dealers").select("code,nam
 if (dErr) { console.error("โหลด dealers ไม่สำเร็จ:", dErr.message); process.exit(1); }
 const dealerSet = new Map(dealers.map((d) => [d.code, d]));
 
-const clean = (v) => { const s = String(v ?? "").replace(/\s+/g, " ").trim(); return s || null; };
+/* รหัสร้านใน Odoo ที่ไม่ตรงกับรหัสในแอป (ผู้ใช้ยืนยันจากชื่อสาขา 2026-11) */
+const OVERRIDE = {
+  odoo: {
+    "5102738": "5102714", // ทีเค-ฉะเชิงเทรา
+    "5102651": "5102652", // อุบลฯ-วารินชำราบ
+    "8030": "5100657", // ลพบุรี
+    "8190": "5101733", // ทรีเค โฮมเบส
+    "8210": "3052659", // โคราช-หัวทะเล
+    "5100983": "5100289", // นครศรีธรรมราช
+    "5102649": "5102653", // บุญทวีวัสดุ
+  },
+};
+// ที่เหลือ (ไม่มีในแอป / ไม่ได้ขายภายใต้ร้าน เช่น 8B10 สำนักงานกลาง, 8B20 Ecommerce, Promptplus) -> dealer_code = null (ไม่ระบุร้าน)
+
+const clean = (v) => { const s = String(v ?? "").replace(/\s+/g, " ").trim(); return s && s !== "-" ? s : null; };
 const num = (v) => { const n = Number(String(v ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : 0; };
 
 /** เพิ่มยอดเข้ากลุ่มสรุป */
@@ -48,7 +62,8 @@ function makeAgg(source) {
   const add = ({ date, dealer, group, sales, amount, qty }) => {
     stat.lines++;
     const period = date.slice(0, 7);
-    const code = dealerSet.has(dealer) ? dealer : null;
+    const mapped = OVERRIDE[source]?.[dealer] ?? dealer;
+    const code = dealerSet.has(mapped) ? mapped : null;
     if (!code) stat.unknownDealer.set(dealer ?? "(ว่าง)", (stat.unknownDealer.get(dealer ?? "(ว่าง)") ?? 0) + 1);
     const g = group ?? NA, s = sales ?? NA;
     if (!group) stat.naGroup++;
