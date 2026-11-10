@@ -17,6 +17,7 @@ import { ProfileCard } from "./profile-card";
 import { YearChips, yearsOf } from "./year-filter";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
 import { fetchDesignIntake, type DiMonth, type DiSummary } from "@/lib/commission/design-intake-store";
+import { DesignIntakeJobsModal } from "./design-intake-jobs-modal";
 import { cn } from "@/lib/utils";
 
 const TH_MONTH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
@@ -63,6 +64,7 @@ export function DesignIntakeScreen() {
   const [data, setData] = useState<{ key: string; s: DiSummary | null } | null>(null);
   const [year, setYear] = useState<string | null | undefined>(undefined);
   const [selected, setSelected] = useState<string | null>(null);
+  const [jobsPeriod, setJobsPeriod] = useState<string | null>(null);
 
   const isSales = !!session?.isSales;
   const isAdmin = !!session?.isAdmin;
@@ -217,17 +219,22 @@ export function DesignIntakeScreen() {
                   <button
                     key={m.period}
                     type="button"
-                    onClick={() => setSelected(m.period)}
+                    onClick={() => {
+                      setSelected(m.period);
+                      setJobsPeriod(m.period);
+                    }}
                     aria-pressed={active}
+                    aria-label={`ดูรายการแบบรับเข้า ${monthFull(m.period)}`}
                     className={cn("w-full text-left px-3.5 py-2.5 transition", active ? "bg-red-50/60" : "hover:bg-slate-50")}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className={cn("text-[13px] font-bold", active ? "text-[#a11119]" : "text-slate-900")}>{monthShort(m.period)}</span>
-                      <span className="text-[11.5px] text-slate-500">
+                      <span className="text-[11.5px] text-slate-500 inline-flex items-center">
                         <span className="text-[#1e5a7a] font-semibold">M {fmt(m.material)}</span>
-                        {" · "}
+                        <span className="mx-1">·</span>
                         <span className="text-[#2b8a8d] font-semibold">S {fmt(m.solution)}</span>
                         <span className="tnum text-[14px] font-bold text-slate-900 ml-2">{fmt(total(m))}</span>
+                        <Icon name="chevron_right" className="text-slate-300 text-lg ml-0.5" />
                       </span>
                     </div>
                     <div className="mt-1.5">
@@ -241,17 +248,26 @@ export function DesignIntakeScreen() {
           <p className="text-[10.5px] text-slate-400 mt-1.5 flex items-center gap-3">
             <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#1e5a7a]" aria-hidden="true" /> Material</span>
             <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-[#4fb0b3]" aria-hidden="true" /> Solution</span>
-            <span>กดที่เดือนเพื่อดูรายละเอียดด้านล่าง</span>
+            <span>กดที่เดือนเพื่อดูรายการแบบทีละงาน</span>
           </p>
         </section>
 
         {/* แยกรายพนักงาน / รายร้าน ของเดือนที่เลือก */}
         {!isSales && focusPeriod && breakdown.length > 0 && (
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-2">
-              <Icon name={dealerCode ? "groups" : "storefront"} className="text-lg text-[#d32029]" />
-              {dealerCode ? "แยกตามพนักงาน" : "แยกตามร้าน"} · {monthFull(focusPeriod)}
-            </h3>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5">
+                <Icon name={dealerCode ? "groups" : "storefront"} className="text-lg text-[#d32029]" />
+                {dealerCode ? "แยกตามพนักงาน" : "แยกตามร้าน"} · {monthFull(focusPeriod)}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setJobsPeriod(focusPeriod)}
+                className="shrink-0 text-[11px] font-bold text-[#c3161c] bg-[#fee2e2] rounded-full px-3 py-1 active:scale-95 transition"
+              >
+                ดูรายการแบบ
+              </button>
+            </div>
             <ul className="space-y-2">
               {breakdown.map((b) => (
                 <li key={b.key}>
@@ -274,6 +290,17 @@ export function DesignIntakeScreen() {
           </section>
         )}
       </div>
+
+      {jobsPeriod && (
+        <DesignIntakeJobsModal
+          period={jobsPeriod}
+          title={monthFull(jobsPeriod)}
+          dealerCode={dealerCode}
+          repCode={repCode}
+          showStore={!dealerCode && !repCode}
+          onClose={() => setJobsPeriod(null)}
+        />
+      )}
 
       <BottomNav active="home" />
     </>
