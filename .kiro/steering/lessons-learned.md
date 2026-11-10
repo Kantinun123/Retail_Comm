@@ -719,3 +719,11 @@ export const dynamic = "force-dynamic";
 - ❌ ฟังก์ชัน `STABLE` ใช้ temp table (create/insert) ไม่ได้ ("INSERT is not allowed in a non-volatile function") → ✅ เขียนเป็น `language sql` + CTE หลายชั้นแทน
 - เปลี่ยน signature RPC (เพิ่ม param) ต้อง `drop function` ของเดิมก่อน ไม่งั้นเกิด overload; ตั้ง default ให้ param ใหม่ทุกตัว → โค้ด production เดิมที่เรียกด้วยชื่อ param เดิมยังทำงานได้ (DB ใช้ร่วมกับ production)
 - `/api/service-sales` เดิมไม่มีการเช็คสิทธิ์เลย (ร้านที่ล็อกอินจริงส่ง dealerCode ว่าง = เห็นทุกร้าน) → เพิ่ม getAuthContext: sales บังคับ repCode ตัวเอง, ร้านต้องส่ง dealerCode ของตัวเอง
+
+### Sync อัตโนมัติ (Task Scheduler) — `scripts/sync-runner.mjs`
+- กลุ่ม `gsheet` (ทุก 1 ชม. 08:00–19:00) และ `sharepoint` (09:30/12:00/16:00, รันเฉพาะไฟล์ที่ mtime+size เปลี่ยน) ; ลงทะเบียนด้วย `scripts/register-sync-tasks.ps1` ; เรียกผ่าน `run-sync-hidden.vbs` (ไม่มีหน้าต่างเด้ง)
+- ❌ เดาผิดว่าไฟล์ SharePoint อัปเดตวันละครั้ง → ✅ จริงๆ ต้นทางเขียนทับหลายรอบต่อวัน (10 พ.ย.: CRM 10:18, LHS 13:28, DI 14:01, Odoo 14:08) — ดูจาก mtime ก่อนสรุปตารางเวลา
+- ❌ อ่านไฟล์ระหว่าง OneDrive กำลังดาวน์โหลด = ได้ไฟล์ไม่ครบ → ✅ ไฟล์ที่ mtime < 3 นาที ให้ข้ามไปรอบหน้า (เจอจริงกับ Odoo ในรอบทดสอบ)
+- ❌ `import-service-sales.mjs` (LHS) เดิมล้างตารางแล้ว insert ใหม่ — ถ้ารันอัตโนมัติแล้วพังกลางทาง ข้อมูลหาย + rep_code หาย → ✅ เปลี่ยนเป็น diff ด้วย "ลายเซ็นทั้งแถว + จำนวนครั้ง" (project_number ซ้ำได้) + guard ลดเกิน 30%
+- สคริปต์ลูก exit 2 = guard (ข้อมูลลดผิดปกติ) → runner บันทึก `guard` ไม่อัปเดต state รอบหน้าจะลองใหม่ ; log ที่ `logs/sync-YYYY-MM-DD.log` (gitignored, เก็บ 30 วัน) + ตาราง `sync_runs`
+- VBScript อ่านไฟล์เป็น ANSI → อย่าใส่ภาษาไทยในไฟล์ .vbs

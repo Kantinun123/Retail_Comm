@@ -1,6 +1,8 @@
 .env
 .kiro
 commission-app
+# log/state ของ sync อัตโนมัติ (scripts/sync-runner.mjs)
+logs/
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
