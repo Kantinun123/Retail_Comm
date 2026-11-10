@@ -666,3 +666,14 @@ export const dynamic = "force-dynamic";
 - web_fetch: export CSV ของ Google Sheet redirect ไป `*.googleusercontent.com` (ต้องอนุมัติ origin แยก) ; ใน node ใช้ `fetch(..., {redirect:"follow"})` ได้ตรง
 - Sheet ตอนนี้แชร์แบบ "ทุกคนที่มีลิงก์" ทั้งที่มีชื่อลูกค้า -> แจ้งผู้ใช้ให้จำกัดสิทธิ์ แล้วเปลี่ยนไปอ่านด้วย Google service account
 - ผล sync ครั้งแรก (2026-11-08): เพิ่ม 86 (พ.ย.) แก้ 4 ลบ 3 -> 7,119 งาน ยอด 202,590,627.69 ; รันซ้ำได้ 0/0/0 (idempotent)
+
+---
+
+## 😊 Cust Sat จาก Google Sheet: 2 แบบสอบถาม อย่ารวมคะแนนกัน + ช่วงเวลาที่ Sheet เป็นเจ้าของ
+
+- Sheet "งานบริการ" (`CUSTSAT_GSHEET_SERVICE_CSV_URL`) = แบบสอบถามรุ่นต่อจาก sheet DATA ใช้ **ทั้ง Housing Expert และ SCG Home** (ผู้ใช้คิดว่าเป็น HE อย่างเดียว — ตรวจด้วย model ของร้านใน DB ก่อนเชื่อ) ; เป็นต้นทางตั้งแต่ **1 ต.ค. 2026** เท่านั้น ข้อมูล ม.ค.–ก.ย. มาจาก xlsx sheet DATA ห้ามลบ (sync ลบเฉพาะ eval_date >= CUTOFF)
+- ไม่มีรหัสคำตอบ -> `cust_sat_lines.source_key` = "<วันที่>T<เวลา>|<สาขา>" ; ตรวจลำดับคอลัมน์ด้วยการเทียบคะแนนกับข้อมูลเดิมที่ซ้อนกัน (297/297 ตรง) ก่อน apply
+- upsert `onConflict` ใช้ **partial unique index ไม่ได้** -> ใช้ unique index เต็ม (NULL ซ้ำได้อยู่แล้ว)
+- Sheet "สินค้าและร้าน SCG Home" (`CUSTSAT_GSHEET_SCGHOME_CSV_URL`) เป็นแบบสอบถามคนละชุด -> ตาราง `scghome_sat_lines` แยก (คีย์ `Case_no`, RLS ไม่มี policy) แสดงเป็นส่วนแยกในหน้าความพึงพอใจ (`/api/scghome-sat`, `ScghomeSatSection`) ไม่รวมกับคะแนนงานบริการ ; ไม่เก็บชื่อ/เบอร์ลูกค้าและชื่อพนักงาน
+- ชื่อสาขาใน Sheet อาจเป็นชื่อนิติบุคคล เช่น "บุญทวีโฮมเซ็นเตอร์" = 5102653 เอสซีจีโฮม บุญถาวร (จันทบุรี) -> หาใน Master_Dealer.csv แล้วใส่ OVERRIDE พร้อมเหตุผล
+- PowerShell: ผล node ที่มีภาษาไทยให้ `| Out-File -Encoding utf8` (redirect `>` ทำ mojibake) ; อย่ารัน SQL ตรวจผลขนานกับคำสั่ง apply (อ่านได้ค่ากลางทาง)

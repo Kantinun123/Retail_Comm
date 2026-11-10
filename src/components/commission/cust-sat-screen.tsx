@@ -14,6 +14,7 @@ import { BottomNav } from "./bottom-nav";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
 import { ProfileCard } from "./profile-card";
 import { YearFilter, computeYearFilter } from "./year-filter";
+import { ScghomeSatSection } from "./scghome-sat-section";
 import {
   fetchCustSatSummary,
   fetchCustSatMonthAgg,
@@ -489,6 +490,9 @@ export function CustSatScreen() {
         <p className="text-[11px] text-slate-400 text-center">
           แบบประเมินความพึงพอใจลูกค้า · คะแนนเต็ม 10 (แสดงเป็น %)
         </p>
+
+        {/* SCG Home: แบบสอบถามสินค้าและร้าน (แยก ไม่รวมกับคะแนนด้านบน) */}
+        <ScghomeSatSection dealerCode={dealerCode} />
       </div>
 
       {detail && (
