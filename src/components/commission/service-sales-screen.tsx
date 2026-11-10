@@ -442,6 +442,8 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const [selected, setSelected] = useState<string | null>(null);
   const [jobsView, setJobsView] = useState<JobsView | null>(null);
   const [allStores, setAllStores] = useState(false);
+  /** ส่วนล่างกราฟ: "month" = เดือนที่เลือก (ค่าเริ่มต้น) | "year" = ทั้งปี */
+  const [view, setView] = useState<"month" | "year">("month");
 
   // ขอบเขต: ร้าน / พนักงาน (เฉพาะงานตัวเอง) / admin (ทุกร้าน, เจาะร้าน, มุมมองร้าน/พนักงาน)
   const isAdmin = !!session?.isAdmin;
@@ -531,10 +533,13 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const showPeople = !!dealerCode && !repCode;
   const peopleYear = showPeople ? aggregatePeople(d?.breakdown.people ?? []) : [];
   const peopleMonth = showPeople && focus ? aggregatePeople((d?.breakdown.people ?? []).filter((p) => p.period === focus.period)) : [];
+  // มุมมองส่วนล่าง: เดือนที่เลือกจากกราฟ (ค่าเริ่มต้น = เดือนล่าสุด) หรือทั้งปี
+  const isMonth = view === "month" && !!focus;
+  const storePeriod = isMonth ? focus!.period : null;
   const storesYear = adminAll
     ? (() => {
         const m = new Map<string, { code: string | null; name: string; model: string | null; amount: number; jobs: number }>();
-        (d?.breakdown.stores ?? []).forEach((s) => {
+        (d?.breakdown.stores ?? []).filter((s) => !storePeriod || s.period === storePeriod).forEach((s) => {
           const k = s.dealerCode ?? "__none__";
           const a = m.get(k) ?? { code: s.dealerCode, name: s.dealerName ?? (s.dealerCode ? s.dealerCode : "ไม่ระบุร้าน"), model: s.model, amount: 0, jobs: 0 };
           a.amount += s.amount;
@@ -555,6 +560,14 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   };
   const openMonth = (period: string, v: Omit<JobsView, "scope" | "query"> & { query: SsJobQuery }) =>
     setJobsView({ ...v, scope: monthFull(period), query: { ...scopeQuery, ...v.query, period } });
+  // ค่าที่ส่วนล่างกราฟใช้ (ตามเดือนที่เลือก หรือทั้งปี)
+  const vGroups = isMonth ? [...focus!.groups].sort((a, b) => b.amount - a.amount) : groups;
+  const vTotal = isMonth ? focus!.amount : yearTotal;
+  const vJobs = isMonth ? focus!.jobCount : yearJobs;
+  const vPeople = isMonth ? peopleMonth : peopleYear;
+  const vKey = isMonth ? focus!.period : `y${activeYear ?? "all"}`;
+  const openView = (v: Omit<JobsView, "scope" | "query"> & { query: SsJobQuery }) =>
+    isMonth ? openMonth(focus!.period, v) : openYear(v);
   const personQuery = (p: PersonAgg): SsJobQuery =>
     p.repCode ? { repCode: p.repCode } : p.salesName ? { sales: p.salesName } : { unassigned: true };
 
@@ -673,6 +686,7 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
             onSelect={(y) => {
               setYear(y);
               setSelected(null);
+              setView("month");
               setAllStores(false);
             }}
           />
@@ -697,7 +711,7 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
             <>
               <div className="flex items-end gap-1 h-36 overflow-x-auto no-scrollbar">
                 {chart.map((m) => {
-                  const active = m.period === focus?.period;
+                  const active = view === "month" && m.period === focus?.period;
                   const partial = m.period === nowP;
                   const h = Math.max(3, (m.amount / maxAmt) * 100);
                   const v = unitM ? m.amount / 1e6 : m.amount / 1e3;
@@ -705,8 +719,12 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                     <button
                       key={m.period}
                       type="button"
-                      onClick={() => setSelected(m.period)}
-                      aria-pressed={active}
+                      onClick={() => {
+                        setSelected(m.period);
+                        setView("month");
+                        setAllStores(false);
+                      }}
+                      aria-pressed={active && view === "month"}
                       aria-label={`${monthFull(m.period)} ${baht(m.amount)}`}
                       className="flex-1 min-w-[26px] h-full flex flex-col justify-end items-center group"
                     >
@@ -735,44 +753,85 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
 
         {!detailLoading && months.length > 0 && (
           <>
-            {/* ===== ทั้งปี ===== */}
-            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-              <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-1">
-                <Icon name="category" className="text-lg text-[#d32029]" />
-                สัดส่วน 3 กลุ่มงาน · {yearLabelOf(activeYear)}
-              </h3>
+            {/* ===== ส่วนล่างกราฟ: ปรับตามเดือนที่กด (หรือทั้งปี) ===== */}
+            <div className="flex items-end justify-between gap-2 px-0.5 pt-1">
+              <div className="min-w-0">
+                <p className="text-[11px] text-slate-500">{isMonth ? "รายละเอียดเดือน" : "รายละเอียดทั้งปี"}</p>
+                <h3 className="text-[16px] font-bold text-slate-900">{isMonth ? monthFull(focus!.period) : yearLabelOf(activeYear)}</h3>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="tnum text-[16px] font-bold text-slate-900">{baht(vTotal)}</p>
+                <p className="text-[10.5px] text-slate-500">
+                  {vJobs.toLocaleString("th-TH")} งาน
+                  {isMonth && focusDelta != null && (
+                    <span className={cn("ml-1 font-semibold", focusDelta >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                      {focusDelta >= 0 ? "▲" : "▼"} {Math.abs(focusDelta).toFixed(1)}% จากเดือนก่อน
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="ช่วงข้อมูล">
+              {(["month", "year"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  aria-selected={(t === "month") === isMonth}
+                  onClick={() => {
+                    setView(t);
+                    setAllStores(false);
+                  }}
+                  className={cn(
+                    "rounded-lg py-1.5 text-[12px] font-bold transition",
+                    (t === "month") === isMonth ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  {t === "month" ? `เดือน ${focus ? monthFull(focus.period) : ""}` : `ทั้ง${yearLabelOf(activeYear)}`}
+                </button>
+              ))}
+            </div>
+
+            <section key={`g-${vKey}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 animate-fade-up">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5">
+                  <Icon name="category" className="text-lg text-[#d32029]" />
+                  กลุ่มงานบริการ
+                </h3>
+                <span className="text-[10.5px] text-slate-400">กดกลุ่มเพื่อดูงาน</span>
+              </div>
               <div className="h-3 rounded-full bg-slate-100 overflow-hidden flex my-2.5" aria-hidden="true">
-                {groups.map((g) => (
-                  <div key={g.group3} className={groupMeta(g.group3).bar} style={{ width: `${yearTotal ? (g.amount / yearTotal) * 100 : 0}%` }} />
+                {vGroups.map((g) => (
+                  <div key={g.group3} className={groupMeta(g.group3).bar} style={{ width: `${vTotal ? (g.amount / vTotal) * 100 : 0}%` }} />
                 ))}
               </div>
               <GroupsBlock
-                groups={groups}
-                total={yearTotal}
-                onOpen={(group, sub) => openYear({ title: sub ?? group, icon: groupMeta(group).icon, group, query: { group, sub } })}
+                groups={vGroups}
+                total={vTotal}
+                onOpen={(group, sub) => openView({ title: sub ?? group, icon: groupMeta(group).icon, group, query: { group, sub } })}
               />
-              {!activeYear && <p className="text-[10px] text-slate-400 mt-2">เลือกปีด้านบนเพื่อกดดูรายการงาน</p>}
+              {!isMonth && !activeYear && <p className="text-[10px] text-slate-400 mt-2">เลือกปีด้านบนเพื่อกดดูรายการงาน</p>}
             </section>
 
-            {showPeople && peopleYear.length > 0 && (
-              <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            {showPeople && vPeople.length > 0 && (
+              <section key={`p-${vKey}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 animate-fade-up">
                 <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-1.5">
                   <Icon name="groups" className="text-lg text-[#d32029]" />
-                  พนักงานขาย · {yearLabelOf(activeYear)}
+                  พนักงานขาย
                 </h3>
                 <PeopleBlock
-                  people={peopleYear}
-                  total={yearTotal}
-                  onOpen={(p) => openYear({ title: p.label, icon: "badge", group: null, query: personQuery(p) })}
+                  people={vPeople}
+                  total={vTotal}
+                  onOpen={(p) => openView({ title: p.label, icon: "badge", group: null, query: personQuery(p) })}
                 />
               </section>
             )}
 
             {adminAll && storesYear.length > 0 && (
-              <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <section key={`s-${vKey}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 animate-fade-up">
                 <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-2.5">
                   <Icon name="storefront" className="text-lg text-[#d32029]" />
-                  อันดับร้าน · {yearLabelOf(activeYear)}
+                  อันดับร้าน
                 </h3>
                 <ul className="space-y-1">
                   {(allStores ? storesYear : storesYear.slice(0, 10)).map((s, i) => (
@@ -780,7 +839,7 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                       <button
                         type="button"
                         disabled={!s.code}
-                        onClick={() => s.code && openYear({ title: s.name, icon: "storefront", group: null, query: { dealerCode: s.code } })}
+                        onClick={() => s.code && openView({ title: s.name, icon: "storefront", group: null, query: { dealerCode: s.code } })}
                         aria-label={`ดูงานของ ${s.name}`}
                         className="w-full text-left rounded-lg -mx-1.5 px-1.5 py-1.5 hover:bg-slate-50 active:bg-slate-100 transition disabled:hover:bg-transparent"
                       >
@@ -808,71 +867,23 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
               </section>
             )}
 
-            {/* ===== เดือนที่เลือก ===== */}
-            {focus && (
-              <>
-                <div className="flex items-end justify-between px-0.5 pt-1">
-                  <div>
-                    <p className="text-[11px] text-slate-500">รายละเอียดเดือน</p>
-                    <h3 className="text-[16px] font-bold text-slate-900">{monthFull(focus.period)}</h3>
-                  </div>
-                  <div className="text-right">
-                    <p className="tnum text-[16px] font-bold text-slate-900">{baht(focus.amount)}</p>
-                    <p className="text-[10.5px] text-slate-500">
-                      {focus.jobCount.toLocaleString("th-TH")} งาน
-                      {focusDelta != null && (
-                        <span className={cn("ml-1 font-semibold", focusDelta >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                          {focusDelta >= 0 ? "▲" : "▼"} {Math.abs(focusDelta).toFixed(1)}% จากเดือนก่อน
-                        </span>
-                      )}
-                    </p>
-                  </div>
+            {(isMonth || activeYear) && (
+              <button
+                type="button"
+                onClick={() => openView({ title: "รายการงานทั้งหมด", icon: "receipt_long", group: null, query: {} })}
+                className="w-full rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 flex items-center gap-3 text-left hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.99] transition-all"
+              >
+                <div className="w-9 h-9 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center shrink-0">
+                  <Icon name="receipt_long" style={{ fontSize: 19 }} />
                 </div>
-
-                <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
-                    <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5">
-                      <Icon name="category" className="text-lg text-[#d32029]" />
-                      กลุ่มงานบริการ
-                    </h3>
-                    <span className="text-[10.5px] text-slate-400">กดกลุ่มเพื่อดูงาน</span>
-                  </div>
-                  <GroupsBlock
-                    groups={[...focus.groups].sort((a, b) => b.amount - a.amount)}
-                    total={focus.amount}
-                    onOpen={(group, sub) => openMonth(focus.period, { title: sub ?? group, icon: groupMeta(group).icon, group, query: { group, sub } })}
-                  />
-                </section>
-
-                {showPeople && peopleMonth.length > 0 && (
-                  <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-                    <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-1.5">
-                      <Icon name="groups" className="text-lg text-[#d32029]" />
-                      พนักงานขาย · {monthFull(focus.period)}
-                    </h3>
-                    <PeopleBlock
-                      people={peopleMonth}
-                      total={focus.amount}
-                      onOpen={(p) => openMonth(focus.period, { title: p.label, icon: "badge", group: null, query: personQuery(p) })}
-                    />
-                  </section>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => openMonth(focus.period, { title: "รายการงานทั้งหมด", icon: "receipt_long", group: null, query: {} })}
-                  className="w-full rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 flex items-center gap-3 text-left hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.99] transition-all"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center shrink-0">
-                    <Icon name="receipt_long" style={{ fontSize: 19 }} />
-                  </div>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-slate-900">ดูรายการงานทั้งหมด</span>
-                    <span className="block text-[10.5px] text-slate-400">{monthFull(focus.period)} · {focus.jobCount.toLocaleString("th-TH")} งาน</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[13px] font-bold text-slate-900">ดูรายการงานทั้งหมด</span>
+                  <span className="block text-[10.5px] text-slate-400">
+                    {isMonth ? monthFull(focus!.period) : yearLabelOf(activeYear)} · {vJobs.toLocaleString("th-TH")} งาน
                   </span>
-                  <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
-                </button>
-              </>
+                </span>
+                <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
+              </button>
             )}
           </>
         )}
