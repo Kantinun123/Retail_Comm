@@ -72,3 +72,22 @@ export function TargetProgress({
     </div>
   );
 }
+
+/** ป้ายเทียบเป้าคะแนน (ตรวจประเมิน / ความพึงพอใจ): ✓ ถึงเป้า 90% | ✗ ต่ำกว่าเป้า 90% (-3 จุด) */
+export function ScoreTargetChip({ pct, target, dark, compact, className }: { pct: number | null | undefined; target: number | null; dark?: boolean; compact?: boolean; className?: string }) {
+  if (target == null || pct == null) return null;
+  const ok = pct >= target - 1e-9;
+  const t = Math.round(target * 100);
+  const gap = ((target - pct) * 100).toFixed(1);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9.5px] font-bold whitespace-nowrap",
+        dark ? (ok ? "bg-emerald-400/20 text-emerald-100" : "bg-amber-300/25 text-amber-100") : ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-[#d32029]",
+        className
+      )}
+    >
+      {ok ? "✓" : "✗"} {compact ? `เป้า ${t}%` : ok ? `ถึงเป้า ${t}%` : `ต่ำกว่าเป้า ${t}% (−${gap} จุด)`}
+    </span>
+  );
+}

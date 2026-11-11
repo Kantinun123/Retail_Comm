@@ -99,3 +99,13 @@ export function tgTone(pct: number | null): { bar: string; text: string; soft: s
   return { bar: "bg-[#d32029]", text: "text-[#d32029]", soft: "bg-red-50" };
 }
 export const pctLabel = (pct: number | null) => (pct == null ? "-" : `${Math.round(pct * 100)}%`);
+
+/* ---------------- เป้าคะแนน: ตรวจประเมินร้าน / ความพึงพอใจ ----------------
+   ปี 2026: ต้องได้ ≥ 90% ทุกเดือน และค่าเฉลี่ยทั้งปี ≥ 90% (ตามที่ทีมกำหนด)
+   ปีใหม่ที่เป้าเปลี่ยน -> เพิ่มปีในตารางนี้ */
+const SCORE_TARGETS: Record<string, number> = { "2026": 0.9 };
+/** เป้าคะแนน (0–1) ของเดือน 'YYYY-MM' หรือปี 'YYYY' — null = ปีนั้นไม่มีเป้า */
+export function scoreTarget(periodOrYear: string | null | undefined): number | null {
+  if (!periodOrYear) return null;
+  return SCORE_TARGETS[periodOrYear.slice(0, 4)] ?? null;
+}

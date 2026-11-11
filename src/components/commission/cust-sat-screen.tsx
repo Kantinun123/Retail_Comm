@@ -10,6 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLinkedPeriod } from "@/lib/commission/linked-period";
+import { scoreTarget } from "@/lib/commission/targets-store";
+import { ScoreTargetChip } from "./target-progress";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
@@ -387,6 +389,21 @@ export function CustSatScreen() {
                 <p className="tnum text-[15px] font-bold">{loading ? "…" : count.toLocaleString()}</p>
               </div>
             </div>
+            {!loading && (() => {
+              // เป้ารายปี: ค่าเฉลี่ยถ่วงจำนวนรีวิวของปีที่เลือก ≥ เป้า
+              const yr = yf.activeYear;
+              const t = scoreTarget(yr);
+              const ms = months.filter((m) => !yr || m.period.startsWith(yr + "-"));
+              const n = ms.reduce((a, m) => a + m.reviewCount, 0);
+              if (!t || !n) return null;
+              const avgY = ms.reduce((a, m) => a + m.pct * m.reviewCount, 0) / n;
+              return (
+                <p className="text-[11px] text-red-50 mt-2.5 flex flex-wrap items-center gap-1.5">
+                  เฉลี่ยปี {Number(yr) + 543} <b className="tnum">{pctText(avgY)}</b> ({n.toLocaleString()} รีวิว)
+                  <ScoreTargetChip pct={avgY} target={t} dark />
+                </p>
+              );
+            })()}
           </div>
         </section>
 
@@ -462,6 +479,7 @@ export function CustSatScreen() {
                     <div className="text-right shrink-0">
                       <p className="tnum text-[16px] font-bold text-slate-900 leading-none">{pctText(m.pct)}</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">{m.overall.toFixed(1)} / 10</p>
+                      <ScoreTargetChip pct={m.pct} target={scoreTarget(m.period)} compact className="mt-1" />
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2.5">

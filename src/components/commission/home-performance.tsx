@@ -20,8 +20,8 @@ import type { CsSummary } from "@/lib/commission/cust-sat-store";
 import type { DiSummary } from "@/lib/commission/design-intake-store";
 import { currentPeriod, periodShort, prevPeriod, type HubView } from "@/lib/commission/freshness-store";
 import { cn } from "@/lib/utils";
-import { pctLabel, tgTone, type TgTotals } from "@/lib/commission/targets-store";
-import { TargetBar } from "./target-progress";
+import { pctLabel, scoreTarget, tgTone, type TgTotals } from "@/lib/commission/targets-store";
+import { ScoreTargetChip, TargetBar } from "./target-progress";
 import { withPeriod } from "@/lib/commission/linked-period";
 
 const short = (v: number) => (Math.abs(v) >= 1e6 ? `฿${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e3 ? `฿${(v / 1e3).toFixed(1)}K` : `฿${Math.round(v).toLocaleString("th-TH")}`);
@@ -90,6 +90,10 @@ export function buildAttention(opts: {
     if (latest.result && latest.result !== "ผ่าน") {
       out.push({ key: "eval-fail", severity: 3, icon: "gpp_bad", title: `ผลตรวจล่าสุด "${latest.result}" (${Math.round(latest.pct * 100)}%)`, sub: `ตรวจเมื่อ ${fmtDate(latest.evalDate)} · กดดูหมวดที่เสียคะแนน`, href: "/app/store-eval" });
     }
+    const evT = scoreTarget(latest.period);
+    if (evT != null && latest.pct < evT && (!latest.result || latest.result === "ผ่าน")) {
+      out.push({ key: "eval-target", severity: 2, icon: "flag", title: `ผลตรวจล่าสุด ${Math.round(latest.pct * 100)}% ต่ำกว่าเป้า ${Math.round(evT * 100)}%`, sub: `ตรวจเมื่อ ${fmtDate(latest.evalDate)} · กดดูหมวดที่เสียคะแนน`, href: "/app/store-eval" });
+    }
     const prev = evals[1];
     if (prev && prev.pct - latest.pct >= 0.05) {
       out.push({ key: "eval-drop", severity: 2, icon: "trending_down", title: `คะแนนตรวจลดลง ${Math.round((prev.pct - latest.pct) * 100)} จุด`, sub: `${Math.round(prev.pct * 100)}% → ${Math.round(latest.pct * 100)}%`, href: "/app/store-eval" });
@@ -106,6 +110,10 @@ export function buildAttention(opts: {
   const cs = opts.csSum;
   if (cs && cs.count > 0 && cs.months.length) {
     const [m0, m1] = cs.months; // ใหม่ -> เก่า
+    const csT = scoreTarget(m0.period);
+    if (csT != null && m0.pct < csT) {
+      out.push({ key: "cs-target", severity: 2, icon: "flag", title: `ความพึงพอใจ ${periodShort(m0.period)} ${(m0.pct * 100).toFixed(1)}% ต่ำกว่าเป้า ${Math.round(csT * 100)}%`, sub: `${m0.reviewCount} รีวิว · กดดูด้านที่คะแนนต่ำ`, href: "/app/cust-sat" });
+    }
     if (m0.lowCount > 0) {
       out.push({ key: "cs-low", severity: 2, icon: "sentiment_dissatisfied", title: `รีวิวคะแนนต่ำกว่า 7 · ${m0.lowCount} รายการ (${periodShort(m0.period)})`, sub: "กดเพื่ออ่านความเห็นที่ลูกค้าอยากให้ปรับปรุง", href: "/app/cust-sat" });
     }
@@ -213,13 +221,18 @@ export function MonthOverview({
 }
 
 /* ---------------- ผลงานร้าน 3 การ์ด ---------------- */
-function Spark({ values }: { values: number[] }) {
+function Spark({ values, target }: { values: number[]; target?: number | null }) {
   if (values.length < 2) return null;
-  const min = Math.min(...values), max = Math.max(...values);
+  const all = target != null ? [...values, target] : values;
+  const min = Math.min(...all), max = Math.max(...all);
   const span = max - min || 1;
-  const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${max === min ? 50 : 90 - ((v - min) / span) * 80}`).join(" ");
+  const y = (v: number) => (max === min ? 50 : 90 - ((v - min) / span) * 80);
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${y(v)}`).join(" ");
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-5" aria-hidden="true">
+      {target != null && (
+        <line x1={0} x2={100} y1={y(target)} y2={y(target)} stroke="#334155" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+      )}
       <polyline points={pts} fill="none" stroke="#d32029" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
@@ -275,6 +288,12 @@ export function PerformanceCards({
       if (e && !hits.length) tag = `ล่าสุด ${fmtDate(e.evalDate)}`;
     }
     const spark = before.slice(-6).map((e) => e.pct);
+    const evalTarget = scoreTarget(view.mode === "month" ? view.period : view.year);
+    const evalPct = (() => {
+      if (view.mode === "year" || scopeAll) return hits.length ? hits.reduce((a, e) => a + e.pct, 0) / hits.length : null;
+      const e = hits[hits.length - 1] ?? before[before.length - 1] ?? null;
+      return e ? e.pct : null;
+    })();
     cards.push(
       <Link key="eval" href={withPeriod("/app/store-eval", view)} className={cn(card, "stagger-1")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="fact_check" style={{ fontSize: 17 }} /></span>
@@ -285,7 +304,8 @@ export function PerformanceCards({
           <span className={cn("self-start mt-0.5 rounded-full px-2 py-0.5 text-[9.5px] font-bold", result === "ผ่าน" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-[#d32029]")}>{result}</span>
         )}
         {sub}
-        <span className="mt-auto pt-2"><Spark values={spark} /></span>
+        {!loading && <ScoreTargetChip pct={evalPct} target={evalTarget} compact className="self-start mt-1" />}
+        <span className="mt-auto pt-2"><Spark values={spark} target={evalTarget} /></span>
         <span className="text-[9px] text-slate-400">{spark.length} ครั้งล่าสุด{view.mode === "month" && !hits.length ? ` · ${monOnly(view.period)} ยังไม่มีผลตรวจ` : ""}</span>
       </Link>
     );
@@ -311,7 +331,9 @@ export function PerformanceCards({
       }
     }
     const last3 = csSum.months.filter((m) => m.period <= upTo).slice(0, 3).reverse();
-    const maxP = Math.max(...last3.map((m) => m.pct), 0.01);
+    const csTarget = scoreTarget(view.mode === "month" ? view.period : view.year);
+    const maxP = Math.max(...last3.map((m) => m.pct), csTarget ?? 0, 0.01);
+    const csPct = value === "-" ? null : Number(value.replace("%", "")) / 100;
     cards.push(
       <Link key="cs" href={withPeriod("/app/cust-sat", view)} className={cn(card, "stagger-2")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="sentiment_satisfied" style={{ fontSize: 17 }} /></span>
@@ -319,10 +341,14 @@ export function PerformanceCards({
         {tag && <Tag>{tag}</Tag>}
         <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">{loading ? "…" : value}</span>
         <DeltaLine v={d} unit=" จุด" label="จากเดือนก่อน" />
-        <span className="mt-auto pt-2 flex items-end gap-1 h-7" aria-hidden="true">
+        {!loading && <ScoreTargetChip pct={csPct} target={csTarget} compact className="self-start mt-1" />}
+        <span className="relative mt-auto pt-2 flex items-end gap-1 h-7" aria-hidden="true">
           {last3.map((m, i) => (
             <span key={m.period} className={cn("flex-1 rounded-sm", i === last3.length - 1 ? "bg-[#d32029]" : "bg-red-200")} style={{ height: `${Math.max(20, (m.pct / maxP) * 100)}%` }} />
           ))}
+          {csTarget != null && (
+            <span className="absolute left-0 right-0 border-t border-dashed border-slate-600" style={{ bottom: `calc(${(csTarget / maxP) * 100}% * 0.7143)` }} />
+          )}
         </span>
         <span className="text-[9px] text-slate-400 mt-0.5">{foot}</span>
       </Link>

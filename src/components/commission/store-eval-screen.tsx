@@ -10,6 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLinkedPeriod } from "@/lib/commission/linked-period";
+import { scoreTarget } from "@/lib/commission/targets-store";
+import { ScoreTargetChip } from "./target-progress";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
@@ -365,6 +367,7 @@ export function StoreEvalScreen() {
                 <p className="text-[11px] text-red-100/80 mt-1">
                   {latest.totalScore} / {latest.maxScore} คะแนน · ตรวจ {fmtDate(latest.evalDate)}
                 </p>
+                <ScoreTargetChip pct={latest.pct} target={scoreTarget(latest.period)} dark className="mt-1.5" />
               </>
             ) : (
               <p className="tnum text-[20px] font-bold leading-none mt-2">ยังไม่มีผลตรวจ</p>
@@ -383,6 +386,20 @@ export function StoreEvalScreen() {
                 <p className="tnum text-[15px] font-bold">{pctText(avgPct)}</p>
               </div>
             </div>
+            {(() => {
+              // เป้ารายปี: ค่าเฉลี่ยของการตรวจในปีที่เลือก ≥ เป้า
+              const yr = yf.activeYear;
+              const t = scoreTarget(yr);
+              const ms = months.filter((m) => !yr || m.period.startsWith(yr + "-"));
+              if (!t || !ms.length) return null;
+              const avgY = ms.reduce((a, m) => a + m.pct, 0) / ms.length;
+              return (
+                <p className="text-[11px] text-red-50 mt-2.5 flex flex-wrap items-center gap-1.5">
+                  เฉลี่ยปี {Number(yr) + 543} <b className="tnum">{pctText(avgY)}</b> ({ms.length} ครั้ง)
+                  <ScoreTargetChip pct={avgY} target={t} dark />
+                </p>
+              );
+            })()}
           </div>
         </section>
 
@@ -463,6 +480,7 @@ export function StoreEvalScreen() {
                         <p className={"text-[11px] font-semibold mt-0.5 " + (pass ? "text-emerald-600" : "text-[#d32029]")}>
                           {m.result ?? "-"}
                         </p>
+                        <ScoreTargetChip pct={m.pct} target={scoreTarget(m.period)} compact className="mt-1" />
                       </div>
                     </div>
                     <div className="flex items-center justify-end mt-1.5 text-[10px] text-slate-400 gap-1">
