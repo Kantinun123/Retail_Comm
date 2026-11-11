@@ -76,10 +76,12 @@ const { data: dealerRows, error: dErr } = await sb.from("dealers").select("code,
 if (dErr) { console.error("โหลด dealers ไม่สำเร็จ:", dErr.message); process.exit(1); }
 const dealerSet = new Map(dealerRows.map((d) => [d.code, d.name]));
 
-/* ---- 3-group (เหมือนสคริปต์เดิม) ---- */
+/* ---- 3-group ----
+   งานซ่อม/รีโนเวทหลังคา (Roof Repair / Re-Roof / Roof Repaint) = Qchang ตามรายงาน Power BI และกติกาฝั่ง Rudy
+   (H5 ROOF REPAIR / REROOF / ROOF REPAINT -> Qchang) — ตรวจ ม.ค.-ต.ค. 69: ร้าน×กลุ่ม×เดือน ตรง 254 -> 680 ช่อง */
 const GROUP3_MAP = {
-  "Roofing B2C": "ROOF SERVICE", "Roof Truss B2C": "ROOF SERVICE", "Re-Roof": "ROOF SERVICE", "Metal Roof": "ROOF SERVICE",
-  "Roof Repair": "ROOF SERVICE", "Roof Repaint": "ROOF SERVICE",
+  "Roofing B2C": "ROOF SERVICE", "Roof Truss B2C": "ROOF SERVICE", "Metal Roof": "ROOF SERVICE",
+  "Re-Roof": "Qchang", "Roof Repair": "Qchang", "Roof Repaint": "Qchang",
   "Solar Rooftop": "SMART SOLUTION", "Active Air Quality": "SMART SOLUTION", "Air system": "SMART SOLUTION",
   "AC Installation": "SMART SOLUTION", "AC Cleaning": "SMART SOLUTION", "AC Repair": "SMART SOLUTION", "Acoustic Solution": "SMART SOLUTION",
   "Renovation": "Qchang", "Carport & Awning": "Qchang", "Gutter": "Qchang", "Gutter Repair": "Qchang", "Insulation": "Qchang",

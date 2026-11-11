@@ -64,10 +64,10 @@ console.log(`Supabase dealers = ${dealerSet.size} ร้าน`);
 const GROUP3_MAP = {
   "Roofing B2C": "ROOF SERVICE",
   "Roof Truss B2C": "ROOF SERVICE",
-  "Re-Roof": "ROOF SERVICE",
+  "Re-Roof": "Qchang", // งานซ่อม/รีโนเวทหลังคา = Qchang ตาม Power BI (เหมือน sync-ba-service-sales-gsheet)
   "Metal Roof": "ROOF SERVICE",
-  "Roof Repair": "ROOF SERVICE",
-  "Roof Repaint": "ROOF SERVICE",
+  "Roof Repair": "Qchang",
+  "Roof Repaint": "Qchang",
   "Solar Rooftop": "SMART SOLUTION",
   "Active Air Quality": "SMART SOLUTION",
   "Air system": "SMART SOLUTION",
