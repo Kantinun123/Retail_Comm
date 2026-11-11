@@ -4,6 +4,8 @@
    - ยอด = gmv ; เฉพาะ sale_status = win ; รวม type S และ I
    - dedupe job_id (เก็บแถว win_date ล่าสุด) ; ข้ามแถวไม่มี win_date ; group3 จาก service_group
    - ร้าน: dealer_code ในไฟล์ (ต้องมีใน dealers) -> ไม่งั้น map store_name ผ่าน Master_Dealer (Dealer Name_BA App_*)
+   - พนักงาน: seller_name -> ba_service_sales_lines.seller_name ; หลัง sync เรียก refresh_service_sales_reps
+     (sales_name = seller_name ก่อน แล้วค่อยชื่อจาก BA Incentive ; rep_code = BA Incentive ก่อน แล้วค่อยจับคู่ sale_reps ด้วยร้าน+ชื่อ)
    ต่างจากของเดิม: ไม่ลบทั้งตาราง แต่ "sync" ด้วย job_id
    - เพิ่มงานใหม่ / แก้งานที่ข้อมูลเปลี่ยน / ลบงานที่ไม่อยู่ในไฟล์แล้ว (เช่น เปลี่ยนจาก win เป็นสถานะอื่น)
    - กันพัง: ถ้ายอดรวมหรือจำนวนงานลดลงเกิน 30% เทียบกับฐานข้อมูล -> หยุด ไม่เขียน (ใช้ --force ถ้าตั้งใจ)
@@ -148,13 +150,15 @@ for (const row of byId.values()) {
     region: str(S(row, "region")),
     product_name: str(S(row, "product_name")),
     amount: num(S(row, "gmv")),
+    // ชื่อพนักงานขายที่ทีมหลังบ้านใส่ให้ (คอลัมน์ใหม่ พ.ย. 69) — refresh_service_sales_reps ใช้เป็น sales_name หลัก + จับคู่ rep_code
+    seller_name: "seller_name" in H ? str(S(row, "seller_name")) : null,
     source_file: SOURCE,
   });
 }
 
 /* ---- ฐานข้อมูลปัจจุบัน ---- */
 const FIELDS = ["job_code", "period", "win_date", "dealer_code", "dealer_name", "store_name", "customer_name", "channel_group",
-  "service_group", "group3", "type_of_job", "shop_model", "region", "product_name", "amount"];
+  "service_group", "group3", "type_of_job", "shop_model", "region", "product_name", "amount", "seller_name"];
 const db = [];
 for (let from = 0; ; from += 1000) {
   const { data: part, error } = await sb.from("ba_service_sales_lines").select(["job_id", ...FIELDS].join(",")).order("id").range(from, from + 999);
