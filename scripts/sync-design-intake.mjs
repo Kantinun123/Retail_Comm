@@ -4,6 +4,7 @@
      ภายหลังชี้ไปโฟลเดอร์ SharePoint ที่ sync ลงเครื่อง
    - ขอบเขต: BU = Housing Expert (GT) / SCG Home Retail (JV) และ crm_created_date >= 2025-01-01
    - เดือน = crm_created_date (ตามรายงาน Power BI ; start_date ในไฟล์ส่วนใหญ่ว่าง/1899/ปี พ.ศ.)
+   - ตัวกรอง: service_solution ต้องอยู่ในรายการ SERVICE_SOLUTION_KEEP (ตาม Power BI) ไม่งั้น design_type = null (ไม่นับ)
    - design_type: material = service_category หรือ service_sub_solution มี "ถอดแบบประมาณการ"/"ออกแบบประมาณการ"
                   solution = งานบริการอื่นที่มี service_sub_solution ; null = ไม่มีข้อมูลงานบริการ
    - ร้าน: created_by_group_name -> dealers ด้วยชื่อทุกคอลัมน์ใน Master_Dealer.csv (+ ชื่อในระบบ)
@@ -25,6 +26,22 @@ const SINCE = "2025-01-01";
 const BUS = new Set(["Housing Expert (GT)", "SCG Home Retail (JV)"]);
 const MAX_DROP = 0.3;
 const MATERIAL_RE = /(ถอด|ออก)แบบประมาณการ/;
+/* ตัวกรอง service_solution ตามรายงาน Power BI ของทีมเจ้าของข้อมูล (Table.SelectRows หลัง "Added Custom4")
+   นอกรายการ (เช่น Roof Renovation, โซลาร์, ระบบอากาศ) = ไม่นับเป็นแบบรับเข้า (design_type = null)
+   null = ไม่มีงานบริการ -> ไม่ใช่ทั้ง Material/Solution (Power BI ก็ไม่จัดประเภทให้) จึงไม่นับเช่นกัน
+   ตรวจกับ Power BI ร้านสมาร์ท โฮมโปรดักส์ ต.ค. 69: 64 แบบ (M30/S34) ตรงทุก Opp_id */
+const SERVICE_SOLUTION_KEEP = new Set([
+  "Metal Roof", "Roof Installation", "Roof-สินค้า Installation",
+  "งานถอดแบบประมาณการ", "งานถอดแบบประมาณการสินค้า", "งานถอดแบบประมาณการสินค้า_inactive",
+  "งานออกแบบประมาณการสินค้า", "งานออกแบบประมาณการสินค้า.", "งานงานออกแบบประมาณการสินค้า",
+  "งานโครงการ - บริการติดตั้งหลังคาบ้านใหม่", "งานโครงการ - บริการติดตั้งหลังคาบ้านใหม่ (มุง)",
+  "งานโครงการ - บริการติดตั้งโครงหลังคาสำเร็จรูป", "งานโครงการ - บริการติดตั้งโครงหลังคาสำเร็จรูป (Truss)",
+  "งานโครงการ - บริการมุงหลังคา เมทัล เอสซีจี", "งานโครงการ - สินค้า เมทัล เอสซีจี",
+  "งานโครงการ - หลังคาเมทัล เอสซีจี (สินค้าพร้อมติดตั้ง)", "ถอดแบบประมาณการสินค้า",
+  "บริการ Premium (Marine Grade)", "บริการ Saver Roof", "บริการงานหลังคา Shingle Roof",
+  "บริการติดตั้งหลังคาบ้านใหม่", "หลังคาบ้านใหม่", "หลังคาเมทัลชีท", "เมทัลรูฟ",
+  "เหมามุงหลังคา เอสซีจี แบบเบ็ดเสร็จ", "โครงหลังคาสำเร็จรูป",
+]);
 
 const env = {};
 for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
@@ -137,7 +154,9 @@ for (const r of raw) {
   const dealer_code = mapDealer(group);
   if (!dealer_code) missStore.set(group ?? "(ว่าง)", (missStore.get(group ?? "(ว่าง)") ?? 0) + 1);
   const cat = str(r.service_category), sub = str(r.service_sub_solution);
-  const design_type = MATERIAL_RE.test(`${cat ?? ""} ${sub ?? ""}`) ? "material" : sub ? "solution" : null;
+  const sol = str(r.service_solution);
+  const inScope = !!sol && SERVICE_SOLUTION_KEEP.has(sol);
+  const design_type = !inScope ? null : MATERIAL_RE.test(`${cat ?? ""} ${sub ?? ""} ${sol}`) ? "material" : sub ? "solution" : null;
   const rep_code = mapRep(r.crm_created_name);
   if (rep_code) repHit++;
   rows.push({
