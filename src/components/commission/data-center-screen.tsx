@@ -324,6 +324,8 @@ function MonthlyTab({ data, onUpload }: { data: DcSummary; onUpload: (source: st
               >
                 {selRow ? "อัปโหลดแทนที่เดือนนี้" : "อัปโหลดเดือนนี้"}
               </button>
+            ) : selMeta.auto ? (
+              <span className="rounded-xl bg-emerald-50 py-2 text-center text-[11px] font-semibold text-emerald-700">sync อัตโนมัติจาก SharePoint</span>
             ) : (
               <span className="rounded-xl bg-slate-50 py-2 text-center text-[11px] font-semibold text-slate-400">อัปโหลดผ่านหน้าเว็บ: เร็ว ๆ นี้</span>
             )}

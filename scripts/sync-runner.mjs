@@ -44,6 +44,8 @@ const JOBS = [
   { id: "product-di", group: "sharepoint", label: "ยอดขายสินค้า DI", file: F.di, args: ["scripts/sync-product-sales.mjs", "--apply", "--source", "di"] },
   { id: "product-odoo", group: "sharepoint", label: "ยอดขายสินค้า Odoo", file: F.odoo, args: ["scripts/sync-product-sales.mjs", "--apply", "--source", "odoo"] },
   { id: "lhs", group: "sharepoint", label: "ยอดขาย LHS/Rudy", file: F.lhs, args: ["scripts/import-service-sales.mjs", "--apply", "--file", F.lhs] },
+  // ไฟล์เดียวกับ LHS/Rudy (PO ที่ปิดแล้ว) -> ส่วนลดช่องทาง 7% ของร้าน HE
+  { id: "lhs-discount", group: "sharepoint", label: "LHS Channel Discount", file: F.lhs, args: ["scripts/import-lhs-purchase-discount.mjs", "--apply", "--file", F.lhs] },
   { id: "design-intake", group: "sharepoint", label: "แบบรับเข้า (CRM)", file: F.crm, args: ["scripts/sync-design-intake.mjs", "--apply", "--file", F.crm] },
 ];
 

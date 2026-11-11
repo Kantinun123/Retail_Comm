@@ -3,7 +3,7 @@
 /* ความสดของข้อมูล (ข้อมูลถึง / อัปเดต) + ตัวช่วยช่วงเวลาของหน้าหลัก
    อ่านผ่าน /api/data-freshness — ดึงครั้งเดียวต่อการโหลดหน้า (cache ใน module) */
 
-export type DailyJob = "product-di" | "product-odoo" | "lhs" | "ba" | "cust-sat" | "scghome-sat" | "store-eval" | "design-intake";
+export type DailyJob = "product-di" | "product-odoo" | "lhs" | "lhs-discount" | "ba" | "cust-sat" | "scghome-sat" | "store-eval" | "design-intake";
 export type MonthlySource = "back-margin" | "profit-share-ba" | "product-commission" | "ba-commission" | "lhs-commission" | "lhs-discount";
 
 export interface Freshness {

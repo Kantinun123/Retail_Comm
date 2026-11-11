@@ -19,6 +19,7 @@ as $$
       ('product-di',    (select max(last_sale_date) from product_sales_lines, t where source = 'di' and last_sale_date <= t.today)),
       ('product-odoo',  (select max(last_sale_date) from product_sales_lines, t where source = 'odoo' and last_sale_date <= t.today)),
       ('lhs',           (select max(close_date) from service_sales_lines, t where close_date <= t.today)),
+      ('lhs-discount',  (select max(coalesce(project_close_date, order_created_date)) from lhs_purchase_discount_lines, t where coalesce(project_close_date, order_created_date) <= t.today)),
       ('ba',            (select max(win_date) from ba_service_sales_lines, t where win_date <= t.today)),
       ('cust-sat',      (select max(eval_date) from cust_sat_lines, t where eval_date <= t.today)),
       ('scghome-sat',   (select max(eval_date) from scghome_sat_lines, t where eval_date <= t.today)),

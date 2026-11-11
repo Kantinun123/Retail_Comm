@@ -57,6 +57,7 @@ as $$
     union all select 'product-di', max(last_sale_date)::text, count(*) from product_sales_lines where source = 'di'
     union all select 'product-odoo', max(last_sale_date)::text, count(*) from product_sales_lines where source = 'odoo'
     union all select 'lhs', max(close_date)::text, count(*) from service_sales_lines
+    union all select 'lhs-discount', max(coalesce(project_close_date, order_created_date))::text, count(*) from lhs_purchase_discount_lines
     union all select 'design-intake', max(created_date)::text, count(*) from design_intake_lines
   ),
   monthly as (

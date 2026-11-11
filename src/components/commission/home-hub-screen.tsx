@@ -423,10 +423,13 @@ export function HomeHubScreen() {
     : undefined;
 
   // กลุ่มร้านค้า = ยอดเงินล้วน
+  // LHS Channel Discount sync รายวัน (PO ที่ปิดแล้ว) -> แสดงเวลาอัปเดตแทน "ข้อมูลถึงเดือน"
+  const pdCard = benCard("lhs-pd", "/app/lhs-purchase-discount", "sell", "LHS Channel Discount", "ส่วนลดช่องทาง 7% จาก PO ที่ปิดแล้ว (HE)", vPd, storeAgg.amount);
+  if (pdCard) pdCard.foot = toFoot(fr(["lhs-discount"])) ?? pdCard.foot;
   const storeCards: CardData[] = [
     benCard("back-margin", "/app/back-margin", "savings", "Back Margin", "จากการขายสินค้าที่หน้าร้าน", vBm, storeAgg.amount),
     benCard("profit-ba", "/app/ba-profit-share", "storefront", "Profit Share BA", "จากการขายงานบริการคิวช่าง", vPs, storeAgg.amount),
-    benCard("lhs-pd", "/app/lhs-purchase-discount", "sell", "LHS Channel Discount", "ส่วนลดช่องทาง 7% งานหลังคา (HE)", vPd, storeAgg.amount),
+    pdCard,
   ].filter((c): c is CardData => !!c);
 
   // กลุ่มพนักงาน

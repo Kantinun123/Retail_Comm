@@ -112,17 +112,19 @@ export const DAILY_JOBS: { job: string; label: string; group: "gsheet" | "sharep
   { job: "product-di", label: "ยอดขายสินค้า DI", group: "sharepoint", unit: "แถวสรุป", href: "/app/product-sales" },
   { job: "product-odoo", label: "ยอดขายสินค้า Odoo", group: "sharepoint", unit: "แถวสรุป", href: "/app/product-sales" },
   { job: "lhs", label: "ยอดขาย LHS/Rudy", group: "sharepoint", unit: "งาน", href: "/app/service-sales/lhs" },
+  { job: "lhs-discount", label: "LHS Channel Discount", group: "sharepoint", unit: "PO", href: "/app/lhs-purchase-discount" },
   { job: "design-intake", label: "แบบรับเข้า (CRM)", group: "sharepoint", unit: "แบบ", href: "/app/design-intake" },
 ];
 
 /** แหล่งข้อมูลรายเดือน (อัปโหลดเอง) */
-export const MONTHLY_SOURCES: { source: string; label: string; href: string; uploadable: boolean }[] = [
+export const MONTHLY_SOURCES: { source: string; label: string; href: string; uploadable: boolean; auto?: boolean }[] = [
   { source: "back-margin", label: "Back Margin", href: "/app/back-margin", uploadable: false },
   { source: "profit-share-ba", label: "Profit Share BA", href: "/app/ba-profit-share", uploadable: false },
   { source: "product-commission", label: "Product Commission", href: "/app/commission-product", uploadable: false },
   { source: "ba-commission", label: "BA Commission", href: "/app/ba-incentive", uploadable: true },
   { source: "lhs-commission", label: "LHS Commission", href: "/app/lhs-commission", uploadable: false },
-  { source: "lhs-discount", label: "LHS Channel Discount", href: "/app/lhs-purchase-discount", uploadable: false },
+  // sync อัตโนมัติจาก SharePoint (win_contract_all.xlsx) — ไม่ต้องอัปโหลด
+  { source: "lhs-discount", label: "LHS Channel Discount", href: "/app/lhs-purchase-discount", uploadable: false, auto: true },
 ];
 
 /** สรุปผลรอบ sync ให้สั้น: ดึงส่วน "DONE ..." ถ้ามี */
