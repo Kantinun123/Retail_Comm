@@ -2,9 +2,11 @@
    -------------------------------------------------------------
    - ไฟล์: ยอดขายทั้งหมด/ยอดขายงานบริการ LHS_Rudy ร้านค้า/win_contract_all.xlsx
    - ยอด = plan_amount_incl_vat (รวม VAT) ใช้ทุกสถานะ (win ทั้งหมด)
-   - ร้าน: map rept_gp_shopgroup -> Master_Dealer.csv (เหมือน LHS discount)
+   กติกาตามรายงาน Power BI ของทีม (ตรวจ ม.ค.-ต.ค. 68/69: LY ตรง 334/374 ร้าน×เดือน ยอดรวม 254.13 / PBI 253.50 ล้าน)
+   - ร้าน: channel_detail_name -> dealers/Master_Dealer (normalize + OVERRIDE) ; ไม่เจอค่อยใช้ rept_gp_shopgroup -> Master_Dealer
      * map ไม่เจอ => dealer_code = null (เก็บไว้ให้ admin เห็น "ไม่ระบุร้าน")
-   - period: จาก project_close_date (YYYY-MM) ; ข้ามแถวที่ไม่มีวันปิด
+   - period: จาก order_created_date (YYYY-MM) ; ไม่มีค่อยใช้ project_close_date ; ข้ามแถวที่ไม่มีทั้งคู่
+   - เก็บ report_gp_buildingtype ไว้ใน building_type ; view service_sales_union นับเฉพาะ OB / NONRES (HP, TP, RES — Power BI ไม่นับ)
    - 3 กลุ่มใหญ่: ROOF SERVICE / SMART SOLUTION / Qchang (ปัด OTHER ทิ้ง)
    - sync แบบ diff (ลายเซ็นทั้งแถว + จำนวนครั้ง) ไม่ล้างตาราง ; กันพังถ้าแถว/ยอดลดเกิน 30%
 
@@ -50,6 +52,30 @@ for (let r = 1; r < md.length; r++) {
 }
 console.log(`Master_Dealer map keys = ${shopMap.size}`);
 
+/* ---- channel_detail_name -> dealer (normalize แบบเดียวกับ sync-design-intake / import-sales-targets) ---- */
+const normA = (s) => String(s ?? "").normalize("NFC")
+  .replace(/บจก\.?|บริษัท|หจก\.?|ห้างหุ้นส่วนจำกัด|บ\.|จก\.?|จำกัด|\(มหาชน\)/g, " ")
+  .replace(/เอสซีจี\s*โฮม|เอสซีจีโฮม|scg\s*home/gi, " ")
+  .replace(/วัตถุ/g, "วัสดุ").replace(/[\s.\-_()]/g, "").toLowerCase();
+const { data: dealerRows, error: dErr } = await sb.from("dealers").select("code,name");
+if (dErr) { console.error("โหลด dealers ไม่สำเร็จ:", dErr.message); process.exit(1); }
+const dealerName = new Map(dealerRows.map((x) => [x.code, x.name]));
+const chAlias = new Map();
+const addA = (n, c) => { const k = normA(n); if (!k || !dealerName.has(c)) return; (chAlias.get(k) ?? chAlias.set(k, new Set()).get(k)).add(c); };
+dealerRows.forEach((x) => addA(x.name, x.code));
+for (let r = 1; r < md.length; r++) { const code = String(md[r][iDCode] ?? "").trim(); for (const c of nameCols) if (String(md[r][c] ?? "").trim()) addA(md[r][c], code); }
+const CH_OVERRIDE = new Map([
+  ["บจก.แม็กซ์โฮม แอนด์ เดคคอร์", "5100967"],
+  ["เอสซีจี โฮม แม็กซ์โฮมแอนด์เดคคอร์", "5100967"],
+  ["เอสซีจี โฮม สหะชัยรีเทล (บ้านนา)", "5100974"],
+  ["บริษัท นพดลพานิช จำกัด สาขา 00001", "5101685"],
+  ["บจก.นพดลพานิช โฮมเอ็กซ์เปิร์ท", "5101685"],
+  ["เอสซีจี โฮม แสงอุปกรณ์ (เมืองสุโขทัย)", "5100163"],
+  ["เอสซีจี โฮม บุญถาวร เมืองขอนแก่น", "5100967"],
+]);
+const mapChannel = (n) => { if (!n) return null; if (CH_OVERRIDE.has(n)) return CH_OVERRIDE.get(n); const z = chAlias.get(normA(n)); return z && z.size === 1 ? [...z][0] : null; };
+const BUILDING_KEEP = new Set(["OB", "NONRES"]);
+
 /* ---- 3-group rollup ---- */
 function groupOf(h3u, h5u) {
   if (h3u === "AIR SOLUTION" || h3u === "SOLAR ROOF" || h3u === "HOME AUTOMATION" || h3u === "CEILING & WALL PERFORMANCE") return "SMART SOLUTION";
@@ -71,27 +97,37 @@ const S = (row, k) => String(row[H[k]] ?? "").trim();
 const G = (row, k) => row[H[k]];
 
 const rows = [];
-let dealerHit = 0, skipNoGroup = 0, skipNoDate = 0;
+let dealerHit = 0, skipNoGroup = 0, skipNoDate = 0, skipBuilding = 0;
 const grp = new Map();
 for (let r = 1; r < d.length; r++) {
   const row = d[r]; if (!row) continue;
   const closeDate = serialToDate(G(row, "project_close_date"));
-  if (!closeDate) { skipNoDate++; continue; }       // ต้องมีวันปิด (ใช้จัดปี/เดือน)
+  const orderDate = serialToDate(G(row, "order_created_date"));
+  const monthDate = orderDate ?? closeDate;          // Power BI จัดเดือนตามวันที่สร้าง order
+  if (!monthDate) { skipNoDate++; continue; }
+  // เก็บทุก building type ไว้ในตาราง ; view service_sales_union กรองเฉพาะ OB/NONRES (ตาม Power BI)
+  const bType = S(row, "report_gp_buildingtype") || null;
+  if (!BUILDING_KEEP.has(bType)) skipBuilding++;
   const h3 = S(row, "H3"), h4 = S(row, "H4"), h5 = S(row, "H5");
   const group3 = groupOf(h3.toUpperCase(), h5.toUpperCase());
   if (!group3) { skipNoGroup++; continue; }
 
   const amt = Number(G(row, "plan_amount_incl_vat") ?? 0) || 0;
   const shop = S(row, "rept_gp_shopgroup");
-  const hit = shopMap.get(norm(shop));
+  const chDetail = S(row, "channel_detail_name");
+  const chCode = mapChannel(chDetail);
+  const hit = chCode ? { code: chCode, name: dealerName.get(chCode) } : shopMap.get(norm(shop));
   if (hit) dealerHit++;
 
   // sub_group: ROOF SERVICE/SMART SOLUTION ใช้ H4, Qchang ใช้ H5 (ละเอียดกว่า)
   const subGroup = group3 === "Qchang" ? (h5 || h4 || null) : (h4 || h3 || null);
 
   rows.push({
-    period: closeDate.slice(0, 7),
+    period: monthDate.slice(0, 7),
     close_date: closeDate,
+    order_date: orderDate,
+    building_type: bType,
+    channel_detail: chDetail || null,
     dealer_code: hit ? hit.code : null,
     dealer_name: hit ? hit.name : null,
     shop_group: shop || null,
@@ -112,7 +148,7 @@ for (let r = 1; r < d.length; r++) {
 }
 
 const f = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-console.log(`\nแถวที่นำเข้า = ${rows.length} | ข้าม(ไม่มีวันปิด) ${skipNoDate} | ข้าม(OTHER) ${skipNoGroup}`);
+console.log(`\nแถวที่นำเข้า = ${rows.length} | ข้าม(ไม่มีวันที่) ${skipNoDate} | building type ไม่ใช่ OB/NONRES (เก็บไว้แต่ไม่นับ) ${skipBuilding} | ข้าม(OTHER) ${skipNoGroup}`);
 console.log(`map ร้านเจอ = ${dealerHit}/${rows.length} | ไม่ระบุร้าน = ${rows.length - dealerHit}`);
 console.log("3-group:");
 [...grp.entries()].sort((a, b) => b[1].amt - a[1].amt).forEach(([k, v]) => console.log(`  ${k}: ${v.n} แถว | ${f(v.amt)}`));
@@ -120,7 +156,7 @@ console.log("3-group:");
 /* ---- sync แบบ diff (ไม่ล้างตาราง) ----
    project_number ซ้ำได้ จึงใช้ "ลายเซ็นทั้งแถว" + จำนวนครั้ง (multiset):
    แถวที่เหมือนเดิมไม่แตะ (rep_code คงอยู่) ; ลบเฉพาะที่หายไป/เปลี่ยน ; เพิ่มเฉพาะที่ใหม่ */
-const SIG_FIELDS = ["period", "close_date", "dealer_code", "dealer_name", "shop_group", "region", "group3", "sub_group", "h3", "h4", "h5",
+const SIG_FIELDS = ["period", "close_date", "order_date", "building_type", "channel_detail", "dealer_code", "dealer_name", "shop_group", "region", "group3", "sub_group", "h3", "h4", "h5",
   "solution_name", "sub_solution_name", "project_name", "sales_name", "project_number", "province_name", "amount_incl_vat"];
 const sigOf = (x) => SIG_FIELDS.map((k) => (k === "amount_incl_vat" ? Number(x[k] ?? 0).toFixed(2) : x[k] ?? "")).join("\u0001");
 const db = [];
