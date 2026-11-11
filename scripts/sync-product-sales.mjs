@@ -224,11 +224,14 @@ async function syncSource(source, file, reader) {
   console.log(`จับคู่พนักงานในระบบ: ${repSet.size} คน | ยอดที่จับคู่ได้ ฿${f0(repAmt)} (${((repAmt / (s.amount || 1)) * 100).toFixed(1)}%)`);
 
   // DB
+  // อ่านแบบ keyset (id > ล่าสุด) ไม่ใช่ offset — offset ลึก ๆ บนตาราง 200k แถวเคย statement timeout
   const db = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from("product_sales_lines").select("id,row_key,amount,qty,line_count,last_sale_date,dealer_code,rep_code").eq("source", source).order("id").range(from, from + 999);
+  for (let lastId = 0; ; ) {
+    const { data, error } = await sb.from("product_sales_lines").select("id,row_key,amount,qty,line_count,last_sale_date,dealer_code,rep_code").eq("source", source).gt("id", lastId).order("id").limit(1000);
     if (error) throw new Error("อ่านฐานข้อมูลไม่สำเร็จ: " + error.message);
-    db.push(...data); if (data.length < 1000) break;
+    db.push(...data);
+    if (data.length < 1000) break;
+    lastId = data[data.length - 1].id;
   }
   const dbMap = new Map(db.map((x) => [x.row_key, x]));
   const toUp = rows.filter((r) => {

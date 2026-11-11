@@ -746,3 +746,8 @@ export const dynamic = "force-dynamic";
 - ไฟล์ = `win_contract_all.xlsx` ตัวเดียวกับยอดขาย LHS/Rudy ; ทุกรายการคือ PO ที่ปิดแล้ว = ส่วนลดที่ร้านได้รับจริง (ไม่ใช่ประมาณการ) ; นับ success + waiting approval
 - ❌ เดิม period = project_close_date อย่างเดียว → 67 รายการ (฿1.31M) ไม่มีวันปิด ไม่ถูกนับในยอดของร้านเลย → ✅ ไม่มีวันปิดให้ใช้เดือนของ order_created_date (ผู้ใช้ยืนยัน)
 - สคริปต์เปลี่ยนจากล้างตารางเป็น diff (ลายเซ็นทั้งแถว + จำนวนครั้ง) + guard 30% ; เพิ่มเป็น job `lhs-discount` ใน sync-runner (กลุ่ม sharepoint ไฟล์เดียวกับ lhs) ; ศูนย์ข้อมูล/ความสดข้อมูลแสดงเป็นแหล่งรายวัน
+
+### Supabase: อ่านตารางใหญ่ด้วย offset ทำให้ statement timeout
+- ❌ `sync-product-sales` อ่าน `product_sales_lines` ด้วย `.eq("source").order("id").range(offset)` → ตาราง ~200k แถว offset ลึก ๆ = `canceling statement due to statement timeout` (รอบ 09:30 ของ Odoo ล้ม)
+- ✅ ใช้ keyset `.gt("id", lastId).order("id").limit(1000)` + index `(source, id)` — Odoo อ่านจบใน 18s
+- ตารางที่โตเรื่อย ๆ ให้ใช้ keyset เสมอ ไม่ใช่ range/offset
