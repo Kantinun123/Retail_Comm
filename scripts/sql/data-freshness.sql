@@ -13,18 +13,18 @@ as $$
     select distinct on (job) job, finished_at from sync_runs where status = 'ok' order by job, started_at desc
   ),
   -- ไม่นับวันที่ในอนาคต (ต้นทางมีรายการลงวันที่ล่วงหน้า เช่น DI 13 พ.ย. ทั้งที่วันนี้ 10 พ.ย.)
-  t as (select (now() at time zone 'Asia/Bangkok')::date as today),
+  -- ใช้นิพจน์ตรง ๆ (ไม่ cross join CTE) ให้ planner ใช้ index (source,last_sale_date) ฯลฯ ได้ — เดิมช้า 2.5s จน timeout บน production
   d(job, data_date) as (
     values
-      ('product-di',    (select max(last_sale_date) from product_sales_lines, t where source = 'di' and last_sale_date <= t.today)),
-      ('product-odoo',  (select max(last_sale_date) from product_sales_lines, t where source = 'odoo' and last_sale_date <= t.today)),
-      ('lhs',           (select max(close_date) from service_sales_lines, t where close_date <= t.today)),
-      ('lhs-discount',  (select max(coalesce(project_close_date, order_created_date)) from lhs_purchase_discount_lines, t where coalesce(project_close_date, order_created_date) <= t.today)),
-      ('ba',            (select max(win_date) from ba_service_sales_lines, t where win_date <= t.today)),
-      ('cust-sat',      (select max(eval_date) from cust_sat_lines, t where eval_date <= t.today)),
-      ('scghome-sat',   (select max(eval_date) from scghome_sat_lines, t where eval_date <= t.today)),
-      ('store-eval',    (select max(eval_date) from store_eval_lines, t where eval_date <= t.today)),
-      ('design-intake', (select max(created_date) from design_intake_lines, t where created_date <= t.today))
+      ('product-di',    (select max(last_sale_date) from product_sales_lines where source = 'di' and last_sale_date <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('product-odoo',  (select max(last_sale_date) from product_sales_lines where source = 'odoo' and last_sale_date <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('lhs',           (select max(close_date) from service_sales_lines where close_date <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('lhs-discount',  (select max(coalesce(project_close_date, order_created_date)) from lhs_purchase_discount_lines where coalesce(project_close_date, order_created_date) <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('ba',            (select max(win_date) from ba_service_sales_lines where win_date <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('cust-sat',      (select max(eval_date) from cust_sat_lines where eval_date <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('scghome-sat',   (select max(eval_date) from scghome_sat_lines where eval_date <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('store-eval',    (select max(eval_date) from store_eval_lines where eval_date <= (now() at time zone 'Asia/Bangkok')::date)),
+      ('design-intake', (select max(created_date) from design_intake_lines where created_date <= (now() at time zone 'Asia/Bangkok')::date))
   )
   select jsonb_build_object(
     'ok', true,
