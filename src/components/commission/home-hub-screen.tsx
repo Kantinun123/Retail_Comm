@@ -634,7 +634,7 @@ export function HomeHubScreen() {
                   </ul>
                 )}
                 <p className="text-[9.5px] text-slate-400 mt-2 flex justify-between gap-2">
-                  <span>เป้าไม่รวม VAT · ยอดทำได้ตามรายงาน Power BI</span>
+                  <span>เป้าไม่รวม VAT · ทำได้ = LHS/Rudy + BA ทุกงานจากระบบต้นทาง</span>
                   <LyText t={svcT} fmt={mil} />
                 </p>
               </Link>
