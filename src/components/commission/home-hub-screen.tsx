@@ -24,6 +24,9 @@ import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-s
 import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
 import { fetchDesignIntake, type DiSummary } from "@/lib/commission/design-intake-store";
 import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
+import { fetchTargets, tgTotals, type TgCompare } from "@/lib/commission/targets-store";
+import { LyText, TargetBar, TargetProgress } from "./target-progress";
+import { pctLabel, tgTone } from "@/lib/commission/targets-store";
 import { yearsOf } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
 import { AttentionList, MonthOverview, PerformanceCards, buildAttention, perfStatus, useLatestEvalFails } from "./home-performance";
@@ -32,6 +35,7 @@ import {
   currentPeriod,
   fetchFreshness,
   freshText,
+  lastFullPeriod,
   monthlyValue,
   periodShort,
   prevPeriod,
@@ -327,6 +331,21 @@ export function HomeHubScreen() {
   // ข้อที่ตกในการตรวจล่าสุด (เฉพาะดูร้านเดียว) — ใช้ในเรื่องที่ควรดู
   const evalFails = useLatestEvalFails(dealerCode, evalSum);
 
+  // เป้า (TG) ของปีที่เลือก: ยอดขายงานบริการ + แบบรับเข้า (dealerCode ว่าง = admin ทุกร้าน)
+  const tgYear = pick.mode === "month" ? pick.period.slice(0, 4) : pick.year;
+  const tgKey = `${dealerCode ?? ""}|${tgYear}`;
+  const [tgs, setTgs] = useState<{ key: string; svc: TgCompare | null; di: TgCompare | null } | null>(null);
+  useEffect(() => {
+    if (!ready || !session) return;
+    let cancelled = false;
+    Promise.all([fetchTargets("service_sales", dealerCode, tgYear), fetchTargets("design_intake", dealerCode, tgYear)]).then(([svc, di2]) => {
+      if (!cancelled) setTgs({ key: tgKey, svc: svc.ok && svc.hasTarget ? svc : null, di: di2.ok && di2.hasTarget ? di2 : null });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, session, dealerCode, tgYear, tgKey]);
+
   if (!ready || !session) return null;
 
   // Back Margin + LHS Channel Discount = เฉพาะร้าน Housing Expert (SCG Home ซ่อน)
@@ -409,6 +428,18 @@ export function HomeHubScreen() {
       ? [{ key: "sales-ba", href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง รายวัน (gmv)", total: salesBa, loading, pct: pctOfSales(salesBa), foot: toFoot(fr(["ba"])), zeroNote: "ไม่มียอดในช่วงนี้" } as CardData]
       : []),
   ];
+
+  // ---- เป้า (TG) ตามช่วงที่เลือก: เดือน = เดือนนั้น ; สะสมปี = ถึงเดือนที่ครบล่าสุด ----
+  const tgNow = tgs && tgs.key === tgKey ? tgs : null;
+  const lfP = lastFullPeriod();
+  const tgKeepView = (p: string) => (view.mode === "month" ? p === view.period : p.startsWith(view.year + "-") && p <= lfP);
+  const tgLabel = view.mode === "month" ? periodShort(view.period) : view.year === lfP.slice(0, 4) ? `สะสมถึง ${periodShort(lfP)}` : `ทั้งปี`;
+  const svcT = tgNow?.svc ? tgTotals(tgNow.svc.months, tgKeepView) : null;
+  const diT = tgNow?.di ? tgTotals(tgNow.di.months, tgKeepView) : null;
+  const svcGroupsT = tgNow?.svc
+    ? ["ROOF SERVICE", "Qchang", "SMART SOLUTION"].map((g) => ({ g, t: tgTotals(tgNow.svc!.months, tgKeepView, g) })).filter((x) => x.t.target > 0)
+    : [];
+  const mil = (v: number) => (Math.abs(v) >= 1e6 ? `฿${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e3 ? `฿${(v / 1e3).toFixed(0)}K` : baht(v));
 
   // ---- ผลงานร้าน + เรื่องที่ควรดู (เรื่องที่ควรดูอิงข้อมูลล่าสุดเสมอ) ----
   const attention = adminAllStores ? [] : buildAttention({ evalSum, evalFails, csSum, di });
@@ -494,7 +525,7 @@ export function HomeHubScreen() {
           attention={attention}
           scopeAll={adminAllStores}
         />
-        <PerformanceCards loading={loading} view={view} evalSum={evalSum} csSum={csSum} di={di} scopeAll={adminAllStores} />
+        <PerformanceCards loading={loading} view={view} evalSum={evalSum} csSum={csSum} di={di} scopeAll={adminAllStores} diTarget={diT} />
         {!adminAllStores && hasPerf && <AttentionList loading={attentionLoading} items={attention} />}
 
         {/* กลุ่มร้านค้า (เงินล้วน) */}
@@ -572,6 +603,38 @@ export function HomeHubScreen() {
                 fresh={fr(["lhs", "ba"])}
                 href="/app/service-sales"
               />
+            )}
+            {showServiceSales && svcT && svcT.target > 0 && (
+              <Link
+                href="/app/service-sales"
+                className="mt-2.5 block rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.99] transition-all"
+              >
+                <p className="text-[12px] font-bold text-slate-900 flex items-center gap-1.5 mb-2">
+                  <Icon name="flag" className="text-[#d32029]" style={{ fontSize: 16 }} />
+                  เป้ายอดขายงานบริการ
+                  {adminAllStores && <span className="text-[10px] font-normal text-slate-400">· ร้าน HE / SCG Home</span>}
+                </p>
+                <TargetProgress t={svcT} fmt={mil} label={tgLabel} partial={view.mode === "month" && view.period === curP} />
+                {svcGroupsT.length > 0 && (
+                  <ul className="mt-2.5 pt-2 border-t border-slate-50 space-y-1.5">
+                    {svcGroupsT.map(({ g, t }) => (
+                      <li key={g}>
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="text-slate-700">{g}</span>
+                          <span className="text-slate-500 tnum">
+                            <b className="text-slate-900">{mil(t.actual)}</b> / {mil(t.target)} · <b className={tgTone(t.pct).text}>{pctLabel(t.pct)}</b>
+                          </span>
+                        </div>
+                        <TargetBar pct={t.pct} className="mt-1" />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[9.5px] text-slate-400 mt-2 flex justify-between gap-2">
+                  <span>เป้าไม่รวม VAT · ยอดทำได้ตามรายงาน Power BI</span>
+                  <LyText t={svcT} fmt={mil} />
+                </p>
+              </Link>
             )}
             {showServiceSales && salesCards.length > 0 && (
               <div className="grid grid-cols-2 gap-2.5 mt-2.5">

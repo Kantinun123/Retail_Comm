@@ -20,6 +20,8 @@ import type { CsSummary } from "@/lib/commission/cust-sat-store";
 import type { DiSummary } from "@/lib/commission/design-intake-store";
 import { currentPeriod, periodShort, prevPeriod, type HubView } from "@/lib/commission/freshness-store";
 import { cn } from "@/lib/utils";
+import { pctLabel, tgTone, type TgTotals } from "@/lib/commission/targets-store";
+import { TargetBar } from "./target-progress";
 
 const short = (v: number) => (Math.abs(v) >= 1e6 ? `฿${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e3 ? `฿${(v / 1e3).toFixed(1)}K` : `฿${Math.round(v).toLocaleString("th-TH")}`);
 const pctChange = (cur: number, base: number | null | undefined) => (base ? ((cur - base) / Math.abs(base)) * 100 : null);
@@ -238,6 +240,7 @@ export function PerformanceCards({
   csSum,
   di,
   scopeAll,
+  diTarget,
 }: {
   loading: boolean;
   view: HubView;
@@ -245,6 +248,8 @@ export function PerformanceCards({
   csSum: CsSummary | null;
   di: DiSummary | null;
   scopeAll: boolean;
+  /** เป้าแบบรับเข้า (TG แบบบ้าน) ของช่วงที่เลือก — null = ไม่มีเป้า */
+  diTarget?: TgTotals | null;
 }) {
   const cards: ReactNode[] = [];
   const cur = currentPeriod();
@@ -346,9 +351,26 @@ export function PerformanceCards({
         <span className="text-[11.5px] font-bold text-slate-900 mt-2 leading-tight">แบบรับเข้า</span>
         <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">
           {loading ? "…" : total.toLocaleString("th-TH")}
-          <span className="text-[11px] font-semibold text-slate-500 ml-0.5">แบบ</span>
+          <span className="text-[11px] font-semibold text-slate-500 ml-0.5">
+            {diTarget && diTarget.target > 0 && !scopeAll ? `/ ${diTarget.target.toLocaleString("th-TH")} แบบ` : "แบบ"}
+          </span>
         </span>
-        <DeltaLine v={view.mode === "month" && view.period === cur ? null : d} unit="%" label="จากเดือนก่อน" />
+        {diTarget && diTarget.target > 0 ? (
+          <>
+            <span className={cn("text-[9.5px] font-bold mt-0.5", tgTone(diTarget.pct).text)}>
+              {pctLabel(diTarget.pct)} ของเป้า{scopeAll ? ` (${diTarget.target.toLocaleString("th-TH")})` : ""}
+            </span>
+            <TargetBar pct={diTarget.pct} className="mt-1" />
+            {diTarget.growth != null && (
+              <span className={cn("text-[9.5px] font-bold mt-1", diTarget.growth >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                {diTarget.growth >= 0 ? "▲" : "▼"} {Math.abs(diTarget.growth).toFixed(0)}% จากปีก่อน
+              </span>
+            )}
+            <span className="text-[9px] text-slate-400">LY {diTarget.ly.toLocaleString("th-TH")} แบบ</span>
+          </>
+        ) : (
+          <DeltaLine v={view.mode === "month" && view.period === cur ? null : d} unit="%" label="จากเดือนก่อน" />
+        )}
         <span className="mt-auto pt-2">
           <span className="block h-2 rounded-full bg-slate-100 overflow-hidden flex" aria-hidden="true">
             <span className="h-full bg-[#1e5a7a]" style={{ width: `${mPct}%` }} />

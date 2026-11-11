@@ -18,6 +18,8 @@ import { YearChips, yearsOf } from "./year-filter";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
 import { fetchDesignIntake, type DiMonth, type DiSummary } from "@/lib/commission/design-intake-store";
 import { DesignIntakeJobsModal } from "./design-intake-jobs-modal";
+import { fetchTargets, pctLabel, tgTone, tgTotals, type TgCompare } from "@/lib/commission/targets-store";
+import { LyText, TargetBar, TargetProgress } from "./target-progress";
 import { cn } from "@/lib/utils";
 
 const TH_MONTH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
@@ -88,6 +90,22 @@ export function DesignIntakeScreen() {
 
   const s = data && data.key === key ? data.s : null;
   const loading = !data || data.key !== key;
+
+  // เป้า (TG แบบบ้าน) ของปีที่เลือก — พนักงานไม่มีเป้ารายคน
+  const [tgState, setTgState] = useState<{ key: string; t: TgCompare } | null>(null);
+  const tgYearSel = year === undefined ? String(new Date().getFullYear()) : year;
+  const tgKey = `${dealerCode ?? ""}|${tgYearSel ?? ""}`;
+  useEffect(() => {
+    if (!ready || !session || isSales || !tgYearSel) return;
+    if (!isAdmin && !dealerCode) return;
+    let cancelled = false;
+    fetchTargets("design_intake", dealerCode, tgYearSel).then((t) => !cancelled && setTgState({ key: tgKey, t }));
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, session, isSales, isAdmin, dealerCode, tgYearSel, tgKey]);
+  const tg = !isSales && tgState?.key === tgKey && tgState.t.ok && tgState.t.hasTarget ? tgState.t : null;
+  const tgMonth = new Map(tg?.months.map((c) => [c.period, tgTotals([c], () => true)]) ?? []);
   const months = useMemo(() => s?.months ?? [], [s]);
   const byPeriod = useMemo(() => new Map(months.map((m) => [m.period, m])), [months]);
   const years = yearsOf(months.map((m) => m.period));
@@ -188,6 +206,18 @@ export function DesignIntakeScreen() {
                 <p className="tnum text-[18px] font-bold">{loading ? "…" : fmt(latest?.solution ?? 0)}</p>
               </div>
             </div>
+            {!loading && latest && tgMonth.get(latest.period) && (tgMonth.get(latest.period)?.target ?? 0) > 0 && (
+              <div className="mt-3 rounded-xl bg-black/10 px-3 py-2">
+                <TargetProgress
+                  t={tgMonth.get(latest.period)!}
+                  fmt={(n) => `${fmt(n)} แบบ`}
+                  dark
+                  label={monthShort(latest.period)}
+                  partial={latest.period === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+                />
+                {!dealerCode && <p className="text-[9.5px] text-red-100/70 mt-1">เทียบเป้า: เฉพาะร้าน HE / SCG Home ที่ยังเป็นตัวแทน</p>}
+              </div>
+            )}
             {latestDate && <p className="text-[10.5px] text-red-100/70 mt-2">ข้อมูลถึง {latestDate} · เดือนปัจจุบันยังนับไม่ครบ</p>}
           </div>
         </section>
@@ -198,6 +228,24 @@ export function DesignIntakeScreen() {
         </div>
 
         <YearChips years={years} activeYear={activeYear} onSelect={(y) => setYear(y)} />
+
+        {/* เป้าสะสมปี (ถึงเดือนที่ครบล่าสุด) */}
+        {!loading && tg && activeYear && activeYear === tgYearSel && (() => {
+          const now = new Date();
+          const curP = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const upTo = activeYear < curP.slice(0, 4) ? `${activeYear}-12` : prevPeriod(curP);
+          const t = tgTotals(tg.months, (p) => p <= upTo);
+          if (t.target <= 0) return null;
+          return (
+            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
+              <p className="text-[12px] font-bold text-slate-900 flex items-center gap-1.5 mb-2">
+                <Icon name="flag" className="text-[#d32029]" style={{ fontSize: 16 }} />
+                เป้าแบบรับเข้า ปี {Number(activeYear) + 543}
+              </p>
+              <TargetProgress t={t} fmt={(n) => `${fmt(n)} แบบ`} label={`สะสมถึง ${monthShort(upTo)}`} />
+            </section>
+          );
+        })()}
 
         {/* รายเดือน */}
         <section>
@@ -242,6 +290,21 @@ export function DesignIntakeScreen() {
                     <div className="mt-1.5">
                       <SplitBar material={m.material} solution={m.solution} max={maxTotal} />
                     </div>
+                    {(() => {
+                      const t = tgMonth.get(m.period);
+                      if (!t || t.target <= 0) return null;
+                      return (
+                        <div className="mt-1.5">
+                          <div className="flex items-center justify-between gap-2 text-[10.5px]">
+                            <span className="text-slate-500">
+                              เป้า <b className="tnum text-slate-700">{fmt(t.target)}</b> · <b className={cn("tnum", tgTone(t.pct).text)}>{pctLabel(t.pct)}</b>
+                            </span>
+                            <LyText t={t} fmt={fmt} />
+                          </div>
+                          <TargetBar pct={t.pct} className="mt-1" />
+                        </div>
+                      );
+                    })()}
                   </button>
                 );
               })}

@@ -38,6 +38,8 @@ import {
 } from "@/lib/commission/service-sales-store";
 import { cn } from "@/lib/utils";
 import { fetchFreshness, freshText, type Freshness } from "@/lib/commission/freshness-store";
+import { fetchTargets, pctLabel, tgTone, tgTotals, type TgCompare, type TgTotals } from "@/lib/commission/targets-store";
+import { LyText, TargetBar, TargetProgress } from "./target-progress";
 
 /** ข้อมูลประจำแหล่งข้อมูล (หัวข้อ + ลิงก์หน้า detail) */
 const SOURCE_META: Record<SsSource, { label: string; short: string; icon: string; href: string }> = {
@@ -284,7 +286,18 @@ function Bar({ value, max, className }: { value: number; max: number; className?
 }
 
 /** 3 กลุ่มงาน + หมวดย่อย — กดกลุ่ม/หมวดย่อยเพื่อดูงาน */
-function GroupsBlock({ groups, total, onOpen }: { groups: SsGroup[]; total: number; onOpen: (group: string, sub: string | null) => void }) {
+function GroupsBlock({
+  groups,
+  total,
+  onOpen,
+  targets,
+}: {
+  groups: SsGroup[];
+  total: number;
+  onOpen: (group: string, sub: string | null) => void;
+  /** เป้ารายกลุ่ม (เฉพาะหน้ารวม + มุมมองร้าน/admin) */
+  targets?: Map<string, TgTotals> | null;
+}) {
   if (groups.length === 0) return <p className="text-[12px] text-slate-400 text-center py-3">ไม่มีข้อมูล</p>;
   return (
     <div className="space-y-2">
@@ -312,6 +325,23 @@ function GroupsBlock({ groups, total, onOpen }: { groups: SsGroup[]; total: numb
               </span>
               <Icon name="chevron_right" className="text-slate-300 shrink-0" style={{ fontSize: 16 }} />
             </button>
+            {(() => {
+              const t = targets?.get(g.group3);
+              if (!t || t.target <= 0) return null;
+              const tone = tgTone(t.pct);
+              return (
+                <div className="px-3 pt-2 pb-2 bg-white border-b border-slate-50">
+                  <div className="flex items-center justify-between gap-2 text-[10.5px]">
+                    <span className="text-slate-500">
+                      เป้า <b className="tnum text-slate-700">{mil(t.target)}</b>
+                    </span>
+                    <span className={cn("font-bold tnum", tone.text)}>{pctLabel(t.pct)} ของเป้า</span>
+                  </div>
+                  <TargetBar pct={t.pct} className="mt-1" />
+                  <p className="text-[10px] mt-1 text-right"><LyText t={t} fmt={mil} /></p>
+                </div>
+              );
+            })()}
             {g.subs.length > 0 && (
               <ul className="px-3 py-1.5 bg-white divide-y divide-slate-50">
                 {g.subs.map((s) => (
@@ -443,6 +473,8 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const [selected, setSelected] = useState<string | null>(null);
   const [jobsView, setJobsView] = useState<JobsView | null>(null);
   const [allStores, setAllStores] = useState(false);
+  /** อันดับร้าน (admin): เรียงตามยอดขาย หรือ % ถึงเป้า */
+  const [storeSort, setStoreSort] = useState<"amount" | "pct">("amount");
   const [fresh, setFresh] = useState<Freshness | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -513,6 +545,20 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
     };
   }, [ready, canFetch, summaryLoaded, dealerCode, activeYear, source, repCode, detailKey]);
 
+  // เป้า (TG) / ปีก่อน (LY): เฉพาะหน้ารวม (LHS/Rudy + BA ตามรายงาน Power BI) — พนักงานไม่มีเป้ารายคน
+  const tgOn = source === null && !isSales && !!activeYear;
+  const tgKey = `${dealerCode ?? ""}|${activeYear ?? ""}`;
+  const [tgState, setTgState] = useState<{ key: string; t: TgCompare } | null>(null);
+  useEffect(() => {
+    if (!ready || !canFetch || !tgOn || !activeYear) return;
+    let cancelled = false;
+    fetchTargets("service_sales", dealerCode, activeYear).then((t) => !cancelled && setTgState({ key: tgKey, t }));
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, canFetch, tgOn, dealerCode, activeYear, tgKey]);
+  const tg = tgOn && tgState?.key === tgKey && tgState.t.ok && tgState.t.hasTarget ? tgState.t : null;
+
   const d = detail && detail.key === detailKey ? detail : null;
   const detailLoading = !d;
   const months = useMemo(() => d?.months ?? [], [d]); // ใหม่ -> เก่า
@@ -536,7 +582,13 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   // เดือนที่เลือก: ค่าเริ่มต้น = เดือนล่าสุดที่มีข้อมูล
   const focus = (selected && months.find((m) => m.period === selected)) || months[0];
   const chart = [...months].reverse();
-  const maxAmt = Math.max(1, ...chart.map((m) => m.amount));
+  const tgMonthMax = (() => {
+    if (!tg) return 0;
+    const m = new Map<string, number>();
+    tg.months.forEach((c) => m.set(c.period, (m.get(c.period) ?? 0) + Math.max(c.target, c.ly)));
+    return Math.max(0, ...m.values());
+  })();
+  const maxAmt = Math.max(1, tgMonthMax, ...chart.map((m) => m.amount));
   const unitM = maxAmt >= 1e6;
 
   const showPeople = !!dealerCode && !repCode;
@@ -574,6 +626,42 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const vTotal = isMonth ? focus!.amount : yearTotal;
   const vJobs = isMonth ? focus!.jobCount : yearJobs;
   const vPeople = isMonth ? peopleMonth : peopleYear;
+
+  // เป้า: ทั้งปี = สะสมถึงเดือนที่ครบล่าสุด (ไม่นับเดือนปัจจุบันที่ยังไม่ครบ) ; เดือน = เดือนที่เลือก
+  const tgUpTo = activeYear ? (activeYear < nowP.slice(0, 4) ? `${activeYear}-12` : lastFull?.period ?? null) : null;
+  const tgUpToLabel = tgUpTo ? `สะสมถึง ${monthShort(tgUpTo)}` : "";
+  const tgYear = tg && tgUpTo ? tgTotals(tg.months, (p) => p <= tgUpTo) : null;
+  const tgKeep = (p: string) => (isMonth ? p === focus!.period : !!tgUpTo && p <= tgUpTo);
+  const tgView = tg ? tgTotals(tg.months, tgKeep) : null;
+  const tgGroups = tg ? new Map(["ROOF SERVICE", "SMART SOLUTION", "Qchang"].map((g) => [g, tgTotals(tg.months, tgKeep, g)])) : null;
+  const tgByMonth = new Map<string, { target: number; ly: number }>();
+  tg?.months.forEach((c) => {
+    const o = tgByMonth.get(c.period) ?? { target: 0, ly: 0 };
+    o.target += c.target;
+    o.ly += c.ly;
+    tgByMonth.set(c.period, o);
+  });
+  // กลุ่มที่มีเป้าแต่ยังไม่มียอด -> แสดงแถวว่างให้เห็นว่ายังไม่ถึงเป้า
+  const vGroupsT: SsGroup[] = tgGroups
+    ? [
+        ...vGroups,
+        ...[...tgGroups.entries()]
+          .filter(([g, t]) => t.target > 0 && !vGroups.some((x) => x.group3 === g))
+          .map(([g]) => ({ group3: g, amount: 0, jobCount: 0, subs: [] })),
+      ]
+    : vGroups;
+  // อันดับร้าน (admin): % ถึงเป้ารายร้าน ตามช่วงเดียวกับส่วนล่างกราฟ
+  const storeTg = new Map<string, TgTotals>();
+  if (tg && adminAll) {
+    const by = new Map<string, TgCompare["stores"]>();
+    tg.stores.forEach((s) => by.set(s.dealerCode, [...(by.get(s.dealerCode) ?? []), s]));
+    by.forEach((cells, code) => storeTg.set(code, tgTotals(cells, tgKeep)));
+  }
+  const pctOf = (code: string | null) => (code ? storeTg.get(code)?.pct ?? null : null);
+  const storesShown =
+    storeSort === "pct" && storeTg.size
+      ? [...storesYear].sort((a, b) => (a.code ? 0 : 1) - (b.code ? 0 : 1) || (pctOf(b.code) ?? -1) - (pctOf(a.code) ?? -1))
+      : storesYear;
   const vKey = isMonth ? focus!.period : `y${activeYear ?? "all"}`;
   const openView = (v: Omit<JobsView, "scope" | "query"> & { query: SsJobQuery }) =>
     isMonth ? openMonth(focus!.period, v) : openYear(v);
@@ -631,6 +719,12 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                 )}
                 <span className="text-red-100/70">· {yearJobs.toLocaleString("th-TH")} งาน</span>
               </p>
+            )}
+            {!detailLoading && tgYear && tgYear.target > 0 && (
+              <div className="mt-3 rounded-xl bg-black/10 px-3 py-2">
+                <TargetProgress t={tgYear} fmt={mil} dark label={tgUpToLabel} />
+                {adminAll && <p className="text-[9.5px] text-red-100/70 mt-1">เทียบเป้า: เฉพาะร้าน HE / SCG Home ที่ยังเป็นตัวแทน (ไม่รวมไม่ระบุร้าน)</p>}
+              </div>
             )}
             <div className="grid grid-cols-3 gap-2 mt-4">
               <div className="rounded-xl bg-white/10 border border-white/10 backdrop-blur-md px-2.5 py-2">
@@ -743,13 +837,29 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                       <span className={cn("tnum text-[9px] mb-0.5", active ? "text-[#a11119] font-bold" : "text-slate-400")}>
                         {v.toFixed(unitM ? (v >= 10 ? 0 : 1) : 0)}
                       </span>
-                      <span
-                        className={cn(
-                          "w-full rounded-t-md transition-all duration-500",
-                          active ? "bg-[#d32029]" : partial ? "bg-red-200 border border-dashed border-red-300" : "bg-red-300/80 group-hover:bg-red-400"
-                        )}
-                        style={{ height: `${h}%` }}
-                      />
+                      <span className="relative w-full flex-1 flex items-end">
+                        <span
+                          className={cn(
+                            "w-full rounded-t-md transition-all duration-500",
+                            active ? "bg-[#d32029]" : partial ? "bg-red-200 border border-dashed border-red-300" : "bg-red-300/80 group-hover:bg-red-400"
+                          )}
+                          style={{ height: `${h}%` }}
+                        />
+                        {(() => {
+                          const t = tgByMonth.get(m.period);
+                          if (!t) return null;
+                          return (
+                            <>
+                              {t.target > 0 && (
+                                <span className="absolute -left-0.5 -right-0.5 h-[2px] bg-slate-900 rounded" style={{ bottom: `${(t.target / maxAmt) * 100}%` }} aria-hidden="true" />
+                              )}
+                              {t.ly > 0 && (
+                                <span className="absolute left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-slate-500 ring-1 ring-white" style={{ bottom: `calc(${(t.ly / maxAmt) * 100}% - 3px)` }} aria-hidden="true" />
+                              )}
+                            </>
+                          );
+                        })()}
+                      </span>
                       <span className={cn("text-[10px] mt-1", active ? "text-[#a11119] font-bold" : "text-slate-500")}>{monthShort(m.period)}</span>
                     </button>
                   );
@@ -759,6 +869,13 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                 หน่วย: {unitM ? "ล้านบาท" : "พันบาท"} · แท่งสีเข้ม = เดือนที่กำลังดู (เริ่มที่เดือนล่าสุด) · กดแท่งเพื่อเปลี่ยนเดือน
                 {chart.some((m) => m.period === nowP) ? " · เส้นประ = เดือนปัจจุบัน (ยังไม่ครบเดือน)" : ""}
               </p>
+              {tg && (
+                <p className="text-[10.5px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-[2px] bg-slate-900 rounded" aria-hidden="true" />เป้า (TG)</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-500" aria-hidden="true" />ปีก่อน (LY)</span>
+                  {adminAll && <span className="text-slate-400">แท่งรวมไม่ระบุร้าน · เป้าเฉพาะร้าน HE/SCG Home</span>}
+                </p>
+              )}
             </>
           )}
         </section>
@@ -817,9 +934,20 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                   <div key={g.group3} className={groupMeta(g.group3).bar} style={{ width: `${vTotal ? (g.amount / vTotal) * 100 : 0}%` }} />
                 ))}
               </div>
+              {tgView && tgView.target > 0 && (
+                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 mb-2.5">
+                  <TargetProgress
+                    t={tgView}
+                    fmt={mil}
+                    label={isMonth ? monthShort(focus!.period) : tgUpToLabel}
+                    partial={isMonth && focus!.period === nowP}
+                  />
+                </div>
+              )}
               <GroupsBlock
-                groups={vGroups}
+                groups={vGroupsT}
                 total={vTotal}
+                targets={tgGroups}
                 onOpen={(group, sub) => openView({ title: sub ?? group, icon: groupMeta(group).icon, group, query: { group, sub } })}
               />
               {!isMonth && !activeYear && <p className="text-[10px] text-slate-400 mt-2">เลือกปีด้านบนเพื่อกดดูรายการงาน</p>}
@@ -841,12 +969,29 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
 
             {adminAll && storesYear.length > 0 && (
               <section key={`s-${vKey}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 animate-fade-up">
-                <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-2.5">
-                  <Icon name="storefront" className="text-lg text-[#d32029]" />
-                  อันดับร้าน
-                </h3>
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5">
+                    <Icon name="storefront" className="text-lg text-[#d32029]" />
+                    อันดับร้าน
+                  </h3>
+                  {storeTg.size > 0 && (
+                    <div className="inline-flex rounded-full bg-slate-100 p-0.5 text-[10.5px] font-bold" role="group" aria-label="เรียงอันดับร้าน">
+                      {(["amount", "pct"] as const).map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          aria-pressed={storeSort === k}
+                          onClick={() => setStoreSort(k)}
+                          className={cn("rounded-full px-2.5 py-1 transition", storeSort === k ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}
+                        >
+                          {k === "amount" ? "ยอดขาย" : "% ถึงเป้า"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <ul className="space-y-1">
-                  {(allStores ? storesYear : storesYear.slice(0, 10)).map((s, i) => (
+                  {(allStores ? storesShown : storesShown.slice(0, 10)).map((s, i) => (
                     <li key={s.code ?? "__none__"}>
                       <button
                         type="button"
@@ -866,7 +1011,32 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                             {s.code && <Icon name="chevron_right" className="text-slate-300 text-lg ml-0.5" />}
                           </span>
                         </div>
-                        {s.code && <div className="mt-1 pl-6"><Bar value={s.amount} max={maxStore} className={s.model === "SCG Home" ? "bg-blue-500" : "bg-[#d32029]"} /></div>}
+                        {s.code && (() => {
+                          const t = storeTg.get(s.code);
+                          if (storeSort === "pct" && t && t.target > 0) {
+                            return (
+                              <div className="mt-1 pl-6">
+                                <TargetBar pct={t.pct} />
+                                <p className="text-[10px] text-slate-500 mt-0.5 flex justify-between gap-2">
+                                  <span>
+                                    เป้า {mil(t.target)} · <b className={tgTone(t.pct).text}>{pctLabel(t.pct)}</b>
+                                  </span>
+                                  <LyText t={t} fmt={mil} />
+                                </p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="mt-1 pl-6">
+                              <Bar value={s.amount} max={maxStore} className={s.model === "SCG Home" ? "bg-blue-500" : "bg-[#d32029]"} />
+                              {t && t.target > 0 && (
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  เป้า {mil(t.target)} · <b className={tgTone(t.pct).text}>{pctLabel(t.pct)}</b>
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </button>
                     </li>
                   ))}
