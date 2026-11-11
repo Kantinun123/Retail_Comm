@@ -28,8 +28,8 @@ const MAX_DROP = 0.3;
 const MATERIAL_RE = /(ถอด|ออก)แบบประมาณการ/;
 /* ตัวกรอง service_solution ตามรายงาน Power BI ของทีมเจ้าของข้อมูล (Table.SelectRows หลัง "Added Custom4")
    นอกรายการ (เช่น Roof Renovation, โซลาร์, ระบบอากาศ) = ไม่นับเป็นแบบรับเข้า (design_type = null)
-   null = ไม่มีงานบริการ -> ไม่ใช่ทั้ง Material/Solution (Power BI ก็ไม่จัดประเภทให้) จึงไม่นับเช่นกัน
-   ตรวจกับ Power BI ร้านสมาร์ท โฮมโปรดักส์ ต.ค. 69: 64 แบบ (M30/S34) ตรงทุก Opp_id */
+   null = ไม่มีงานบริการ (โอกาสขายสินค้า เช่น SCG Roof) -> Power BI นับเป็น "แบบ Material" (Estimate Service)
+   ตรวจกับ Power BI: ร้าน 5100895 ต.ค. 69 = 64 (M30/S34) และ HE ทุกร้าน ต.ค. 69 = 1,006 (M820/S186) ตรงราย Opp_id */
 const SERVICE_SOLUTION_KEEP = new Set([
   "Metal Roof", "Roof Installation", "Roof-สินค้า Installation",
   "งานถอดแบบประมาณการ", "งานถอดแบบประมาณการสินค้า", "งานถอดแบบประมาณการสินค้า_inactive",
@@ -156,7 +156,8 @@ for (const r of raw) {
   const cat = str(r.service_category), sub = str(r.service_sub_solution);
   const sol = str(r.service_solution);
   const inScope = !!sol && SERVICE_SOLUTION_KEEP.has(sol);
-  const design_type = !inScope ? null : MATERIAL_RE.test(`${cat ?? ""} ${sub ?? ""} ${sol}`) ? "material" : sub ? "solution" : null;
+  // service_solution ว่าง = Power BI จัดเป็น "แบบ Material" (Service categor-II = บริการงานออกแบบประมาณการ (Estimate Service))
+  const design_type = !sol ? "material" : !inScope ? null : MATERIAL_RE.test(`${cat ?? ""} ${sub ?? ""} ${sol}`) ? "material" : sub ? "solution" : null;
   const rep_code = mapRep(r.crm_created_name);
   if (rep_code) repHit++;
   rows.push({
