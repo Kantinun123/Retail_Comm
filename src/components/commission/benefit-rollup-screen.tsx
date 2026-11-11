@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useLinkedPeriod } from "@/lib/commission/linked-period";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
@@ -52,8 +53,11 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
   const router = useRouter();
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState<string | null>(null);
-  const [openPeriod, setOpenPeriod] = useState<string | null>(null);
+  // ช่วงเวลาจากหน้าหลัก (?p= / ?y=) -> เลือกปีนั้น + ไฮไลต์เดือนนั้น
+  const linked = useLinkedPeriod();
+  const [selectedYear, setSelectedYear] = useState<string | null>(linked.year);
+  // โหมดเดือนจากหน้าหลัก -> เปิดเดือนนั้นไว้ให้เลย
+  const [openPeriod, setOpenPeriod] = useState<string | null>(linked.period);
   const [showDownload, setShowDownload] = useState(false);
 
   const dealerCode = session

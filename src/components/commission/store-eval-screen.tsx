@@ -9,6 +9,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useLinkedPeriod } from "@/lib/commission/linked-period";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
@@ -267,7 +268,9 @@ export function StoreEvalScreen() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<EvalMonth | null>(null);
   const [fails, setFails] = useState<EvalFail[]>([]);
-  const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  // ช่วงเวลาจากหน้าหลัก (?p= / ?y=) -> เลือกปีนั้น + ไฮไลต์เดือนนั้น
+  const linked = useLinkedPeriod();
+  const [selectedYear, setSelectedYear] = useState<string | null>(linked.year);
 
   const dealerCode = session
     ? session.isAdmin
@@ -439,7 +442,8 @@ export function StoreEvalScreen() {
                     key={m.period}
                     type="button"
                     onClick={() => setDetail(m)}
-                    className="w-full text-left bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5 active:scale-[0.99] hover:border-red-200 transition"
+                    aria-current={m.period === linked.period ? "true" : undefined}
+                    className={"w-full text-left bg-white rounded-2xl border shadow-sm p-3.5 active:scale-[0.99] hover:border-red-200 transition " + (m.period === linked.period ? "border-[#d32029] ring-2 ring-red-100" : "border-slate-100")}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">

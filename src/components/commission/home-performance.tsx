@@ -22,6 +22,7 @@ import { currentPeriod, periodShort, prevPeriod, type HubView } from "@/lib/comm
 import { cn } from "@/lib/utils";
 import { pctLabel, tgTone, type TgTotals } from "@/lib/commission/targets-store";
 import { TargetBar } from "./target-progress";
+import { withPeriod } from "@/lib/commission/linked-period";
 
 const short = (v: number) => (Math.abs(v) >= 1e6 ? `฿${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e3 ? `฿${(v / 1e3).toFixed(1)}K` : `฿${Math.round(v).toLocaleString("th-TH")}`);
 const pctChange = (cur: number, base: number | null | undefined) => (base ? ((cur - base) / Math.abs(base)) * 100 : null);
@@ -275,7 +276,7 @@ export function PerformanceCards({
     }
     const spark = before.slice(-6).map((e) => e.pct);
     cards.push(
-      <Link key="eval" href="/app/store-eval" className={cn(card, "stagger-1")}>
+      <Link key="eval" href={withPeriod("/app/store-eval", view)} className={cn(card, "stagger-1")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="fact_check" style={{ fontSize: 17 }} /></span>
         <span className="text-[11.5px] font-bold text-slate-900 mt-2 leading-tight">ตรวจประเมินร้าน</span>
         {tag && <Tag>{tag}</Tag>}
@@ -312,7 +313,7 @@ export function PerformanceCards({
     const last3 = csSum.months.filter((m) => m.period <= upTo).slice(0, 3).reverse();
     const maxP = Math.max(...last3.map((m) => m.pct), 0.01);
     cards.push(
-      <Link key="cs" href="/app/cust-sat" className={cn(card, "stagger-2")}>
+      <Link key="cs" href={withPeriod("/app/cust-sat", view)} className={cn(card, "stagger-2")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="sentiment_satisfied" style={{ fontSize: 17 }} /></span>
         <span className="text-[11.5px] font-bold text-slate-900 mt-2 leading-tight">ความพึงพอใจ</span>
         {tag && <Tag>{tag}</Tag>}
@@ -346,7 +347,7 @@ export function PerformanceCards({
     const total = material + solution;
     const mPct = total ? (material / total) * 100 : 0;
     cards.push(
-      <Link key="di" href="/app/design-intake" className={cn(card, "stagger-3")}>
+      <Link key="di" href={withPeriod("/app/design-intake", view)} className={cn(card, "stagger-3")}>
         <span className="w-8 h-8 rounded-xl bg-red-50 text-[#d32029] flex items-center justify-center"><Icon name="architecture" style={{ fontSize: 17 }} /></span>
         <span className="text-[11.5px] font-bold text-slate-900 mt-2 leading-tight">แบบรับเข้า</span>
         <span className="tnum text-[21px] font-bold text-[#a11119] leading-tight mt-1">

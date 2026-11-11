@@ -25,6 +25,7 @@ import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/servi
 import { fetchDesignIntake, type DiSummary } from "@/lib/commission/design-intake-store";
 import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
 import { fetchTargets, tgTotals, type TgCompare } from "@/lib/commission/targets-store";
+import { withPeriod } from "@/lib/commission/linked-period";
 import { LyText, TargetBar, TargetProgress } from "./target-progress";
 import { pctLabel, tgTone } from "@/lib/commission/targets-store";
 import { yearsOf } from "./year-filter";
@@ -393,9 +394,11 @@ export function HomeHubScreen() {
   const pctOf = (v: number | null, base: number | null) =>
     v == null || base == null || base <= 0 ? null : (v / base) * 100;
   const waitLabel = view.mode === "month" ? `รอข้อมูล ${periodShort(view.period)}` : "รอข้อมูล";
+  // ลิงก์ไปหน้ารายละเอียด: แนบช่วงเวลาที่เลือก (?p= / ?y=) ให้หน้าปลายทางเปิดที่ช่วงเดียวกัน
+  const lp = (href: string) => withPeriod(href, view);
   const benCard = (key: string, href: string, icon: string, label: string, sub: string, v: SourceValue | null, base: number | null): CardData | null =>
     v && {
-      key, href, icon, label, sub, loading,
+      key, href: lp(href), icon, label, sub, loading,
       total: v.amount,
       pct: pctOf(v.amount, base),
       waiting: v.waiting ? { label: waitLabel, latest: v.latest } : null,
@@ -422,10 +425,10 @@ export function HomeHubScreen() {
   const toFoot = (f: { text: string; stale: boolean } | null) => (f ? { text: f.text, warn: f.stale } : null);
   const salesCards: CardData[] = [
     ...((ssRudy?.count ?? 0) > 0
-      ? [{ key: "sales-lhs", href: "/app/service-sales/lhs", icon: "roofing", label: "ยอดขาย LHS/Rudy", sub: "งานบริการหลังคาและโซลูชัน (รวม VAT)", total: salesRudy, loading, pct: pctOfSales(salesRudy), foot: toFoot(fr(["lhs"])), zeroNote: "ไม่มียอดในช่วงนี้" } as CardData]
+      ? [{ key: "sales-lhs", href: lp("/app/service-sales/lhs"), icon: "roofing", label: "ยอดขาย LHS/Rudy", sub: "งานบริการหลังคาและโซลูชัน (รวม VAT)", total: salesRudy, loading, pct: pctOfSales(salesRudy), foot: toFoot(fr(["lhs"])), zeroNote: "ไม่มียอดในช่วงนี้" } as CardData]
       : []),
     ...((ssBa?.count ?? 0) > 0
-      ? [{ key: "sales-ba", href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง รายวัน (gmv)", total: salesBa, loading, pct: pctOfSales(salesBa), foot: toFoot(fr(["ba"])), zeroNote: "ไม่มียอดในช่วงนี้" } as CardData]
+      ? [{ key: "sales-ba", href: lp("/app/service-sales/ba"), icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง รายวัน (gmv)", total: salesBa, loading, pct: pctOfSales(salesBa), foot: toFoot(fr(["ba"])), zeroNote: "ไม่มียอดในช่วงนี้" } as CardData]
       : []),
   ];
 
@@ -541,7 +544,7 @@ export function HomeHubScreen() {
             display={storeAgg.amount == null ? "รอข้อมูล" : null}
             loading={loading}
             note={groupNote(storeAgg)}
-            href="/app/benefit-store"
+            href={lp("/app/benefit-store")}
           />
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {storeCards.map((c) => (
@@ -563,7 +566,7 @@ export function HomeHubScreen() {
             display={empAgg.amount == null ? "รอข้อมูล" : null}
             loading={loading}
             note={`${groupNote(empAgg)} · จ่ายจริง`}
-            href="/app/benefit-staff"
+            href={lp("/app/benefit-staff")}
           />
           <div className="grid grid-cols-2 gap-2.5 mt-2.5">
             {empCards.map((c) => (
@@ -589,7 +592,7 @@ export function HomeHubScreen() {
                   loading={loading}
                   note={`${productSalesSource} · แยกกลุ่มสินค้า/พนักงาน`}
                   fresh={fr(prodJobs)}
-                  href="/app/product-sales"
+                  href={lp("/app/product-sales")}
                 />
               </div>
             )}
@@ -601,12 +604,12 @@ export function HomeHubScreen() {
                 loading={loading}
                 note="LHS/Rudy + BA · 3 กลุ่มงานบริการ"
                 fresh={fr(["lhs", "ba"])}
-                href="/app/service-sales"
+                href={lp("/app/service-sales")}
               />
             )}
             {showServiceSales && svcT && svcT.target > 0 && (
               <Link
-                href="/app/service-sales"
+                href={lp("/app/service-sales")}
                 className="mt-2.5 block rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.99] transition-all"
               >
                 <p className="text-[12px] font-bold text-slate-900 flex items-center gap-1.5 mb-2">

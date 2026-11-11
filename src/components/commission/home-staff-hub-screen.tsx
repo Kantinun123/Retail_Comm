@@ -35,6 +35,7 @@ import {
   type MonthlySource,
   type SourceValue,
 } from "@/lib/commission/freshness-store";
+import { withPeriod } from "@/lib/commission/linked-period";
 
 function baht(n: number | null): string {
   if (n === null) return "—";
@@ -201,6 +202,7 @@ export function HomeStaffHubScreen() {
   const cards: CardData[] = [
     ...meta.map((m, i) => ({
       ...m,
+      href: withPeriod(m.href, view),
       loading,
       total: vals[i].amount,
       pct: pctOf(vals[i].amount),
@@ -224,7 +226,7 @@ export function HomeStaffHubScreen() {
     { data: ssBa?.months, jobs: ["ba"] as DailyJob[], href: "/app/service-sales/ba", icon: "home_repair_service", label: "ยอดขาย BA", sub: "งานบริการคิวช่าง (gmv)" },
   ]
     .filter((r) => (r.data?.length ?? 0) > 0)
-    .map((r) => ({ ...r, total: amountIn(r.data, view), fresh: freshText(fresh, r.jobs) }));
+    .map((r) => ({ ...r, href: withPeriod(r.href, view), total: amountIn(r.data, view), fresh: freshText(fresh, r.jobs) }));
 
   return (
     <>

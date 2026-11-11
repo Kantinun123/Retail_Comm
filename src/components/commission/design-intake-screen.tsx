@@ -19,6 +19,8 @@ import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
 import { fetchDesignIntake, type DiMonth, type DiSummary } from "@/lib/commission/design-intake-store";
 import { DesignIntakeJobsModal } from "./design-intake-jobs-modal";
 import { fetchTargets, pctLabel, tgTone, tgTotals, type TgCompare } from "@/lib/commission/targets-store";
+import { useLinkedPeriod } from "@/lib/commission/linked-period";
+import { lastFullPeriod } from "@/lib/commission/freshness-store";
 import { LyText, TargetBar, TargetProgress } from "./target-progress";
 import { cn } from "@/lib/utils";
 
@@ -64,8 +66,10 @@ export function DesignIntakeScreen() {
   const homeHref = useHomeHref();
   const router = useRouter();
   const [data, setData] = useState<{ key: string; s: DiSummary | null } | null>(null);
-  const [year, setYear] = useState<string | null | undefined>(undefined);
-  const [selected, setSelected] = useState<string | null>(null);
+  // ช่วงเวลาจากหน้าหลัก (?p= / ?y=) — ไม่มี = เดือนที่ครบล่าสุด
+  const linked = useLinkedPeriod();
+  const [year, setYear] = useState<string | null | undefined>(linked.year ?? undefined);
+  const [selected, setSelected] = useState<string | null>(linked.period);
   // เปิดรายการแบบ: ทั้งเดือน หรือเฉพาะพนักงาน/ร้านที่กดในส่วน "แยกตาม..."
   const [jobs, setJobs] = useState<{ period: string; dealerCode: string | null; repCode: string | null; unassigned: boolean; label: string | null } | null>(null);
   const openMonth = (period: string) => setJobs({ period, dealerCode, repCode, unassigned: false, label: null });
@@ -114,8 +118,10 @@ export function DesignIntakeScreen() {
   const shown = months.filter((m) => !activeYear || m.period.startsWith(activeYear));
   const maxTotal = Math.max(1, ...shown.map(total));
 
-  const latest = months[0];
-  const focus = (selected && byPeriod.get(selected)) || latest;
+  const newest = months[0];
+  // เดือนที่ดู: ที่เลือก/ส่งมาจากหน้าหลัก -> เดือนที่ครบล่าสุด -> เดือนล่าสุดที่มีข้อมูล ; hero แสดงเดือนเดียวกัน
+  const focus = (selected && byPeriod.get(selected)) || shown.find((m) => m.period === lastFullPeriod()) || newest;
+  const latest = focus;
   const focusPeriod = focus?.period ?? null;
 
   // แยกตามเดือนที่เลือก: ร้านค้า -> รายพนักงาน ; admin ทุกร้าน -> รายร้าน

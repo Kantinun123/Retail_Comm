@@ -37,7 +37,8 @@ import {
   type SsPersonRow,
 } from "@/lib/commission/service-sales-store";
 import { cn } from "@/lib/utils";
-import { fetchFreshness, freshText, type Freshness } from "@/lib/commission/freshness-store";
+import { fetchFreshness, freshText, lastFullPeriod, type Freshness } from "@/lib/commission/freshness-store";
+import { useLinkedPeriod } from "@/lib/commission/linked-period";
 import { fetchTargets, pctLabel, tgTone, tgTotals, type TgCompare, type TgTotals } from "@/lib/commission/targets-store";
 import { LyText, TargetBar, TargetProgress } from "./target-progress";
 
@@ -469,8 +470,10 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
     breakdown: SsBreakdown;
     sources: SsSourceAmount[];
   } | null>(null);
-  const [year, setYear] = useState<string | null | undefined>(undefined); // undefined = ยังไม่ตั้ง
-  const [selected, setSelected] = useState<string | null>(null);
+  // ช่วงเวลาจากหน้าหลัก (?p= เดือน / ?y= สะสมปี) — ไม่มี = เดือนที่ครบล่าสุด
+  const linked = useLinkedPeriod();
+  const [year, setYear] = useState<string | null | undefined>(linked.year ?? undefined); // undefined = ยังไม่ตั้ง
+  const [selected, setSelected] = useState<string | null>(linked.period);
   const [jobsView, setJobsView] = useState<JobsView | null>(null);
   const [allStores, setAllStores] = useState(false);
   /** อันดับร้าน (admin): เรียงตามยอดขาย หรือ % ถึงเป้า */
@@ -484,7 +487,7 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
     };
   }, []);
   /** ส่วนล่างกราฟ: "month" = เดือนที่เลือก (ค่าเริ่มต้น) | "year" = ทั้งปี */
-  const [view, setView] = useState<"month" | "year">("month");
+  const [view, setView] = useState<"month" | "year">(linked.mode === "year" ? "year" : "month");
 
   // ขอบเขต: ร้าน / พนักงาน (เฉพาะงานตัวเอง) / admin (ทุกร้าน, เจาะร้าน, มุมมองร้าน/พนักงาน)
   const isAdmin = !!session?.isAdmin;
@@ -580,7 +583,9 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const top = groups[0];
 
   // เดือนที่เลือก: ค่าเริ่มต้น = เดือนล่าสุดที่มีข้อมูล
-  const focus = (selected && months.find((m) => m.period === selected)) || months[0];
+  // เดือนที่ดู: ที่เลือก/ส่งมาจากหน้าหลัก -> เดือนที่ครบล่าสุด (เหมือนค่าเริ่มต้นหน้าหลัก) -> เดือนล่าสุดที่มีข้อมูล
+  const focus =
+    (selected && months.find((m) => m.period === selected)) || months.find((m) => m.period === lastFullPeriod()) || months[0];
   const chart = [...months].reverse();
   const tgMonthMax = (() => {
     if (!tg) return 0;

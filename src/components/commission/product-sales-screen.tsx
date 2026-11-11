@@ -25,7 +25,8 @@ import {
   type PsSummary,
 } from "@/lib/commission/product-sales-store";
 import { cn } from "@/lib/utils";
-import { fetchFreshness, freshText, type Freshness } from "@/lib/commission/freshness-store";
+import { fetchFreshness, freshText, lastFullPeriod, type Freshness } from "@/lib/commission/freshness-store";
+import { useLinkedPeriod } from "@/lib/commission/linked-period";
 
 const TH_MONTH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -191,8 +192,10 @@ export function ProductSalesScreen() {
   const homeHref = useHomeHref();
   const router = useRouter();
   const [data, setData] = useState<{ key: string; s: PsSummary | null } | null>(null);
-  const [year, setYear] = useState<string | null | undefined>(undefined);
-  const [selected, setSelected] = useState<string | null>(null);
+  // ช่วงเวลาจากหน้าหลัก (?p= / ?y=) — ไม่มี = เดือนที่ครบล่าสุด
+  const linked = useLinkedPeriod();
+  const [year, setYear] = useState<string | null | undefined>(linked.year ?? undefined);
+  const [selected, setSelected] = useState<string | null>(linked.period);
   const [tab, setTab] = useState<PsSource | null>(null);
   const [drill, setDrill] = useState<Drill | null>(null);
   const [allStores, setAllStores] = useState(false);
@@ -245,7 +248,7 @@ export function ProductSalesScreen() {
 
   const nowP = curPeriod();
   const latest = months[0];
-  const focus = (selected && byPeriod.get(selected)) || latest;
+  const focus = (selected && byPeriod.get(selected)) || shown.find((m) => m.period === lastFullPeriod()) || latest;
   const focusPeriod = focus?.period ?? null;
 
   if (!ready || !session) return null;
