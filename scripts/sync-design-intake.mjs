@@ -2,7 +2,7 @@
    -------------------------------------------------------------
    - ต้นทาง: ไฟล์ xlsx (ดีฟอลต์ commission-app/ยอดขายทั้งหมด/แบบรับเข้า/crm_trn_opportunity.xlsx หรือ --file <path>)
      ภายหลังชี้ไปโฟลเดอร์ SharePoint ที่ sync ลงเครื่อง
-   - ขอบเขต: BU = Housing Expert (GT) / SCG Home Retail (JV) และ crm_created_date >= 2025-01-01
+   - ขอบเขต: (BU = Housing Expert (GT) / SCG Home Retail (JV) หรือ ร้านผู้สร้างเป็นร้าน HE/SCG Home) และ crm_created_date >= 2025-01-01
    - เดือน = crm_created_date (ตามรายงาน Power BI ; start_date ในไฟล์ส่วนใหญ่ว่าง/1899/ปี พ.ศ.)
    - ตัวกรอง: service_solution ต้องอยู่ในรายการ SERVICE_SOLUTION_KEEP (ตาม Power BI) ไม่งั้น design_type = null (ไม่นับ)
    - design_type: material = service_category หรือ service_sub_solution มี "ถอดแบบประมาณการ"/"ออกแบบประมาณการ"
@@ -53,7 +53,9 @@ const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_
 const str = (v) => { const s = String(v ?? "").trim(); return s === "" ? null : s; };
 const numv = (v) => { const n = Number(String(v ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : null; };
 const isoTs = (d) => (d instanceof Date && !Number.isNaN(d.getTime()) && d.getUTCFullYear() > 1900 ? d.toISOString() : null);
-const isoDate = (d) => (isoTs(d) ? d.toISOString().slice(0, 10) : null);
+/* วันที่ตามค่าในไฟล์ (เวลาไทย) — SheetJS cellDates สร้าง Date ด้วย local time จึงใช้ getter แบบ local
+   ห้ามใช้ toISOString().slice (UTC) เพราะงานที่เปิด 00:00-07:00 จะเลื่อนไปวันก่อน/เดือนก่อน */
+const localDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 function norm(s) {
   return String(s ?? "")
     .normalize("NFC")
@@ -102,7 +104,10 @@ const OVERRIDE = new Map([
   ["บริษัท นพดลพานิช จำกัด สาขา 00001", "5101685"],     // บ.นพดลพานิช จก.
   ["เอสซีจี โฮม สหะชัยรีเทล (บ้านนา)", "5100974"],      // ตามที่ใช้ใน import-cust-sat (สหะชัยรีเทล บ้านนา -> 5100974)
   ["เอสซีจี โฮม แสงอุปกรณ์ (เมืองสุโขทัย)", "5100163"],  // หจก.สุโขทัยแสงอุปกรณ์
+  ["เอสซีจี โฮม บุญถาวร เมืองขอนแก่น", "5100967"],      // Power BI จัดเป็น บจก.แม็กซ์โฮม แอนด์ เดคคอร์ (82/82 รายการ ม.ค.-ต.ค. 69)
 ]);
+/* BU อื่น (เช่น HomeSmile, SCG Solar Roof) นับด้วยถ้าร้านผู้สร้างเป็นร้าน HE / SCG Home — Power BI กรองตามโมเดลร้าน ไม่ใช่ BU */
+const STORE_MODELS = new Set(["Housing Expert", "SCG Home"]);
 function mapDealer(name) {
   if (!name) return null;
   if (OVERRIDE.has(name)) return OVERRIDE.get(name);
@@ -144,27 +149,29 @@ let outBu = 0, outDate = 0, dup = 0;
 const missStore = new Map();
 let repHit = 0;
 for (const r of raw) {
-  if (!BUS.has(r.business_unit)) { outBu++; continue; }
+  const group = str(r.created_by_group_name);
+  const dealer_code = mapDealer(group);
+  if (!BUS.has(r.business_unit) && !STORE_MODELS.has(dealerSet.get(dealer_code)?.model)) { outBu++; continue; }
   const ts = isoTs(r.crm_created_date);
-  if (!ts || ts.slice(0, 10) < SINCE) { outDate++; continue; }
+  const day = ts ? localDate(r.crm_created_date) : null;
+  if (!ts || day < SINCE) { outDate++; continue; }
   const id = str(r.id);
   if (!id || seen.has(id)) { dup++; continue; }
   seen.add(id);
-  const group = str(r.created_by_group_name);
-  const dealer_code = mapDealer(group);
   if (!dealer_code) missStore.set(group ?? "(ว่าง)", (missStore.get(group ?? "(ว่าง)") ?? 0) + 1);
   const cat = str(r.service_category), sub = str(r.service_sub_solution);
   const sol = str(r.service_solution);
   const inScope = !!sol && SERVICE_SOLUTION_KEEP.has(sol);
-  // service_solution ว่าง = Power BI จัดเป็น "แบบ Material" (Service categor-II = บริการงานออกแบบประมาณการ (Estimate Service))
-  const design_type = !sol ? "material" : !inScope ? null : MATERIAL_RE.test(`${cat ?? ""} ${sub ?? ""} ${sol}`) ? "material" : sub ? "solution" : null;
+  // service_solution ว่าง + สินค้า Roof = Power BI จัดเป็น "แบบ Material" (Service categor-II = บริการงานออกแบบประมาณการ (Estimate Service))
+  // ว่าง + สินค้าอื่น (Smartwood, SFG, Q-con ...) = ไม่นับ (ตรวจ ม.ค.-ต.ค. 69: Roof 961/961 อยู่ใน Power BI, อื่นๆ 0/15)
+  const design_type = !sol ? (str(r.product_solution) === "Roof" ? "material" : null) : !inScope ? null : MATERIAL_RE.test(`${cat ?? ""} ${sub ?? ""} ${sol}`) ? "material" : sub ? "solution" : null;
   const rep_code = mapRep(r.crm_created_name);
   if (rep_code) repHit++;
   rows.push({
     opp_id: id,
     created_at_crm: ts,
-    created_date: ts.slice(0, 10),
-    period: ts.slice(0, 7),
+    created_date: day,
+    period: day.slice(0, 7),
     business_unit: r.business_unit,
     store_group_name: group,
     dealer_code,
@@ -184,7 +191,7 @@ for (const r of raw) {
     expected_product: numv(r.product_expected_sale_vol),
     expected_service: numv(r.service_expected_sale_vol),
     actual_sale: numv(r.actual_sale),
-    actual_close_date: isoDate(r.actual_close_date),
+    actual_close_date: isoTs(r.actual_close_date) ? localDate(r.actual_close_date) : null,
     rudy_id: str(r.rudy_id),
     home_id: str(r.home_id),
     crm_modified_at: isoTs(r.modified_date),

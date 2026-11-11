@@ -751,3 +751,38 @@ export const dynamic = "force-dynamic";
 - ❌ `sync-product-sales` อ่าน `product_sales_lines` ด้วย `.eq("source").order("id").range(offset)` → ตาราง ~200k แถว offset ลึก ๆ = `canceling statement due to statement timeout` (รอบ 09:30 ของ Odoo ล้ม)
 - ✅ ใช้ keyset `.gt("id", lastId).order("id").limit(1000)` + index `(source, id)` — Odoo อ่านจบใน 18s
 - ตารางที่โตเรื่อย ๆ ให้ใช้ keyset เสมอ ไม่ใช่ range/offset
+
+### Production: data_freshness timeout หลัง deploy
+- ❌ ใน RPC ใช้ `from table, t where col <= t.today` (cross join CTE วันที่) → planner ไม่ใช้ index, ทั้งฟังก์ชัน 2.5s → PostgREST (service role) statement timeout บน production ทั้งที่ local ผ่าน
+- ✅ ใช้นิพจน์ตรง `(now() at time zone 'Asia/Bangkok')::date` + index บนคอลัมน์วันที่/period ของทุกตาราง → 0.18s
+- หลัง deploy ให้ยิง API ใหม่บน production จริงเสมอ (curl ดู status + body) ไม่ใช่แค่หน้าเว็บ 200
+
+### นำเข้าไฟล์ BA รายเดือนจากโฟลเดอร์ (BA Incentive I-*.xlsx / BA Profit Share P-*.xlsx)
+- ใช้ `node scripts/import-ba-monthly.mjs --kind incentive|profit --dir "<โฟลเดอร์>" [--apply]` — เดาเดือนจากชื่อไฟล์, แทนที่ทั้งเดือนผ่าน RPC (`replace_ba_incentive_period` / `replace_ba_profit_share_period`), บันทึก data_uploads, incentive แล้ว refresh_service_sales_reps อัตโนมัติ
+- Profit Share: `sale_rep_name` = assignee_sales_team จาก Google Sheet BA (ไม่ใช่พนักงานร้าน) ; `product_brand` <- คอลัมน์ `service_brand` ในไฟล์รายร้าน
+- ร้าน GT/Qkiosk หลายร้านยังไม่อยู่ใน master_aliases → ยอดเข้า "ไม่ระบุร้าน" (เหมือนเดือนก่อน ๆ)
+- ⚠ query ตรวจผลที่ยิงพร้อมกัน (parallel) กับการเขียนอาจเห็น snapshot เก่า → ตรวจซ้ำหลังเขียนเสร็จเสมอ
+
+### แบบรับเข้า: ตัวกรอง service_solution ตาม Power BI
+- ทีมเจ้าของข้อมูลกรองด้วยรายการ `service_solution` ชุดเดียว (null + 26 ค่า งานหลังคา/ถอดแบบ) → ใส่เป็น `SERVICE_SOLUTION_KEEP` ใน sync-design-intake ; นอกรายการ (Roof Renovation, โซลาร์, AAQ/AAF ...) = design_type null (ไม่นับ)
+- null service_solution = ไม่มีงานบริการ → Power BI ไม่จัดเป็น Material/Solution จึงไม่นับเหมือนเดิม
+- ยืนยันด้วยไฟล์ export Power BI ร้าน 5100895 ต.ค. 69: 64 แบบ (M30/S34) ตรงทุก Opp_id/ประเภท/วันที่ ; ก่อนแก้แอปเกิน 1 (ระบบหลังคาโซลาร์ - OB)
+- วิธีเทียบที่ได้ผล: ขอไฟล์ export ระดับ Opp_id จากรายงานต้นทาง 1 ร้าน 1 เดือน แล้วเทียบรายการต่อรายการ (ไม่ใช่แค่ยอดรวม)
+- (อัปเดต) เทียบ Power BI HE ทุกร้าน ต.ค. 69 (1,006 แบบ) พบว่า `service_solution` ว่าง ถูกนับเป็น **แบบ Material** (Service categor-II = "บริการงานออกแบบประมาณการ (Estimate Service)", service_solution แสดง "ไม่ระบุ") → แก้ให้ null = material ; หลังแก้ตรง 1,006/1,006 ราย Opp_id, 46/47 ร้านตรงเป๊ะ
+- ตัวอย่าง 1 ร้านไม่พอ: ร้าน 5100895 ไม่มีแถว null เลย จึงไม่เห็นกฎนี้ — ต้องเทียบกับข้อมูลหลายร้านก่อนสรุปกฎ
+- ต่าง 1 รายการ: Opp ที่ BU ใน CRM = SCG Home Retail (JV) แต่ชื่อร้านเป็นร้าน HE (5100974) → Power BI (กรอง shopmodel = Housing Expert) ไม่นับ แอปนับเข้าร้านตามชื่อร้าน
+
+---
+
+## 📐 แบบรับเข้า (Design Intake) — เทียบ Power BI ทั้งปี ม.ค.-ต.ค. 69 (HE + SCG Home)
+
+**ผล**: หลังแก้ 4 ข้อ ทุก Opp ใน Power BI (13,668) ตรงกับแอปราย Opp_id/เดือน/ประเภท 100%
+
+1. **Power BI กรองด้วยโมเดลร้าน (`rept_gp_shopmodel`) ไม่ใช่ BU** → opp จาก BU อื่น (HomeSmile, SCG Solar Roof) ที่สร้างโดยร้าน HE/SCG Home ก็นับ (หายไป 311) → sync รับ BU อื่นถ้าร้านที่ map ได้เป็น model HE/SCG Home (`STORE_MODELS`)
+2. **service_solution ว่าง นับเป็น Material เฉพาะ product_solution = "Roof"** (Roof 961/961 อยู่ใน PBI, สินค้าอื่น Smartwood/SFG/Q-con 0/15) — ข้อสรุปเดิม "ว่าง = Material ทั้งหมด" ถูกแค่บางส่วน เพราะเทียบแค่เดือนเดียว
+3. **ชื่อกลุ่ม CRM "เอสซีจี โฮม บุญถาวร เมืองขอนแก่น" = ร้าน 5100967 แม็กซ์โฮม แอนด์ เดคคอร์** (PBI 82/82) → เพิ่ม OVERRIDE
+4. **Timezone bug**: เดิม period = `toISOString().slice(0,7)` (UTC) ทำให้งานที่เปิด 00:00-07:00 เวลาไทยเลื่อนไปวันก่อน (เช่น 1 ก.พ. 05:00 → ม.ค.) → ใช้ local getter (`getFullYear/getMonth/getDate`) เพราะ SheetJS `cellDates` สร้าง Date แบบ local
+
+**ยังต่าง (แอปนับเกิน 209)**: ร้านที่ PBI ไม่แสดงเลย 5102009 (109), 5101839 (68), 5100975 (24) ; sub_solution ใหม่ "มุงหลังคา เอสซีจี (… รอบบน)" ของ 5101027 ต.ค. (7) ; OP202610220066 5100974 (1) — รอผู้ใช้ตัดสิน
+
+**บทเรียน**: อย่าสรุปกฎจาก export เดือนเดียว ให้ขอข้อมูลหลายเดือน/ทุกโมเดลร้านแล้วเทียบราย ID และแยกสาเหตุ (ไม่มีใน DB / map ร้านไม่ได้ / ตัวกรอง / เดือนต่าง) ; วันที่จาก Excel ห้ามตัด string จาก ISO UTC
