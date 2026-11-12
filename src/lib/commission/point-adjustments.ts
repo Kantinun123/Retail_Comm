@@ -19,7 +19,8 @@ export interface PointAdjustment {
   byName: string;
 }
 
-const STORAGE_KEY = "cmPointAdjustments";
+// v2 (12 พ.ย. 69): รีเซ็ตแต้มเป็น 0 — ไม่อ่านค่าทดสอบเดิมใน localStorage ของแต่ละเครื่อง
+const STORAGE_KEY = "cmPointAdjustments_v2";
 
 type Store = Record<string, PointAdjustment[]>;
 

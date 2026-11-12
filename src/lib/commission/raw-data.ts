@@ -12586,448 +12586,448 @@ export const POINT_COMPANIES: PointCompany[] = [
     "name": "เอสซีจี โฮม เซ็นทรัลโฮม (หัวทะเล)",
     "model": "SCG Home",
     "region": "เหนือ",
-    "points": 153
+    "points": 0
   },
   {
     "code": "5100011",
     "name": "หจก.ต.วิวัฒน์ค้าวัสดุภัณฑ์ (1987)",
     "model": "Housing Expert",
     "region": "อีสาน",
-    "points": 259
+    "points": 0
   },
   {
     "code": "5100014",
     "name": "บ.สงวนพงษ์วัสดุก่อสร้าง จก.",
     "model": "Housing Expert",
     "region": "กลาง",
-    "points": 332
+    "points": 0
   },
   {
     "code": "5100034",
     "name": "บ.สหสินไทยค้าวัตถุก่อสร้าง จก.",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 193
+    "points": 0
   },
   {
     "code": "5100042",
     "name": "บ.นวการค้าวัสดุก่อสร้าง จก.",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 48
+    "points": 0
   },
   {
     "code": "5100044",
     "name": "บ.วรวิทย์วัสดุก่อสร้างอยุธยา จก. +",
     "model": "Housing Expert",
     "region": "ใต้",
-    "points": 281
+    "points": 0
   },
   {
     "code": "5100071",
     "name": "บ.โรซาร์เทรดดิ้ง จก.",
     "model": "Housing Expert",
     "region": "นครหลวง",
-    "points": 199
+    "points": 0
   },
   {
     "code": "5100074",
     "name": "หจก.กิจเพิ่มพูลค้าวัสดุก่อสร้าง",
     "model": "Housing Expert",
     "region": "เหนือ",
-    "points": 189
+    "points": 0
   },
   {
     "code": "5100088",
     "name": "บ.ชลบุรีอึ้งย่งล้ง จก.",
     "model": "Housing Expert",
     "region": "อีสาน",
-    "points": 456
+    "points": 0
   },
   {
     "code": "5100090",
     "name": "บ.บ้านอำเภอเทรดดิ้ง จก.",
     "model": "Housing Expert",
     "region": "กลาง",
-    "points": 393
+    "points": 0
   },
   {
     "code": "5100119",
     "name": "บ.อุดมชัยกู๊ดโฮมสมุทรสงคราม จก.",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 378
+    "points": 0
   },
   {
     "code": "5100126",
     "name": "บ.จำหน่ายวัตถุก่อสร้าง จก.",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 492
+    "points": 0
   },
   {
     "code": "5100129",
     "name": "หจก.ต.แสงอุปกรณ์สุพรรณบุรี",
     "model": "Housing Expert",
     "region": "ใต้",
-    "points": 460
+    "points": 0
   },
   {
     "code": "5100142",
     "name": "หจก.โชควิชัยค้าวัสดุ",
     "model": "Housing Expert",
     "region": "นครหลวง",
-    "points": 498
+    "points": 0
   },
   {
     "code": "5100163",
     "name": "หจก.สุโขทัยแสงอุปกรณ์",
     "model": "Housing Expert",
     "region": "เหนือ",
-    "points": 15
+    "points": 0
   },
   {
     "code": "5100186",
     "name": "หจก.ลำปางเตียวเชียงล้ง",
     "model": "Housing Expert",
     "region": "อีสาน",
-    "points": 33
+    "points": 0
   },
   {
     "code": "5100215",
     "name": "หจก.อังครงค์รักษ์พาณิชย์",
     "model": "Housing Expert",
     "region": "กลาง",
-    "points": 323
+    "points": 0
   },
   {
     "code": "5100236",
     "name": "บ.หนองคายวิศิษฎ์ จก.",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 189
+    "points": 0
   },
   {
     "code": "5100250",
     "name": "หจก.ซุ่ยเฮงเส็ง",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 484
+    "points": 0
   },
   {
     "code": "5100252",
     "name": "บ.คูย่งฮวด (1995) จก.",
     "model": "Housing Expert",
     "region": "ใต้",
-    "points": 237
+    "points": 0
   },
   {
     "code": "5100266",
     "name": "บ.โชคพูลผลคอนกรีต จก.",
     "model": "Housing Expert",
     "region": "นครหลวง",
-    "points": 360
+    "points": 0
   },
   {
     "code": "5100311",
     "name": "บ.ไถ่เชียงวัสดุก่อสร้าง จก.",
     "model": "Housing Expert",
     "region": "เหนือ",
-    "points": 111
+    "points": 0
   },
   {
     "code": "5100350",
     "name": "บ.แสงชัยแมคโครวัสดุภัณฑ์ จก.",
     "model": "Housing Expert",
     "region": "อีสาน",
-    "points": 79
+    "points": 0
   },
   {
     "code": "5100657",
     "name": "เอสซีจี โฮม บุญถาวร วู๊ด แอนด์ เซรามิค (ลพบุรี)",
     "model": "SCG Home",
     "region": "กลาง",
-    "points": 308
+    "points": 0
   },
   {
     "code": "5100676",
     "name": "บ.วนาวัฒน์วัสดุ จก.",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 76
+    "points": 0
   },
   {
     "code": "5100710",
     "name": "บ.ย่งฮวดวัสดุก่อสร้าง จก.",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 77
+    "points": 0
   },
   {
     "code": "5100724",
     "name": "เอสซีจี โฮม บ้านช้าง กรุ๊ป (พัทยา)",
     "model": "SCG Home",
     "region": "ใต้",
-    "points": 12
+    "points": 0
   },
   {
     "code": "5100751",
     "name": "บ.เจี้ยบเซ้งโฮมแมคโคร จก.",
     "model": "Housing Expert",
     "region": "นครหลวง",
-    "points": 479
+    "points": 0
   },
   {
     "code": "5100755",
     "name": "บ.ไถ่เชียงโฮมแม็กซ์ จก.",
     "model": "Housing Expert",
     "region": "เหนือ",
-    "points": 35
+    "points": 0
   },
   {
     "code": "5100779",
     "name": "หจก.เกี้ยนเฮงวัสดุก่อสร้าง",
     "model": "Housing Expert",
     "region": "อีสาน",
-    "points": 223
+    "points": 0
   },
   {
     "code": "5100782",
     "name": "เอสซีจี โฮม บุญถาวร ธีรภาดา (ร้อยเอ็ด)",
     "model": "SCG Home",
     "region": "กลาง",
-    "points": 297
+    "points": 0
   },
   {
     "code": "5100786",
     "name": "บจก.บุญชัยค้าวัตถุก่อสร้าง",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 169
+    "points": 0
   },
   {
     "code": "5100804",
     "name": "หจก.ท่าช้างทอง",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 477
+    "points": 0
   },
   {
     "code": "5100808",
     "name": "บ.ตั้งหง่วงเซ้ง ไทย โฮมมาร์ท จก.",
     "model": "Housing Expert",
     "region": "ใต้",
-    "points": 370
+    "points": 0
   },
   {
     "code": "5100811",
     "name": "เอสซีจี โฮม บุญถาวร ตึกน้ำเงิน (นครสวรรค์)",
     "model": "SCG Home",
     "region": "นครหลวง",
-    "points": 230
+    "points": 0
   },
   {
     "code": "5100817",
     "name": "บ.จอมทองเคหะภัณฑ์ จก.",
     "model": "Housing Expert",
     "region": "เหนือ",
-    "points": 40
+    "points": 0
   },
   {
     "code": "5100846",
     "name": "บ.ระยองเคหะภัณฑ์ กรุ๊ป จก.",
     "model": "Housing Expert",
     "region": "อีสาน",
-    "points": 322
+    "points": 0
   },
   {
     "code": "5100887",
     "name": "บ.วีระพานิช เชียงใหม่ จก.",
     "model": "Housing Expert",
     "region": "กลาง",
-    "points": 144
+    "points": 0
   },
   {
     "code": "5100895",
     "name": "บ.สมาร์ท โฮมโปรดักส์ จก.",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 251
+    "points": 0
   },
   {
     "code": "5100902",
     "name": "บ.เซ็นเตอร์รุ่งเรือง จก.",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 27
+    "points": 0
   },
   {
     "code": "5100908",
     "name": "บ.เอ แอนด์ บี รุ่งเรือง จก.",
     "model": "Housing Expert",
     "region": "ใต้",
-    "points": 73
+    "points": 0
   },
   {
     "code": "5100910",
     "name": "บ.พัฒนาดีโฮมมาร์ท จก.",
     "model": "Housing Expert",
     "region": "นครหลวง",
-    "points": 335
+    "points": 0
   },
   {
     "code": "5100915",
     "name": "บ.สระบุรี โฮมมาร์ท จก.",
     "model": "Housing Expert",
     "region": "เหนือ",
-    "points": 113
+    "points": 0
   },
   {
     "code": "5100928",
     "name": "เอสซีจี โฮม ชีย้งเฮง (เมืองพัทลุง)",
     "model": "SCG Home",
     "region": "อีสาน",
-    "points": 212
+    "points": 0
   },
   {
     "code": "5100962",
     "name": "เอสซีจี โฮม ศิริภัณฑ์ (ท่าศาลา)",
     "model": "SCG Home",
     "region": "กลาง",
-    "points": 61
+    "points": 0
   },
   {
     "code": "5100967",
     "name": "บ.แม็กซ์โฮม แอนด์ เดคคอร์ จก.",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 310
+    "points": 0
   },
   {
     "code": "5100968",
     "name": "บ.คูย่งฮวด อุดรธานี จก.",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 400
+    "points": 0
   },
   {
     "code": "5100969",
     "name": "บ.ยิ่งเจริญ โฮมมาร์ท ปากช่อง จก.",
     "model": "Housing Expert",
     "region": "ใต้",
-    "points": 40
+    "points": 0
   },
   {
     "code": "5100971",
     "name": "เอสซีจี โฮม บุญถาวร ช.โลหะกิจ (กระบี่)",
     "model": "SCG Home",
     "region": "นครหลวง",
-    "points": 68
+    "points": 0
   },
   {
     "code": "5100973",
     "name": "เอสซีจี โฮม บุญถาวร ร่อนทองชัย (ประจวบคีรีขันธ์)",
     "model": "SCG Home",
     "region": "เหนือ",
-    "points": 382
+    "points": 0
   },
   {
     "code": "5100974",
     "name": "บ.สหะชัยวัสดุก่อสร้าง จก.",
     "model": "Housing Expert",
     "region": "อีสาน",
-    "points": 11
+    "points": 0
   },
   {
     "code": "5100980",
     "name": "บ.ชัยเจริญโฮมโซลูชั่น จก.",
     "model": "Housing Expert",
     "region": "กลาง",
-    "points": 373
+    "points": 0
   },
   {
     "code": "5101001",
     "name": "บ.ส.เอื้อสุข จก.",
     "model": "Housing Expert",
     "region": "ตะวันออก",
-    "points": 384
+    "points": 0
   },
   {
     "code": "5101021",
     "name": "เอสซีจี โฮม บุญถาวร เปรมปรีดิ์ (ชุมแพ)",
     "model": "SCG Home",
     "region": "ตะวันตก",
-    "points": 322
+    "points": 0
   },
   {
     "code": "5101025",
     "name": "บ.ไถ่เชียงระนอง จก.",
     "model": "Housing Expert",
     "region": "ใต้",
-    "points": 139
+    "points": 0
   },
   {
     "code": "5101027",
     "name": "เอสซีจี โฮม บุญถาวร แสงไพบูลย์ (เชียงราย)",
     "model": "SCG Home",
     "region": "นครหลวง",
-    "points": 14
+    "points": 0
   },
   {
     "code": "5101685",
     "name": "บ.นพดลพานิช จก.",
     "model": "Housing Expert",
     "region": "เหนือ",
-    "points": 15
+    "points": 0
   },
   {
     "code": "5101839",
     "name": "เอสซีจี โฮม บุญถาวร นางรองเคหะภัณฑ์ (นางรอง)",
     "model": "SCG Home",
     "region": "อีสาน",
-    "points": 239
+    "points": 0
   },
   {
     "code": "5102009",
     "name": "เอสซีจี โฮม ทรีเค โฮมโซลูชั่น (หาดใหญ่)",
     "model": "SCG Home",
     "region": "กลาง",
-    "points": 333
+    "points": 0
   },
   {
     "code": "5102354",
     "name": "เอสซีจี โฮม โฮมมาสเตอร์ (เมืองอำนาจเจริญ)",
     "model": "SCG Home",
     "region": "ตะวันออก",
-    "points": 481
+    "points": 0
   },
   {
     "code": "5102381",
     "name": "บ.ชลรุ่งเรืองโฮมมาร์ท แม็กซ์ จก.",
     "model": "Housing Expert",
     "region": "ตะวันตก",
-    "points": 67
+    "points": 0
   },
   {
     "code": "5102652",
     "name": "เอสซีจี โฮม บุญถาวร เมืองวัสดุ (วารินชำราบ)",
     "model": "SCG Home",
     "region": "ใต้",
-    "points": 194
+    "points": 0
   },
   {
     "code": "5102653",
     "name": "เอสซีจีโฮม บุญถาวร (จันทบุรี)",
     "model": "SCG Home",
     "region": "นครหลวง",
-    "points": 191
+    "points": 0
   },
   {
     "code": "5102714",
     "name": "เอสซีจี โฮม บุญถาวร ทีเค โฮมเซ็นเตอร์ (ฉะเชิงเทรา)",
     "model": "SCG Home",
     "region": "เหนือ",
-    "points": 151
+    "points": 0
   }
 ];
 
@@ -13037,1343 +13037,1343 @@ export const POINT_EMPLOYEES: PointEmployee[] = [
     "name": "เกตวลี พูลมาศ",
     "companyCode": "5102652",
     "avatar": "เพ",
-    "points": 8
+    "points": 0
   },
   {
     "empCode": "CR0002",
     "name": "เกรียงชัย ภิญวัย",
     "companyCode": "5100657",
     "avatar": "เภ",
-    "points": 143
+    "points": 0
   },
   {
     "empCode": "CR0151",
     "name": "เกล้านภา สิงห์ด้วง",
     "companyCode": "5100968",
     "avatar": "เส",
-    "points": 378
+    "points": 0
   },
   {
     "empCode": "OLD-CR0004",
     "name": "เกศรินทร์ กาเผือกงาม",
     "companyCode": "5102354",
     "avatar": "เก",
-    "points": 286
+    "points": 0
   },
   {
     "empCode": "OLD-CR0005",
     "name": "เกษร มิ่งใจเย็น",
     "companyCode": "5100895",
     "avatar": "เม",
-    "points": 405
+    "points": 0
   },
   {
     "empCode": "CR0106",
     "name": "เจนจิรา สารเห็ด",
     "companyCode": "5100142",
     "avatar": "เส",
-    "points": 81
+    "points": 0
   },
   {
     "empCode": "CR0007",
     "name": "เทพรินทร์ มีสุข",
     "companyCode": "5102653",
     "avatar": "เม",
-    "points": 336
+    "points": 0
   },
   {
     "empCode": "OLD-CR0009",
     "name": "เทียนทอง จริยธรรมานุกูล",
     "companyCode": "5100142",
     "avatar": "เจ",
-    "points": 57
+    "points": 0
   },
   {
     "empCode": "OLD-CR0010",
     "name": "เทียนทอง จริยธรรมานุกูล",
     "companyCode": "5100142",
     "avatar": "เจ",
-    "points": 347
+    "points": 0
   },
   {
     "empCode": "CR0078",
     "name": "เนตรนภา ภูกระโทก",
     "companyCode": "5100034",
     "avatar": "เภ",
-    "points": 284
+    "points": 0
   },
   {
     "empCode": "CR0164",
     "name": "เพชรรัตน์ สีหบุตร",
     "companyCode": "5102381",
     "avatar": "เส",
-    "points": 348
+    "points": 0
   },
   {
     "empCode": "CR0069",
     "name": "เพชรรัตน์ สุวรรณศรี",
     "companyCode": "5100895",
     "avatar": "เส",
-    "points": 99
+    "points": 0
   },
   {
     "empCode": "OLD-CR0014",
     "name": "เมธินี ถึกสกุล",
     "companyCode": "5100974",
     "avatar": "เถ",
-    "points": 298
+    "points": 0
   },
   {
     "empCode": "OLD-CR0015",
     "name": "เสาวณี บุญประเสริฐ",
     "companyCode": "5100676",
     "avatar": "เบ",
-    "points": 21
+    "points": 0
   },
   {
     "empCode": "CR0093",
     "name": "เสาวรัตน์ สมงาม",
     "companyCode": "5100014",
     "avatar": "เส",
-    "points": 15
+    "points": 0
   },
   {
     "empCode": "CR0142",
     "name": "เสาวลักษณ์ แมลงภู่",
     "companyCode": "5100163",
     "avatar": "เแ",
-    "points": 107
+    "points": 0
   },
   {
     "empCode": "OLD-CR0018",
     "name": "เอ๋ วงศ์กระจ่าง",
     "companyCode": "5100710",
     "avatar": "เว",
-    "points": 188
+    "points": 0
   },
   {
     "empCode": "CR0179",
     "name": "เอกณิพัชร์ จำเดิม",
     "companyCode": "5100350",
     "avatar": "เจ",
-    "points": 126
+    "points": 0
   },
   {
     "empCode": "OLD-CR0020",
     "name": "เอกนรินทร์ เอกนรินทร์",
     "companyCode": "5100129",
     "avatar": "เเ",
-    "points": 140
+    "points": 0
   },
   {
     "empCode": "OLD-CR0021",
     "name": "แน๊ท เขียวสอาด",
     "companyCode": "5100895",
     "avatar": "แเ",
-    "points": 163
+    "points": 0
   },
   {
     "empCode": "OLD-CR0022",
     "name": "แพรวา กลิ่นพยอม",
     "companyCode": "5100973",
     "avatar": "แก",
-    "points": 23
+    "points": 0
   },
   {
     "empCode": "CR0117",
     "name": "กมลชนก ขอถือกลาง",
     "companyCode": "5100974",
     "avatar": "กข",
-    "points": 222
+    "points": 0
   },
   {
     "empCode": "OLD-CR0024",
     "name": "กมลชนก มั่งมูล",
     "companyCode": "5100969",
     "avatar": "กม",
-    "points": 139
+    "points": 0
   },
   {
     "empCode": "OLD-CR0025",
     "name": "กรรณิการ์ ราชคมน์",
     "companyCode": "5101027",
     "avatar": "กร",
-    "points": 329
+    "points": 0
   },
   {
     "empCode": "OLD-CR0026",
     "name": "กฤชพร ไพรอนันต์",
     "companyCode": "5100724",
     "avatar": "กไ",
-    "points": 355
+    "points": 0
   },
   {
     "empCode": "CR0101",
     "name": "กฤตภาส พิริยะกูลธร",
     "companyCode": "5100126",
     "avatar": "กพ",
-    "points": 460
+    "points": 0
   },
   {
     "empCode": "OLD-CR0028",
     "name": "กอบชัย พฤทธิพัฒนพงศ์",
     "companyCode": "5100119",
     "avatar": "กพ",
-    "points": 457
+    "points": 0
   },
   {
     "empCode": "CR0053",
     "name": "กัญจน์ชญา วิเชียรวรรณกูล",
     "companyCode": "3052659",
     "avatar": "กว",
-    "points": 217
+    "points": 0
   },
   {
     "empCode": "OLD-CR0030",
     "name": "กัมปนาท บูรพา",
     "companyCode": "5100887",
     "avatar": "กบ",
-    "points": 332
+    "points": 0
   },
   {
     "empCode": "OLD-CR0031",
     "name": "กุสุมา สาริกา",
     "companyCode": "5100088",
     "avatar": "กส",
-    "points": 39
+    "points": 0
   },
   {
     "empCode": "CR0133",
     "name": "คเณศวร สุวรรณ์",
     "companyCode": "5100808",
     "avatar": "คส",
-    "points": 199
+    "points": 0
   },
   {
     "empCode": "CR0076",
     "name": "คณิศร งานสลุง",
     "companyCode": "5100034",
     "avatar": "คง",
-    "points": 204
+    "points": 0
   },
   {
     "empCode": "OLD-CR0037",
     "name": "คุณิตา ประจิมทิศ",
     "companyCode": "5100236",
     "avatar": "คป",
-    "points": 137
+    "points": 0
   },
   {
     "empCode": "OLD-CR0038",
     "name": "จริยา จันธ์เทศ",
     "companyCode": "5100973",
     "avatar": "จจ",
-    "points": 397
+    "points": 0
   },
   {
     "empCode": "CR0031",
     "name": "จารุวรรณ เส็งหพันธุ์",
     "companyCode": "5100811",
     "avatar": "จเ",
-    "points": 374
+    "points": 0
   },
   {
     "empCode": "CR0015",
     "name": "จิณณพัต ขุนศรี",
     "companyCode": "5100724",
     "avatar": "จข",
-    "points": 284
+    "points": 0
   },
   {
     "empCode": "CR0086",
     "name": "จิราภรณ์ พังแก้ว",
     "companyCode": "5100071",
     "avatar": "จพ",
-    "points": 233
+    "points": 0
   },
   {
     "empCode": "CR0089",
     "name": "จุฑามาศ ทองผ่อง",
     "companyCode": "5100902",
     "avatar": "จท",
-    "points": 375
+    "points": 0
   },
   {
     "empCode": "OLD-CR0043",
     "name": "จุฬาภรณ์ พึ่งกุศล",
     "companyCode": "5100236",
     "avatar": "จพ",
-    "points": 221
+    "points": 0
   },
   {
     "empCode": "CR0145",
     "name": "ฉลอง ม่อมพะเนาว์",
     "companyCode": "5100266",
     "avatar": "ฉม",
-    "points": 391
+    "points": 0
   },
   {
     "empCode": "CR0063",
     "name": "ชญานิศ กัลยวณิชย์",
     "companyCode": "5100971",
     "avatar": "ชก",
-    "points": 411
+    "points": 0
   },
   {
     "empCode": "CR0116",
     "name": "ชบาไพร ชื่นอารมย์",
     "companyCode": "5100915",
     "avatar": "ชช",
-    "points": 346
+    "points": 0
   },
   {
     "empCode": "CR0109",
     "name": "ชลธิชา มูลเงิน",
     "companyCode": "5101001",
     "avatar": "ชม",
-    "points": 253
+    "points": 0
   },
   {
     "empCode": "CR0179",
     "name": "ชาญณัฎฐ์ จิตอร่าม",
     "companyCode": "5100350",
     "avatar": "ชจ",
-    "points": 284
+    "points": 0
   },
   {
     "empCode": "OLD-CR0049",
     "name": "ชิดชนก เอี่ยมอังกูร",
     "companyCode": "5100895",
     "avatar": "ชเ",
-    "points": 196
+    "points": 0
   },
   {
     "empCode": "OLD-CR0050",
     "name": "ชุติมา ทองใบ",
     "companyCode": "5101001",
     "avatar": "ชท",
-    "points": 86
+    "points": 0
   },
   {
     "empCode": "OLD-CR0051",
     "name": "ฐิติพร โพธิกุล",
     "companyCode": "5102009",
     "avatar": "ฐโ",
-    "points": 158
+    "points": 0
   },
   {
     "empCode": "CR0143",
     "name": "ฐิติพร ชูเตชะ",
     "companyCode": "5100163",
     "avatar": "ฐช",
-    "points": 128
+    "points": 0
   },
   {
     "empCode": "OLD-CR0053",
     "name": "ณรงค์ พงค์ยี่ล่า",
     "companyCode": "5100962",
     "avatar": "ณพ",
-    "points": 492
+    "points": 0
   },
   {
     "empCode": "CR0115",
     "name": "ณรงค์ศิลป์ พรมบุตร",
     "companyCode": "5100915",
     "avatar": "ณพ",
-    "points": 4
+    "points": 0
   },
   {
     "empCode": "OLD-CR0055",
     "name": "ณริศรา เสนารักษ์",
     "companyCode": "5102009",
     "avatar": "ณเ",
-    "points": 399
+    "points": 0
   },
   {
     "empCode": "OLD-CR0056",
     "name": "ณัฐชยา โฆษิตเจริญกุล",
     "companyCode": "5100846",
     "avatar": "ณโ",
-    "points": 78
+    "points": 0
   },
   {
     "empCode": "OLD-CR0057",
     "name": "ณัฐชัย วิลัยแก้ว",
     "companyCode": "5100967",
     "avatar": "ณว",
-    "points": 464
+    "points": 0
   },
   {
     "empCode": "OLD-CR0058",
     "name": "ณัฐณิชา แก้วเนตร",
     "companyCode": "5100973",
     "avatar": "ณแ",
-    "points": 369
+    "points": 0
   },
   {
     "empCode": "OLD-CR0059",
     "name": "ณัฐนรี บุญเกิด",
     "companyCode": "5101839",
     "avatar": "ณบ",
-    "points": 246
+    "points": 0
   },
   {
     "empCode": "CR0134",
     "name": "ณัฐพงษ์ ชัยบุญ",
     "companyCode": "5100808",
     "avatar": "ณช",
-    "points": 145
+    "points": 0
   },
   {
     "empCode": "CR0067",
     "name": "ณัฐภัทร กลิ่นบุญฟุ้ง",
     "companyCode": "5100895",
     "avatar": "ณก",
-    "points": 341
+    "points": 0
   },
   {
     "empCode": "CR0127",
     "name": "ณัฐวุฒิ สุภาโชค",
     "companyCode": "5100980",
     "avatar": "ณส",
-    "points": 443
+    "points": 0
   },
   {
     "empCode": "OLD-CR0064",
     "name": "ดวงฤทัย คณะโจทย์",
     "companyCode": "5100846",
     "avatar": "ดค",
-    "points": 313
+    "points": 0
   },
   {
     "empCode": "OLD-CR0065",
     "name": "ทรรศนีย์ ศรีจันทร์",
     "companyCode": "5100973",
     "avatar": "ทศ",
-    "points": 218
+    "points": 0
   },
   {
     "empCode": "OLD-CR0066",
     "name": "ทวีทรัพย์ เหมือนรักษา",
     "companyCode": "5100042",
     "avatar": "ทเ",
-    "points": 141
+    "points": 0
   },
   {
     "empCode": "OLD-CR0067",
     "name": "ทัศณีวรรณ์ ทศประเสริฐ",
     "companyCode": "5102381",
     "avatar": "ทท",
-    "points": 181
+    "points": 0
   },
   {
     "empCode": "OLD-CR0068",
     "name": "ทิพวรรณ อ้ายเสาร์",
     "companyCode": "5101685",
     "avatar": "ทอ",
-    "points": 268
+    "points": 0
   },
   {
     "empCode": "CR0085",
     "name": "ธนพล เทวกุล",
     "companyCode": "5100071",
     "avatar": "ธเ",
-    "points": 34
+    "points": 0
   },
   {
     "empCode": "CR0098",
     "name": "ธนวรรณ บุญอำไพ",
     "companyCode": "5100074",
     "avatar": "ธบ",
-    "points": 329
+    "points": 0
   },
   {
     "empCode": "CR0184",
     "name": "ธัญญาภรณ์ สุวรรณชาตรี",
     "companyCode": "5100676",
     "avatar": "ธส",
-    "points": 270
+    "points": 0
   },
   {
     "empCode": "OLD-CR0073",
     "name": "ธัญวรัตน์ พงษ์ธนานิกร",
     "companyCode": "5100817",
     "avatar": "ธพ",
-    "points": 287
+    "points": 0
   },
   {
     "empCode": "OLD-CR0074",
     "name": "ธันยาภรณ์ บุปผาวรรณา",
     "companyCode": "5100311",
     "avatar": "ธบ",
-    "points": 477
+    "points": 0
   },
   {
     "empCode": "OLD-CR0075",
     "name": "ธีระวัฒย์ แก้วเพชร",
     "companyCode": "5101685",
     "avatar": "ธแ",
-    "points": 165
+    "points": 0
   },
   {
     "empCode": "CR0008",
     "name": "นเรศ สุขนิรันดร์กูล",
     "companyCode": "5100724",
     "avatar": "นส",
-    "points": 446
+    "points": 0
   },
   {
     "empCode": "CR0168",
     "name": "นทวัฒน์ แสนศรี",
     "companyCode": "5100969",
     "avatar": "นแ",
-    "points": 108
+    "points": 0
   },
   {
     "empCode": "CR0158",
     "name": "นพพร รุ่งรัศมี",
     "companyCode": "5100252",
     "avatar": "นร",
-    "points": 413
+    "points": 0
   },
   {
     "empCode": "OLD-CR0079",
     "name": "นภาพร เชิดเกียรติสกุล",
     "companyCode": "5100755",
     "avatar": "นเ",
-    "points": 281
+    "points": 0
   },
   {
     "empCode": "OLD-CR0080",
     "name": "นรวิช สงัดเงาะ",
     "companyCode": "5100755",
     "avatar": "นส",
-    "points": 322
+    "points": 0
   },
   {
     "empCode": "CR0016",
     "name": "นรินทร์ ยามชัยภูมิ",
     "companyCode": "5100724",
     "avatar": "นย",
-    "points": 70
+    "points": 0
   },
   {
     "empCode": "OLD-CR0082",
     "name": "นริศรา วงค์ธานี",
     "companyCode": "5102381",
     "avatar": "นว",
-    "points": 472
+    "points": 0
   },
   {
     "empCode": "CR0006",
     "name": "นางสาวทิวาภรณ์ ทองเป้า",
     "companyCode": "5102653",
     "avatar": "นท",
-    "points": 443
+    "points": 0
   },
   {
     "empCode": "CR0005",
     "name": "นายศักดิ์สิทธิ์ มากสวัสดิ์",
     "companyCode": "5102714",
     "avatar": "นม",
-    "points": 114
+    "points": 0
   },
   {
     "empCode": "OLD-CR0085",
     "name": "นิชานาถ ขำชูสงฆ์",
     "companyCode": "5100962",
     "avatar": "นข",
-    "points": 447
+    "points": 0
   },
   {
     "empCode": "CR0125",
     "name": "นิชาภา จันทร์บัว",
     "companyCode": "5100846",
     "avatar": "นจ",
-    "points": 22
+    "points": 0
   },
   {
     "empCode": "CR0018",
     "name": "นิตยา นาบำรุง",
     "companyCode": "5100724",
     "avatar": "นน",
-    "points": 272
+    "points": 0
   },
   {
     "empCode": "CR0169",
     "name": "นิตยา พิมพ์แหวน",
     "companyCode": "5100969",
     "avatar": "นพ",
-    "points": 434
+    "points": 0
   },
   {
     "empCode": "OLD-CR0089",
     "name": "นิตยา พิมพ์แหวน",
     "companyCode": "5100969",
     "avatar": "นพ",
-    "points": 160
+    "points": 0
   },
   {
     "empCode": "OLD-CR0090",
     "name": "นิภาพร นวลละออง",
     "companyCode": "5100786",
     "avatar": "นน",
-    "points": 5
+    "points": 0
   },
   {
     "empCode": "CR0182",
     "name": "นิสิต บุญญสิริ",
     "companyCode": "5100817",
     "avatar": "นบ",
-    "points": 19
+    "points": 0
   },
   {
     "empCode": "OLD-CR0092",
     "name": "บุตรทวี หน่วยแก้ว",
     "companyCode": "5100974",
     "avatar": "บห",
-    "points": 59
+    "points": 0
   },
   {
     "empCode": "CR0043",
     "name": "ปฏิภาณ คำโท",
     "companyCode": "5101021",
     "avatar": "ปค",
-    "points": 293
+    "points": 0
   },
   {
     "empCode": "OLD-CR0094",
     "name": "ปนัดดา ช้าเบ็ญจา",
     "companyCode": "5100910",
     "avatar": "ปช",
-    "points": 451
+    "points": 0
   },
   {
     "empCode": "CR0068",
     "name": "ประกายกาญจน์ เพียรเจริญ",
     "companyCode": "5100895",
     "avatar": "ปเ",
-    "points": 279
+    "points": 0
   },
   {
     "empCode": "OLD-CR0096",
     "name": "ประภัสสร ทาละไล",
     "companyCode": "5100817",
     "avatar": "ปท",
-    "points": 181
+    "points": 0
   },
   {
     "empCode": "CR0072",
     "name": "ปลาหนัน ผ่ายเพ็ชร",
     "companyCode": "5100895",
     "avatar": "ปผ",
-    "points": 305
+    "points": 0
   },
   {
     "empCode": "CR0120",
     "name": "ปวริศา จูวรรณะ",
     "companyCode": "5100974",
     "avatar": "ปจ",
-    "points": 228
+    "points": 0
   },
   {
     "empCode": "CR0095",
     "name": "ปัญจพล พลเขตต์",
     "companyCode": "5100011",
     "avatar": "ปพ",
-    "points": 24
+    "points": 0
   },
   {
     "empCode": "OLD-CR0100",
     "name": "ปาริชาติ เชี่ยวชาญ",
     "companyCode": "5100887",
     "avatar": "ปเ",
-    "points": 427
+    "points": 0
   },
   {
     "empCode": "OLD-CR0101",
     "name": "ปิยวรรณ เวศย์วานิชเสถียร",
     "companyCode": "5100710",
     "avatar": "ปเ",
-    "points": 18
+    "points": 0
   },
   {
     "empCode": "OLD-CR0102",
     "name": "ปิย์วรา สิริจิตราภรณ์",
     "companyCode": "5100808",
     "avatar": "ปส",
-    "points": 265
+    "points": 0
   },
   {
     "empCode": "OLD-CR0103",
     "name": "ปิยะมาศ สุวรรณธารารัตน์",
     "companyCode": "5100967",
     "avatar": "ปส",
-    "points": 367
+    "points": 0
   },
   {
     "empCode": "CR0108",
     "name": "พงษ์เทพ ถาวรเจริญสุโข",
     "companyCode": "5100910",
     "avatar": "พถ",
-    "points": 161
+    "points": 0
   },
   {
     "empCode": "CR0070",
     "name": "พจนิน คงเล็ก",
     "companyCode": "5100895",
     "avatar": "พค",
-    "points": 159
+    "points": 0
   },
   {
     "empCode": "CR0121",
     "name": "พรรณนภา วันทา",
     "companyCode": "5100090",
     "avatar": "พว",
-    "points": 462
+    "points": 0
   },
   {
     "empCode": "CR0082",
     "name": "พัชรินทร์ คะเชนทร์กูล",
     "companyCode": "5100786",
     "avatar": "พค",
-    "points": 343
+    "points": 0
   },
   {
     "empCode": "OLD-CR0108",
     "name": "พิมพ์ปวีณ์ พรหมสิทธิ์",
     "companyCode": "5100011",
     "avatar": "พพ",
-    "points": 97
+    "points": 0
   },
   {
     "empCode": "CR0009",
     "name": "พิมพิมล พลภักดี",
     "companyCode": "5100724",
     "avatar": "พพ",
-    "points": 478
+    "points": 0
   },
   {
     "empCode": "CR0071",
     "name": "พิราภรณ์ ทิมทอง",
     "companyCode": "5100895",
     "avatar": "พท",
-    "points": 401
+    "points": 0
   },
   {
     "empCode": "OLD-CR0111",
     "name": "ภัสชากาญจน์ ชัยสกุลทรัพย์",
     "companyCode": "5102381",
     "avatar": "ภช",
-    "points": 370
+    "points": 0
   },
   {
     "empCode": "OLD-CR0112",
     "name": "ภาคภูมิ สวัสดิกุล",
     "companyCode": "5101685",
     "avatar": "ภส",
-    "points": 140
+    "points": 0
   },
   {
     "empCode": "CR0133",
     "name": "ภิญญุพัชญ์ สุภผลา",
     "companyCode": "5100808",
     "avatar": "ภส",
-    "points": 38
+    "points": 0
   },
   {
     "empCode": "CR0186",
     "name": "ภีมวัจน์ ยอดคง",
     "companyCode": "5100779",
     "avatar": "ภย",
-    "points": 110
+    "points": 0
   },
   {
     "empCode": "CR0034",
     "name": "ภูเบศวร์ สิงห์เหม",
     "companyCode": "5100782",
     "avatar": "ภส",
-    "points": 13
+    "points": 0
   },
   {
     "empCode": "OLD-CR0116",
     "name": "ภูพิรัฐ ไชยบุรณากร",
     "companyCode": "5100724",
     "avatar": "ภไ",
-    "points": 165
+    "points": 0
   },
   {
     "empCode": "OLD-CR0117",
     "name": "มนทกานต์ ธูปคำ",
     "companyCode": "5100973",
     "avatar": "มธ",
-    "points": 34
+    "points": 0
   },
   {
     "empCode": "CR0012",
     "name": "มลฐิญา พรมชัยยา",
     "companyCode": "5100724",
     "avatar": "มพ",
-    "points": 485
+    "points": 0
   },
   {
     "empCode": "OLD-CR0119",
     "name": "มัลลิกา นกแก้ว",
     "companyCode": "5102009",
     "avatar": "มน",
-    "points": 196
+    "points": 0
   },
   {
     "empCode": "OLD-CR0120",
     "name": "มิลิน จันทรกรานต์",
     "companyCode": "5101025",
     "avatar": "มจ",
-    "points": 140
+    "points": 0
   },
   {
     "empCode": "CR0104",
     "name": "ยอดขวัญ อาจหาญ",
     "companyCode": "5100129",
     "avatar": "ยอ",
-    "points": 121
+    "points": 0
   },
   {
     "empCode": "CR0090",
     "name": "ยุทธนา เทียนสัมฤทธิ์",
     "companyCode": "5100014",
     "avatar": "ยเ",
-    "points": 476
+    "points": 0
   },
   {
     "empCode": "CR0177",
     "name": "ยุรนันท์ คงแก้ว",
     "companyCode": "5101025",
     "avatar": "ยค",
-    "points": 147
+    "points": 0
   },
   {
     "empCode": "CR0123",
     "name": "รวี นามวงษ์",
     "companyCode": "5100090",
     "avatar": "รน",
-    "points": 110
+    "points": 0
   },
   {
     "empCode": "OLD-CR0125",
     "name": "รหัสสอง อภัยโรจน์ คำพานุช",
     "companyCode": "5102381",
     "avatar": "รอ",
-    "points": 253
+    "points": 0
   },
   {
     "empCode": "CR0046",
     "name": "รัตตญา โชติทอง",
     "companyCode": "5101021",
     "avatar": "รโ",
-    "points": 385
+    "points": 0
   },
   {
     "empCode": "OLD-CR0127",
     "name": "รัตนาวดี ภิญโญทรัพย์",
     "companyCode": "5102381",
     "avatar": "รภ",
-    "points": 298
+    "points": 0
   },
   {
     "empCode": "OLD-CR0128",
     "name": "รุจิรา ขุนตาแสง",
     "companyCode": "5102652",
     "avatar": "รข",
-    "points": 235
+    "points": 0
   },
   {
     "empCode": "CR0014",
     "name": "ฤทัยชนก จันธิดา",
     "companyCode": "5100724",
     "avatar": "ฤจ",
-    "points": 388
+    "points": 0
   },
   {
     "empCode": "OLD-CR0130",
     "name": "ลลิตา หิตะรักษ์",
     "companyCode": "5100724",
     "avatar": "ลห",
-    "points": 50
+    "points": 0
   },
   {
     "empCode": "OLD-CR0131",
     "name": "ละอองฟ้า ทะนวนรัมย์",
     "companyCode": "5100252",
     "avatar": "ลท",
-    "points": 119
+    "points": 0
   },
   {
     "empCode": "OLD-CR0132",
     "name": "ลักขณา สุกใส",
     "companyCode": "5100034",
     "avatar": "ลส",
-    "points": 213
+    "points": 0
   },
   {
     "empCode": "CR0124",
     "name": "ลินดา พิมพ์แก้ว",
     "companyCode": "5100804",
     "avatar": "ลพ",
-    "points": 292
+    "points": 0
   },
   {
     "empCode": "CR0080",
     "name": "วงศ์ธวัช เปรมมิตร์",
     "companyCode": "5100042",
     "avatar": "วเ",
-    "points": 141
+    "points": 0
   },
   {
     "empCode": "CR0059",
     "name": "วชิรพันธ์ ทองแก้ว",
     "companyCode": "5100962",
     "avatar": "วท",
-    "points": 35
+    "points": 0
   },
   {
     "empCode": "CR0132",
     "name": "วนิดา ศรียอด",
     "companyCode": "5100186",
     "avatar": "วศ",
-    "points": 132
+    "points": 0
   },
   {
     "empCode": "OLD-CR0137",
     "name": "วรรณวนัช ประเสริฐจิต",
     "companyCode": "5100163",
     "avatar": "วป",
-    "points": 344
+    "points": 0
   },
   {
     "empCode": "CR0172",
     "name": "วรรณสิงห์ มีสำลี",
     "companyCode": "5100311",
     "avatar": "วม",
-    "points": 32
+    "points": 0
   },
   {
     "empCode": "OLD-CR0139",
     "name": "วรรณา มังธิสาร",
     "companyCode": "5100266",
     "avatar": "วม",
-    "points": 325
+    "points": 0
   },
   {
     "empCode": "CR0163",
     "name": "วรัชยา กรใหม่",
     "companyCode": "5102381",
     "avatar": "วก",
-    "points": 184
+    "points": 0
   },
   {
     "empCode": "OLD-CR0141",
     "name": "วราภรณ์ กล้าหาญ",
     "companyCode": "5100042",
     "avatar": "วก",
-    "points": 323
+    "points": 0
   },
   {
     "empCode": "OLD-CR0142",
     "name": "วริศรา ปิ่นมังกร",
     "companyCode": "5100973",
     "avatar": "วป",
-    "points": 71
+    "points": 0
   },
   {
     "empCode": "CR0153",
     "name": "วสันต์ ปาลวงค์",
     "companyCode": "5100967",
     "avatar": "วป",
-    "points": 358
+    "points": 0
   },
   {
     "empCode": "CR0090",
     "name": "วัชรพล กิ่งพวง",
     "companyCode": "5100014",
     "avatar": "วก",
-    "points": 49
+    "points": 0
   },
   {
     "empCode": "CR0060",
     "name": "วาสนา เชษฐวรรณสิทธิ์",
     "companyCode": "5100962",
     "avatar": "วเ",
-    "points": 317
+    "points": 0
   },
   {
     "empCode": "OLD-CR0146",
     "name": "วาสนา แตงคำ",
     "companyCode": "5100973",
     "avatar": "วแ",
-    "points": 400
+    "points": 0
   },
   {
     "empCode": "CR0021",
     "name": "วิจิตรา ไตรพิมพ์",
     "companyCode": "5100724",
     "avatar": "วไ",
-    "points": 447
+    "points": 0
   },
   {
     "empCode": "OLD-CR0148",
     "name": "วิทยา ภารา",
     "companyCode": "5100974",
     "avatar": "วภ",
-    "points": 432
+    "points": 0
   },
   {
     "empCode": "OLD-CR0149",
     "name": "วิภูวรรธน์ สิทธิโชควงศ์",
     "companyCode": "5100011",
     "avatar": "วส",
-    "points": 245
+    "points": 0
   },
   {
     "empCode": "OLD-CR0151",
     "name": "วีรพงศ์ จันทร์ทรา",
     "companyCode": "5101685",
     "avatar": "วจ",
-    "points": 134
+    "points": 0
   },
   {
     "empCode": "CR0075",
     "name": "วุฒิไกร เสียงเสนาะ",
     "companyCode": "5100034",
     "avatar": "วเ",
-    "points": 448
+    "points": 0
   },
   {
     "empCode": "OLD-CR0153",
     "name": "วุฒิพงศ์ ศิลมีสัตย์",
     "companyCode": "5101027",
     "avatar": "วศ",
-    "points": 445
+    "points": 0
   },
   {
     "empCode": "OLD-CR0154",
     "name": "ศราวุฒิ จำปาหอม",
     "companyCode": "5100968",
     "avatar": "ศจ",
-    "points": 87
+    "points": 0
   },
   {
     "empCode": "OLD-CR0155",
     "name": "ศราวุฒิ ปาลวัฒน์",
     "companyCode": "5100811",
     "avatar": "ศป",
-    "points": 424
+    "points": 0
   },
   {
     "empCode": "OLD-CR0156",
     "name": "ศศิธร พรั่งขุนทด",
     "companyCode": "5102381",
     "avatar": "ศพ",
-    "points": 429
+    "points": 0
   },
   {
     "empCode": "OLD-CR0157",
     "name": "ศานติ กลิ่นสุคนธ์",
     "companyCode": "5100119",
     "avatar": "ศก",
-    "points": 337
+    "points": 0
   },
   {
     "empCode": "OLD-CR0158",
     "name": "ศิริชัย ศิริตัน",
     "companyCode": "5100887",
     "avatar": "ศศ",
-    "points": 354
+    "points": 0
   },
   {
     "empCode": "CR0144",
     "name": "ศิริณภาวรรณ สาทา",
     "companyCode": "5100908",
     "avatar": "ศส",
-    "points": 6
+    "points": 0
   },
   {
     "empCode": "OLD-CR0160",
     "name": "ศิริประภา แสงทอง",
     "companyCode": "5102381",
     "avatar": "ศแ",
-    "points": 181
+    "points": 0
   },
   {
     "empCode": "OLD-CR0161",
     "name": "ศิริพร เศรษฐ์สิทธิโชค",
     "companyCode": "5100126",
     "avatar": "ศเ",
-    "points": 436
+    "points": 0
   },
   {
     "empCode": "CR0162",
     "name": "ศุภณัฐ อินทราเวช",
     "companyCode": "5102381",
     "avatar": "ศอ",
-    "points": 168
+    "points": 0
   },
   {
     "empCode": "OLD-CR0163",
     "name": "ศุภฤกษ์ มาตรวิจิตร์",
     "companyCode": "5100044",
     "avatar": "ศม",
-    "points": 224
+    "points": 0
   },
   {
     "empCode": "CR0064",
     "name": "สถาวร ชนะสิทธิ์",
     "companyCode": "5100928",
     "avatar": "สช",
-    "points": 414
+    "points": 0
   },
   {
     "empCode": "CR0129",
     "name": "สมพงษ์ คำครบุรี",
     "companyCode": "5100088",
     "avatar": "สค",
-    "points": 168
+    "points": 0
   },
   {
     "empCode": "OLD-CR0166",
     "name": "สหวงศ์ ยายอด",
     "companyCode": "5101027",
     "avatar": "สย",
-    "points": 156
+    "points": 0
   },
   {
     "empCode": "OLD-CR0167",
     "name": "สามินี นาคงาม",
     "companyCode": "5100973",
     "avatar": "สน",
-    "points": 194
+    "points": 0
   },
   {
     "empCode": "OLD-CR0168",
     "name": "สายรุ้ง ซาตำแย",
     "companyCode": "5100910",
     "avatar": "สซ",
-    "points": 464
+    "points": 0
   },
   {
     "empCode": "OLD-CR0169",
     "name": "สิทธิกร เอกเจริญกุล",
     "companyCode": "5100751",
     "avatar": "สเ",
-    "points": 297
+    "points": 0
   },
   {
     "empCode": "OLD-CR0170",
     "name": "สุกัญญา สามารถ",
     "companyCode": "5100962",
     "avatar": "สส",
-    "points": 333
+    "points": 0
   },
   {
     "empCode": "OLD-CR0171",
     "name": "สุทธิรักษ์ โสภาสุวรรณ์",
     "companyCode": "5100811",
     "avatar": "สโ",
-    "points": 247
+    "points": 0
   },
   {
     "empCode": "OLD-CR0172",
     "name": "สุธรี ไกรโกศล",
     "companyCode": "5100250",
     "avatar": "สไ",
-    "points": 166
+    "points": 0
   },
   {
     "empCode": "CR0156",
     "name": "สุนันทา ไชยทุมมา",
     "companyCode": "5100967",
     "avatar": "สไ",
-    "points": 71
+    "points": 0
   },
   {
     "empCode": "CR0186",
     "name": "สุนันทา วิจิตรคุณากร",
     "companyCode": "5100779",
     "avatar": "สว",
-    "points": 145
+    "points": 0
   },
   {
     "empCode": "OLD-CR0175",
     "name": "สุนันทา สารีแผลง",
     "companyCode": "5102354",
     "avatar": "สส",
-    "points": 123
+    "points": 0
   },
   {
     "empCode": "CR0094",
     "name": "สุนิศา สุขหิรัญ",
     "companyCode": "5100014",
     "avatar": "สส",
-    "points": 207
+    "points": 0
   },
   {
     "empCode": "OLD-CR0177",
     "name": "สุนิสา สาระยาน",
     "companyCode": "5100962",
     "avatar": "สส",
-    "points": 158
+    "points": 0
   },
   {
     "empCode": "CR0029",
     "name": "สุปรียา เพ็ชรทิพย์",
     "companyCode": "5100811",
     "avatar": "สเ",
-    "points": 118
+    "points": 0
   },
   {
     "empCode": "OLD-CR0179",
     "name": "สุภาพร โพธิรุกข์",
     "companyCode": "5100967",
     "avatar": "สโ",
-    "points": 37
+    "points": 0
   },
   {
     "empCode": "CR0087",
     "name": "สุภาพร ขันทอง",
     "companyCode": "5100071",
     "avatar": "สข",
-    "points": 369
+    "points": 0
   },
   {
     "empCode": "CR0065",
     "name": "สุภาพร ช่วยนะ",
     "companyCode": "5100928",
     "avatar": "สช",
-    "points": 121
+    "points": 0
   },
   {
     "empCode": "OLD-CR0182",
     "name": "สุภาพร สุคนธี",
     "companyCode": "5100724",
     "avatar": "สส",
-    "points": 129
+    "points": 0
   },
   {
     "empCode": "CR0025",
     "name": "สุภาวดี คิงคำ",
     "companyCode": "5101027",
     "avatar": "สค",
-    "points": 190
+    "points": 0
   },
   {
     "empCode": "CR0181",
     "name": "สุมณฑา รุกขา",
     "companyCode": "5100350",
     "avatar": "สร",
-    "points": 2
+    "points": 0
   },
   {
     "empCode": "CR0033",
     "name": "สุระชัย พรมแสง",
     "companyCode": "5100782",
     "avatar": "สพ",
-    "points": 97
+    "points": 0
   },
   {
     "empCode": "OLD-CR0186",
     "name": "สุวรรณา ไพรินพาณิช",
     "companyCode": "5100980",
     "avatar": "สไ",
-    "points": 337
+    "points": 0
   },
   {
     "empCode": "CR0003",
     "name": "สุวารี ธรรมวงษ์",
     "companyCode": "5102714",
     "avatar": "สธ",
-    "points": 267
+    "points": 0
   },
   {
     "empCode": "CR0166",
     "name": "สุวินันท์ ถนัดหมอ",
     "companyCode": "5100215",
     "avatar": "สถ",
-    "points": 144
+    "points": 0
   },
   {
     "empCode": "OLD-CR0189",
     "name": "สุวิมล หน่อแก้ว",
     "companyCode": "5100011",
     "avatar": "สห",
-    "points": 335
+    "points": 0
   },
   {
     "empCode": "OLD-CR0191",
     "name": "อนุชสา ผาสุข",
     "companyCode": "5100967",
     "avatar": "อผ",
-    "points": 393
+    "points": 0
   },
   {
     "empCode": "CR0160",
     "name": "อนุชา ปะโมทิง",
     "companyCode": "5100250",
     "avatar": "อป",
-    "points": 395
+    "points": 0
   },
   {
     "empCode": "CR0162",
     "name": "อภัยโรจน์ คำพานุช",
     "companyCode": "5102381",
     "avatar": "อค",
-    "points": 3
+    "points": 0
   },
   {
     "empCode": "OLD-CR0194",
     "name": "อภิวัฒน์ เกษมสุขพิพัฒน์",
     "companyCode": "5100011",
     "avatar": "อเ",
-    "points": 127
+    "points": 0
   },
   {
     "empCode": "CR0170",
     "name": "อมรรัตน์ เครือพานิช",
     "companyCode": "5100751",
     "avatar": "อเ",
-    "points": 466
+    "points": 0
   },
   {
     "empCode": "OLD-CR0196",
     "name": "อัมพร สิริวัฒนากานต์กุล",
     "companyCode": "5102652",
     "avatar": "อส",
-    "points": 357
+    "points": 0
   },
   {
     "empCode": "OLD-CR0197",
     "name": "อัมรินทร์ ยอดระบำ",
     "companyCode": "5100974",
     "avatar": "อย",
-    "points": 220
+    "points": 0
   },
   {
     "empCode": "OLD-CR0198",
     "name": "อัศนัย นพวงศ์",
     "companyCode": "5100350",
     "avatar": "อน",
-    "points": 284
+    "points": 0
   },
   {
     "empCode": "OLD-CR0199",
     "name": "อารีรัตน์ พราห์มณัง",
     "companyCode": "5100119",
     "avatar": "อพ",
-    "points": 261
+    "points": 0
   },
   {
     "empCode": "OLD-CR0200",
     "name": "อารีรัตน์ สุขพิริยกุล",
     "companyCode": "5100074",
     "avatar": "อส",
-    "points": 256
+    "points": 0
   }
 ];

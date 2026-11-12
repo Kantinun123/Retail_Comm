@@ -16,7 +16,8 @@ import type {
 } from "./types";
 import { notify } from "./notifications";
 
-const STORAGE_KEY = "cmRedemptions";
+// v2 (12 พ.ย. 69): รีเซ็ตแต้มเป็น 0 — ไม่อ่านการแลกทดสอบเดิมใน localStorage ของแต่ละเครื่อง
+const STORAGE_KEY = "cmRedemptions_v2";
 
 /* ---------------- deterministic PRNG จาก string ---------------- */
 function hashSeed(s: string): number {
