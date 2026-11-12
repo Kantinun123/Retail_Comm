@@ -168,7 +168,14 @@ export function BottomNav({ active }: { active: NavKey }) {
   const inStaffView = isAdmin && adminViewMode === "staff";
 
   let items: { key: NavKey; href: string; icon: string; label: string }[];
-  if (inStaffView) {
+  if (session?.isArea) {
+    // Area/Coach/หัวหน้า Area: รายชื่อร้านที่ดูแล + หน้าหลักของร้านที่เลือก (ถ้าเลือกแล้ว) + สอบถาม
+    items = [
+      { key: "database", href: "/app/stores", icon: "store", label: "ร้านที่ดูแล" },
+      ...(session.areaViewDealer ? [{ ...HOME_ITEM, label: "ข้อมูลร้าน" }] : []),
+      CHAT_ITEM,
+    ];
+  } else if (inStaffView) {
     // admin ดูมุมมองพนักงาน: หน้าหลักพนักงาน + สอบถาม
     items = [
       { key: "home", href: "/app/home-staff", icon: "home", label: "หน้าหลัก" },

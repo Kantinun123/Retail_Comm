@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
-import { useSession, useHomeHref } from "@/lib/commission/session";
+import { useSession, useHomeHref, setAreaStore, doLogout } from "@/lib/commission/session";
 import { getStoreTeamCaps } from "@/lib/commission/permissions";
 import {
   fetchStores,
@@ -137,6 +137,12 @@ export function StoresScreen() {
     },
     { se: 0, seA: 0, seS: 0, seB: 0, seNoLevel: 0, saleFloor: 0, exec: 0, other: 0, total: 0 }
   );
+
+  // Area/Coach/หัวหน้า Area: เลือกร้านแล้วเปิดหน้าหลักของร้านนั้น (ทุกกล่องกรองเฉพาะร้านนี้)
+  function openStoreData(code: string) {
+    setAreaStore(code);
+    router.push("/app/home");
+  }
 
   async function onToggle(s: StoreInfo) {
     setBusy(s.code);
@@ -315,24 +321,41 @@ export function StoresScreen() {
                     )}
                     </div>
                   </Link>
-                  <button
-                    onClick={() => onToggle(s)}
-                    disabled={busy === s.code}
-                    className={cn(
-                      "relative w-14 h-7 rounded-full transition shrink-0 disabled:opacity-50",
-                      s.isActive ? "bg-emerald-500" : "bg-slate-300"
-                    )}
-                    aria-pressed={s.isActive}
-                    title={s.isActive ? "ปิดใช้งานร้าน" : "เปิดใช้งานร้าน"}
-                  >
-                    <span
+                  {caps.canToggleStore && (
+                    <button
+                      onClick={() => onToggle(s)}
+                      disabled={busy === s.code}
                       className={cn(
-                        "absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all",
-                        s.isActive ? "left-7" : "left-0.5"
+                        "relative w-14 h-7 rounded-full transition shrink-0 disabled:opacity-50",
+                        s.isActive ? "bg-emerald-500" : "bg-slate-300"
                       )}
-                    />
-                  </button>
+                      aria-pressed={s.isActive}
+                      title={s.isActive ? "ปิดใช้งานร้าน" : "เปิดใช้งานร้าน"}
+                    >
+                      <span
+                        className={cn(
+                          "absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all",
+                          s.isActive ? "left-7" : "left-0.5"
+                        )}
+                      />
+                    </button>
+                  )}
                 </div>
+                {session.isArea && (
+                  <button
+                    type="button"
+                    onClick={() => openStoreData(s.code)}
+                    className={cn(
+                      "mt-2.5 w-full py-2 rounded-xl text-[12.5px] font-bold flex items-center justify-center gap-1.5 hover:-translate-y-0.5 transition-all",
+                      session.areaViewDealer === s.code
+                        ? "bg-[#d32029] text-white"
+                        : "bg-red-50 text-[#d32029] border border-red-100"
+                    )}
+                  >
+                    <Icon name="monitoring" style={{ fontSize: 16 }} />
+                    {session.areaViewDealer === s.code ? "กำลังดูร้านนี้ · เปิดหน้าข้อมูล" : "ดูข้อมูลร้าน (ยอดขาย / ผลประโยชน์)"}
+                  </button>
+                )}
               </div>
             ))}
             {filtered.length === 0 && (
@@ -492,27 +515,49 @@ function countBy(
 }
 
 function Header({ homeHref }: { homeHref: string }) {
+  const { session } = useSession();
+  const router = useRouter();
+  const isArea = !!session?.isArea;
+  // Area ที่ยังไม่เลือกร้าน: หน้านี้คือหน้าแรก -> ไม่มีปุ่มย้อน แต่มีปุ่มออกจากระบบ
+  const showBack = homeHref !== "/app/stores";
   return (
     <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
       <div className="flex items-center space-x-2.5">
-        <Link
-          href={homeHref}
-          className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
-        >
-          <Icon name="arrow_back" className="text-xl" />
-        </Link>
+        {showBack && (
+          <Link
+            href={homeHref}
+            aria-label="กลับ"
+            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
+          >
+            <Icon name="arrow_back" className="text-xl" />
+          </Link>
+        )}
         <div className="flex flex-col">
           <span className="font-bold text-[15px] text-[#231313] leading-tight">
-            ร้านค้าและทีมงาน
+            {isArea ? "ร้านที่ดูแล" : "ร้านค้าและทีมงาน"}
           </span>
           <span className="text-[11px] font-semibold text-[#b21e1e]">
-            เฉพาะผู้ดูแลระบบ (Admin)
+            {isArea ? session?.areaName ?? "Area / Coach" : "เฉพาะผู้ดูแลระบบ (Admin)"}
           </span>
         </div>
       </div>
-      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#d32029]">
-        <Icon name="store" className="text-xl" />
-      </div>
+      {isArea ? (
+        <button
+          type="button"
+          onClick={() => {
+            doLogout();
+            router.replace("/");
+          }}
+          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
+        >
+          <Icon name="logout" style={{ fontSize: 16 }} />
+          ออกจากระบบ
+        </button>
+      ) : (
+        <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#d32029]">
+          <Icon name="store" className="text-xl" />
+        </div>
+      )}
     </header>
   );
 }

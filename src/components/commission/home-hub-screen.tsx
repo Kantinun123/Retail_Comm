@@ -523,6 +523,23 @@ export function HomeHubScreen() {
           </div>
         )}
 
+        {/* Area/Coach/หัวหน้า Area: ดูทีละร้าน — ทุกกล่องและหน้าที่เจาะเข้าไปกรองเฉพาะร้านนี้ */}
+        {session.isArea && (
+          <div className="rounded-2xl bg-blue-50 border border-blue-200 px-3 py-2.5 flex items-center gap-2.5">
+            <Icon name="visibility" className="text-blue-700 shrink-0" style={{ fontSize: 18 }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-blue-700">กำลังดูข้อมูลร้าน{session.areaName ? ` · ${session.areaName}` : ""}</p>
+              <p className="text-[13px] font-bold text-blue-950 truncate">{session.dealer.name} ({session.dealer.code})</p>
+            </div>
+            <Link
+              href="/app/stores"
+              className="shrink-0 px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-[12px] font-bold text-blue-700 hover:-translate-y-0.5 transition-all"
+            >
+              เปลี่ยนร้าน
+            </Link>
+          </div>
+        )}
+
         <ProfileCard />
 
         {/* ช่วงเวลาเดียวคุมทั้งหน้า (ติดด้านบนเวลาเลื่อน) */}

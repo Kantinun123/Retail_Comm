@@ -5,6 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/lib/commission/session";
 import { useDatasetReady } from "@/lib/commission/dataset";
 
+/** หน้าที่ Area ใช้ได้โดยยังไม่ต้องเลือกร้าน (ที่เหลือเป็นหน้าข้อมูลรายร้าน) */
+const AREA_NO_STORE_OK = ["/app/stores", "/app/store", "/app/change-password", "/app/chat"];
+
 /** Redirects to the login page when there is no active session. */
 export function AppGuard({ children }: { children: React.ReactNode }) {
   // โหลดข้อมูลจาก Supabase ก่อน (hook เริ่ม hydrate อัตโนมัติ + anonymous sign-in
@@ -23,6 +26,11 @@ export function AppGuard({ children }: { children: React.ReactNode }) {
       // ส่งหน้าปัจจุบันไปด้วย: ถ้า Supabase ยังจำการ login (เช่นเปิดแอปจากไอคอนใหม่)
       // หน้า login จะกู้ session แล้วพากลับมาหน้านี้
       router.replace(pathname && pathname !== "/app/change-password" ? `/?next=${encodeURIComponent(pathname)}` : "/");
+      return;
+    }
+    // Area/Coach/หัวหน้า Area: หน้าข้อมูลต้องเลือกร้านก่อน (เลือกจากหน้าร้านที่ดูแล)
+    if (session?.loggedIn && session.isArea && !session.areaViewDealer && pathname && !AREA_NO_STORE_OK.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+      router.replace("/app/stores");
       return;
     }
     // บัญชีที่ admin แจกให้: ต้องเปลี่ยนรหัสผ่านก่อนใช้หน้าอื่น

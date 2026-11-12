@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { resolveScope } from "@/lib/supabase/api-scope";
 
 /**
  * LHS Purchase Discount API (ส่วนลดซื้อ 7% Housing Expert — Roof, ฝั่งร้านค้า)
@@ -7,8 +8,10 @@ import { createServiceClient } from "@/lib/supabase/service";
  * - GET /api/lhs-purchase-discount?dealerCode=XXX&period=YYYY-MM   -> รายบรรทัด
  */
 export async function GET(req: NextRequest) {
-  const dealerCode = req.nextUrl.searchParams.get("dealerCode")?.trim() || null;
   const period = req.nextUrl.searchParams.get("period")?.trim() || null;
+  const scope = await resolveScope(req.nextUrl.searchParams.get("dealerCode")?.trim() || null, null);
+  if (!scope.ok) return scope.res;
+  const { dealerCode } = scope;
   try {
     const sb = createServiceClient();
     if (period) {

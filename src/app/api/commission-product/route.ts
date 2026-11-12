@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { resolveScope } from "@/lib/supabase/api-scope";
 
 /**
  * Commission Product API (ฝั่งพนักงาน/vendor, server-authoritative)
@@ -9,9 +10,14 @@ import { createServiceClient } from "@/lib/supabase/service";
  */
 
 export async function GET(req: NextRequest) {
-  const dealerCode = req.nextUrl.searchParams.get("dealerCode")?.trim() || null;
-  const repCode = req.nextUrl.searchParams.get("repCode")?.trim() || null;
   const period = req.nextUrl.searchParams.get("period")?.trim() || null;
+  const scope = await resolveScope(
+    req.nextUrl.searchParams.get("dealerCode")?.trim() || null,
+    req.nextUrl.searchParams.get("repCode")?.trim() || null,
+    { perRep: true }
+  );
+  if (!scope.ok) return scope.res;
+  const { dealerCode, repCode } = scope;
 
   try {
     const sb = createServiceClient();

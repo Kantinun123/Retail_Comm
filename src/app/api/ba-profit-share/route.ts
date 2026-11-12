@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { resolveScope } from "@/lib/supabase/api-scope";
 
 /**
  * BA Profit Share API (ผลประโยชน์ร้านค้าจากระบบ BA Q-CHANG)
@@ -9,8 +10,10 @@ import { createServiceClient } from "@/lib/supabase/service";
  */
 
 export async function GET(req: NextRequest) {
-  const dealerCode = req.nextUrl.searchParams.get("dealerCode")?.trim() || null;
   const period = req.nextUrl.searchParams.get("period")?.trim() || null;
+  const scope = await resolveScope(req.nextUrl.searchParams.get("dealerCode")?.trim() || null, null);
+  if (!scope.ok) return scope.res;
+  const { dealerCode } = scope;
 
   try {
     const sb = createServiceClient();

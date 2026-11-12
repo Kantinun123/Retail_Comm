@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { resolveScope } from "@/lib/supabase/api-scope";
 
 /**
  * Customer Satisfaction API (ความพึงพอใจของลูกค้า — ฝั่งร้านค้า)
@@ -8,9 +9,11 @@ import { createServiceClient } from "@/lib/supabase/service";
  * - GET /api/cust-sat?dealerCode=XXX&period=YYYY-MM&mode=reviews -> รายรีวิว (ตัด PII)
  */
 export async function GET(req: NextRequest) {
-  const dealerCode = req.nextUrl.searchParams.get("dealerCode")?.trim() || null;
   const period = req.nextUrl.searchParams.get("period")?.trim() || null;
   const mode = req.nextUrl.searchParams.get("mode")?.trim() || null;
+  const scope = await resolveScope(req.nextUrl.searchParams.get("dealerCode")?.trim() || null, null);
+  if (!scope.ok) return scope.res;
+  const { dealerCode } = scope;
   try {
     const sb = createServiceClient();
     if (period && mode === "reviews") {

@@ -47,6 +47,8 @@ const KEYS = {
   // Area/Coach: ร้านที่ดูแล (JSON array ของรหัสร้าน) + ชื่อที่แสดง
   areaStores: "areaStores",
   areaName: "areaName",
+  // Area/Coach/หัวหน้า Area: ร้านที่เลือกดูข้อมูล (ต้องอยู่ใน areaStores)
+  areaViewDealer: "areaViewDealer",
 } as const;
 
 export type AdminViewMode = "admin" | "store" | "staff";
@@ -78,9 +80,12 @@ export interface SessionData {
   areaStores: string[];
   /** ชื่อ Area/Coach ที่แสดง */
   areaName: string | null;
+  /** ร้านที่ Area/Coach/หัวหน้า Area เลือกดูข้อมูล (null = ยังไม่เลือก -> ต้องเลือกจากหน้าร้านที่ดูแล) */
+  areaViewDealer: string | null;
   /**
-   * ขอบเขตร้านที่ admin กำลังเจาะดู (รหัสร้าน) หรือ null = ดูทุกร้านรวมกัน
-   * สำหรับ dealer/sales ค่านี้ไม่ใช้ (scope อิง dealerCode/empId ตามเดิม)
+   * ขอบเขตร้านที่ admin กำลังดู (รหัสร้าน) หรือ null = ดูทุกร้านรวมกัน
+   * - อยู่ใน "มุมมองร้านค้า/พนักงาน" = ร้านของมุมมองนั้น (ทุกหน้าจอที่อ่าน storeFilter จึงกรองตามร้านที่เลือกเสมอ)
+   * สำหรับ dealer/sales/area ค่านี้ไม่ใช้ (ใช้ session.dealer)
    */
   storeFilter: string | null;
   /** โหมด "ดูในมุมมอง" ของ admin: ดูหน้าเหมือนร้านค้า/พนักงาน (เฉพาะ admin) */
@@ -127,15 +132,18 @@ function readSession(): SessionData {
     }
   }
   const areaName = isArea ? sessionStorage.getItem(KEYS.areaName) || null : null;
-  // admin อาจเจาะดูร้านหนึ่ง (storeFilter) หรือดูทุกร้าน (null)
-  const storeFilter = isAdmin
-    ? sessionStorage.getItem(KEYS.storeFilter) || null
-    : null;
+  const areaPick = isArea ? sessionStorage.getItem(KEYS.areaViewDealer) || null : null;
+  const areaViewDealer = areaPick && areaStores.includes(areaPick) ? areaPick : null;
   // admin "ดูในมุมมอง" (store/staff) — role อื่นไม่ใช้
   const adminViewMode = (isAdmin
     ? (sessionStorage.getItem(KEYS.adminViewMode) as AdminViewMode) || "admin"
     : "admin") as AdminViewMode;
   const adminViewDealer = isAdmin ? sessionStorage.getItem(KEYS.adminViewDealer) || null : null;
+  // admin อาจเจาะดูร้านหนึ่ง (storeFilter) หรือดูทุกร้าน (null)
+  // อยู่ในมุมมองร้าน/พนักงาน -> ใช้ร้านของมุมมอง (ทุกหน้าที่อ่าน storeFilter จะกรองตามร้านนั้น)
+  const storeFilter = isAdmin
+    ? (adminViewMode !== "admin" && adminViewDealer) || sessionStorage.getItem(KEYS.storeFilter) || null
+    : null;
   const adminViewRep = isAdmin ? sessionStorage.getItem(KEYS.adminViewRep) || null : null;
   const adminViewRepName = isAdmin ? sessionStorage.getItem(KEYS.adminViewRepName) || null : null;
   // dealer ที่ใช้แสดงผล: dealer/sales ใช้ dealerCode, admin ใช้ร้านที่เจาะ (ถ้ามี) ไม่งั้น fallback ร้านแรก
@@ -143,10 +151,13 @@ function readSession(): SessionData {
   // ร้านที่ใช้แสดงผล: ถ้า admin กำลัง "ดูในมุมมอง" ใช้ร้านที่เลือกในมุมมองก่อน
   const effectiveDealerCode = isAdmin
     ? (adminViewMode !== "admin" ? adminViewDealer : storeFilter)
-    : dealerCode;
+    : isArea
+      ? areaViewDealer
+      : dealerCode;
+  // Area ที่ยังไม่เลือกร้าน -> ร้านว่าง (ไม่ fallback ไปร้านแรก กันเห็นข้อมูลร้านที่ไม่ได้ดูแล)
   const dealer =
     dealerByCode(effectiveDealerCode || "") ||
-    getDealers()[0] ||
+    (isArea ? EMPTY_DEALER : getDealers()[0]) ||
     EMPTY_DEALER;
   const repCode = sessionStorage.getItem(KEYS.repCode) || null;
   const repName = sessionStorage.getItem(KEYS.repName) || null;
@@ -170,6 +181,7 @@ function readSession(): SessionData {
     isArea,
     areaStores,
     areaName,
+    areaViewDealer,
     storeFilter,
     adminViewMode,
     adminViewDealer,
@@ -206,6 +218,8 @@ export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repD
     sessionStorage.removeItem(KEYS.areaStores);
     sessionStorage.removeItem(KEYS.areaName);
   }
+  // login ใหม่ -> ยังไม่เลือกร้าน (Area เลือกจากหน้าร้านที่ดูแล)
+  sessionStorage.removeItem(KEYS.areaViewDealer);
   if (dealerCode) sessionStorage.setItem(KEYS.dealerCode, dealerCode);
   else sessionStorage.removeItem(KEYS.dealerCode);
   sessionStorage.setItem(KEYS.role, role);
@@ -233,10 +247,20 @@ export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repD
   emit();
 }
 
-/** admin: ตั้งร้านที่เจาะดู (null = ทุกร้าน) */
+/** admin: ตั้งร้านที่เจาะดู (null = ทุกร้าน) — ถ้าอยู่ในมุมมองร้าน ให้เปลี่ยนร้านของมุมมองด้วย (ช่องเลือกร้านที่เดียว) */
 export function setStoreFilter(code: string | null) {
   if (code) sessionStorage.setItem(KEYS.storeFilter, code);
   else sessionStorage.removeItem(KEYS.storeFilter);
+  if (code && sessionStorage.getItem(KEYS.adminViewMode) === "store") {
+    sessionStorage.setItem(KEYS.adminViewDealer, code);
+  }
+  emit();
+}
+
+/** Area/Coach/หัวหน้า Area: เลือกร้านที่จะดูข้อมูล (ต้องเป็นร้านที่ดูแล) ; null = ล้าง */
+export function setAreaStore(code: string | null) {
+  if (code) sessionStorage.setItem(KEYS.areaViewDealer, code);
+  else sessionStorage.removeItem(KEYS.areaViewDealer);
   emit();
 }
 
@@ -294,6 +318,7 @@ export function doLogout() {
   sessionStorage.removeItem(KEYS.repModel);
   sessionStorage.removeItem(KEYS.areaStores);
   sessionStorage.removeItem(KEYS.areaName);
+  sessionStorage.removeItem(KEYS.areaViewDealer);
   sessionStorage.removeItem(KEYS.adminViewMode);
   sessionStorage.removeItem(KEYS.adminViewDealer);
   sessionStorage.removeItem(KEYS.adminViewRep);
@@ -349,7 +374,8 @@ export function useSession(): {
 export function useHomeHref(): string {
   const { session } = useSession();
   if (session && session.isSales) return "/app/home-staff";
-  if (session && session.isArea) return "/app/stores";
+  // Area: เลือกร้านแล้ว -> หน้าหลักของร้านนั้น ; ยังไม่เลือก -> รายชื่อร้านที่ดูแล
+  if (session && session.isArea) return session.areaViewDealer ? "/app/home" : "/app/stores";
   // admin ใช้ Hub ร่วมกับร้านค้า (เวอร์ชันทุกร้าน)
   return "/app/home";
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { REAL_AUTH } from "@/lib/supabase/api-scope";
 import { canAccessDealer, getAuthContext } from "@/lib/supabase/auth-context";
 
 /**
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
   const repCode = req.nextUrl.searchParams.get("repCode")?.trim() || null;
   try {
     const ctx = await getAuthContext();
+    // โหมด login จริง: ไม่มี session = ปฏิเสธ (เดิมปล่อยผ่านแบบเดโม)
+    if (!ctx && REAL_AUTH) return NextResponse.json({ ok: false, error: "unauthenticated" }, { status: 401 });
     if (ctx) {
       if (dealerCode && !canAccessDealer(ctx, dealerCode)) {
         return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });

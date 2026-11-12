@@ -95,6 +95,10 @@ export function ProfileCard() {
                 <Icon name="admin_panel_settings" style={{ fontSize: 13 }} /> Admin ·{" "}
                 {session.storeFilter ? session.dealer.name : "ทุกร้าน"}
               </>
+            ) : session.isArea ? (
+              <>
+                <Icon name="supervisor_account" style={{ fontSize: 13 }} /> {session.areaName ?? "Area / Coach"} · ดูร้าน {session.dealer.code}
+              </>
             ) : (
               <>
                 <Icon name="storefront" style={{ fontSize: 13 }} /> ร้านค้าตัวแทน · {session.dealer.code}
