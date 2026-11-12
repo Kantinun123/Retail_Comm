@@ -17,6 +17,9 @@ interface UserRow {
   full_name: string | null;
   phone: string | null;
   status: string;
+  role: string | null;
+  rep_code: string | null;
+  username: string;
   dealer_code: string | null;
   dealer_name: string | null;
   requested_dealer_code: string | null;
@@ -32,6 +35,21 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "rejected", label: "ปฏิเสธ/ระงับ" },
 ];
 
+type RoleFilter = "all" | "dealer" | "area" | "coach";
+const ROLE_FILTERS: { key: RoleFilter; label: string }[] = [
+  { key: "all", label: "ทั้งหมด" },
+  { key: "dealer", label: "ร้านค้า" },
+  { key: "area", label: "Area" },
+  { key: "coach", label: "Coach" },
+];
+const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
+  dealer: { label: "ร้านค้า", cls: "bg-red-50 text-[#a11119] border-red-200" },
+  area: { label: "Area", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  coach: { label: "Coach", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  re: { label: "RE", cls: "bg-slate-50 text-slate-700 border-slate-200" },
+  sales: { label: "พนักงาน", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+};
+
 export function AdminUsersScreen() {
   const { session, ready } = useSession();
   const [tab, setTab] = useState<Tab>("pending");
@@ -46,8 +64,10 @@ export function AdminUsersScreen() {
   const [creds, setCreds] = useState<{ email: string; tempPassword: string } | null>(null);
   const [dealers, setDealers] = useState<{ code: string; name: string }[]>([]);
   const [newDealer, setNewDealer] = useState("");
-  const [newEmail, setNewEmail] = useState("");
+  const [newUsername, setNewUsername] = useState("");
   const [creating, setCreating] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [query, setQuery] = useState("");
 
   // คำขอรีเซ็ตรหัสผ่านจากร้านค้า
   interface ResetReq {
@@ -113,7 +133,7 @@ export function AdminUsersScreen() {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", dealerCode: newDealer, email: newEmail }),
+        body: JSON.stringify({ action: "create", dealerCode: newDealer, username: newUsername }),
       });
       const j = await res.json();
       if (!j.ok) {
@@ -121,7 +141,7 @@ export function AdminUsersScreen() {
       } else {
         setCreds(j.credentials);
         setNewDealer("");
-        setNewEmail("");
+        setNewUsername("");
         setMsg({ type: "ok", text: "สร้างบัญชีแล้ว" });
         setReload((r) => r + 1);
       }
@@ -184,6 +204,14 @@ export function AdminUsersScreen() {
     }
   }
 
+  const q = query.trim().toLowerCase();
+  const shown = users.filter((u) => {
+    if (roleFilter !== "all" && (u.role ?? "") !== roleFilter) return false;
+    if (!q) return true;
+    return [u.username, u.full_name, u.dealer_code, u.dealer_name, u.requested_dealer_code, u.requested_dealer_name, u.rep_code]
+      .some((v) => (v ?? "").toLowerCase().includes(q));
+  });
+
   if (!ready || !session) return null;
   if (!session.isAdmin) {
     return <p className="mt-10 text-center text-sm text-slate-500">เฉพาะผู้ดูแลระบบ</p>;
@@ -195,24 +223,24 @@ export function AdminUsersScreen() {
         <Link href="/app/home" aria-label="กลับ" className="p-2 -ml-2 rounded-xl hover:bg-slate-100">
           <Icon name="arrow_back" className="text-xl" />
         </Link>
-        <h1 className="text-[17px] font-bold text-slate-900">บัญชีผู้ใช้ร้านค้า</h1>
+        <h1 className="text-[17px] font-bold text-slate-900">บัญชีผู้ใช้</h1>
       </div>
 
       {creds && (
         <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3.5">
-          <p className="text-[12px] font-bold text-amber-900">บัญชีสำหรับส่งให้ร้าน (แสดงครั้งเดียว)</p>
+          <p className="text-[12px] font-bold text-amber-900">บัญชีสำหรับส่งให้ผู้ใช้ (แสดงครั้งเดียว)</p>
           <p className="text-[13px] mt-1.5 text-slate-800">
-            ผู้ใช้: <b className="select-all">{creds.email}</b>
+            ชื่อผู้ใช้: <b className="select-all">{creds.email}</b>
           </p>
           <p className="text-[13px] text-slate-800">
             รหัสผ่านชั่วคราว: <b className="select-all font-mono">{creds.tempPassword}</b>
           </p>
           <p className="text-[11px] text-amber-800 mt-1.5">
-            ร้านต้องตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก · ปิดกล่องนี้แล้วจะดูรหัสไม่ได้อีก
+            ต้องตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก · ปิดกล่องนี้แล้วจะดูรหัสไม่ได้อีก
           </p>
           <div className="flex gap-2 mt-2">
             <button
-              onClick={() => navigator.clipboard?.writeText(`ผู้ใช้: ${creds.email}\nรหัสผ่านชั่วคราว: ${creds.tempPassword}`)}
+              onClick={() => navigator.clipboard?.writeText(`ชื่อผู้ใช้: ${creds.email}\nรหัสผ่านชั่วคราว: ${creds.tempPassword}`)}
               className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-[12px] font-bold"
             >
               คัดลอก
@@ -276,7 +304,10 @@ export function AdminUsersScreen() {
         <p className="text-[13px] font-bold text-slate-900 mb-2">สร้างบัญชีให้ร้าน</p>
         <select
           value={newDealer}
-          onChange={(e) => setNewDealer(e.target.value)}
+          onChange={(e) => {
+            setNewDealer(e.target.value);
+            setNewUsername(e.target.value);
+          }}
           className="w-full bg-[#faf8f8] text-[13px] rounded-xl px-3 py-2.5 border border-slate-200"
         >
           <option value="">เลือกร้าน</option>
@@ -286,16 +317,20 @@ export function AdminUsersScreen() {
             </option>
           ))}
         </select>
+        <label htmlFor="new-username" className="sr-only">ชื่อผู้ใช้</label>
         <input
-          type="email"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          placeholder="อีเมลร้าน (ไม่บังคับ — ว่างไว้จะใช้ รหัสร้าน@retail-comm.local)"
+          id="new-username"
+          type="text"
+          value={newUsername}
+          onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/\s+/g, ""))}
+          placeholder="ชื่อผู้ใช้: รหัสร้าน + ชื่อย่อ 4 ตัว (เช่น 5100895smrt)"
+          autoCapitalize="none"
+          spellCheck={false}
           className="w-full mt-2 bg-[#faf8f8] text-[13px] rounded-xl px-3 py-2.5 border border-slate-200"
         />
         <button
           onClick={createAccount}
-          disabled={!newDealer || creating}
+          disabled={!newDealer || !newUsername || creating}
           className="w-full mt-2.5 py-2.5 rounded-xl bg-[#d32029] text-white text-[13px] font-bold disabled:opacity-40"
         >
           {creating ? "กำลังสร้าง..." : "สร้างบัญชีและสุ่มรหัสผ่าน"}
@@ -335,25 +370,66 @@ export function AdminUsersScreen() {
         </p>
       )}
 
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {ROLE_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setRoleFilter(f.key)}
+            aria-pressed={roleFilter === f.key}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-[11.5px] font-semibold border transition",
+              roleFilter === f.key ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-600 border-slate-200"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <label htmlFor="user-search" className="sr-only">ค้นหาผู้ใช้</label>
+      <input
+        id="user-search"
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="ค้นหา ชื่อผู้ใช้ / ชื่อร้าน / รหัสร้าน / ชื่อคน"
+        className="w-full mb-3 bg-white text-[13px] rounded-xl px-3 py-2.5 border border-slate-200"
+      />
+
       {authErr ? (
         <p className="text-[13px] text-[#a11119] bg-red-50 border border-red-200 rounded-xl p-4">{authErr}</p>
       ) : loading ? (
         <p className="text-center text-slate-400 text-sm py-10">กำลังโหลด...</p>
-      ) : users.length === 0 ? (
+      ) : shown.length === 0 ? (
         <p className="text-center text-slate-400 text-sm py-10">ไม่มีรายการ</p>
       ) : (
         <div className="space-y-2.5">
-          {users.map((u) => {
+          <p className="text-[11px] text-slate-400 px-1">{shown.length} บัญชี</p>
+          {shown.map((u) => {
             const storeName = u.dealer_name ?? u.requested_dealer_name;
             const storeCode = u.dealer_code ?? u.requested_dealer_code;
+            const badge = u.role ? ROLE_BADGE[u.role] : undefined;
+            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re";
             return (
               <div key={u.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
-                <p className="text-[14px] font-bold text-slate-900">{u.full_name || u.email}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[14px] font-bold text-slate-900">
+                    {isStaff ? u.full_name || u.username : storeName ?? (u.full_name || u.username)}
+                  </p>
+                  {badge && (
+                    <span className={cn("shrink-0 px-2 py-0.5 rounded-md border text-[10.5px] font-bold", badge.cls)}>
+                      {badge.label}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[12px] text-slate-500 mt-0.5">
-                  {storeName ? `${storeName} (${storeCode})` : "ไม่ได้ระบุร้าน"}
+                  {isStaff
+                    ? `รหัสพนักงาน ${u.rep_code ?? "-"}`
+                    : storeName
+                      ? `รหัสร้าน ${storeCode}${u.full_name && u.full_name !== storeName ? ` · ${u.full_name}` : ""}`
+                      : "ไม่ได้ระบุร้าน"}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {u.email}
+                  ชื่อผู้ใช้: <span className="font-mono text-slate-600">{u.username}</span>
                   {u.phone ? ` · ${u.phone}` : ""}
                 </p>
                 {u.status === "pending" && u.existing_dealer_user && (
@@ -387,7 +463,7 @@ export function AdminUsersScreen() {
                     <button
                       disabled={busy === u.id}
                       onClick={() => {
-                        if (window.confirm(`รีเซ็ตรหัสผ่านของ ${u.email}? รหัสเดิมจะใช้ไม่ได้ทันที`)) {
+                        if (window.confirm(`รีเซ็ตรหัสผ่านของ ${u.username}? รหัสเดิมจะใช้ไม่ได้ทันที`)) {
                           act(u, "reset");
                         }
                       }}

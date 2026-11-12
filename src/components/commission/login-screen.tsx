@@ -11,7 +11,7 @@ import { fetchSaleReps, type SaleRep } from "@/lib/commission/sale-reps-store";
 import type { Dealer, Role } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
 import { RealLoginForm } from "./real-login-form";
-import { MicrosoftLoginButton } from "./microsoft-login-button";
+import { MicrosoftLoginButton, SCG_LOGIN_ENABLED } from "./microsoft-login-button";
 
 /** เปิด login จริง (email/password + Supabase Auth) เมื่อ NEXT_PUBLIC_REAL_AUTH=1
  *  ค่าเริ่มต้น = โหมดเดโม (dropdown เลือก role) เพื่อไม่ให้ production เดิมพัง
@@ -358,15 +358,11 @@ function DemoLoginScreen() {
         </div>
       </div>
 
-      <MicrosoftLoginButton />
-      <p className="text-center text-[12px] text-slate-500 -mt-1 mb-3">
-        ร้านค้า:{" "}
+      {SCG_LOGIN_ENABLED && <MicrosoftLoginButton />}
+      <p className="text-center text-[12px] text-slate-500 mb-3">
+        มีบัญชีจริงแล้ว?{" "}
         <Link href="/auth/email" className="font-bold text-[#d32029]">
-          เข้าสู่ระบบด้วยอีเมล
-        </Link>
-        {" · "}
-        <Link href="/auth/signup" className="font-bold text-[#d32029]">
-          สมัครใช้งาน
+          เข้าสู่ระบบด้วยชื่อผู้ใช้
         </Link>
       </p>
 

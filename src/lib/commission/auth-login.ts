@@ -53,16 +53,8 @@ function toSessionRole(role: string | null): Role {
   }
 }
 
-/** โดเมนอีเมลภายในของบัญชีที่ไม่มีอีเมลจริง (ร้านค้า: ชื่อผู้ใช้ = รหัสร้าน + ชื่อย่อ 4 ตัว เช่น 5100895smrt) */
-export const LOCAL_ACCOUNT_DOMAIN = "retail-comm.local";
-
-/** ชื่อผู้ใช้ -> อีเมลที่ใช้กับ Supabase Auth
- *  - มี @ = อีเมลจริง (Area/Coach/admin)
- *  - ไม่มี @ = ชื่อผู้ใช้ร้าน -> <username>@retail-comm.local (ต้องพิมพ์เต็ม แบบเข้ม ; ตัวพิมพ์เล็ก/ใหญ่ไม่มีผล) */
-export function usernameToEmail(input: string): string {
-  const s = input.trim().toLowerCase().replace(/\s+/g, "");
-  return s.includes("@") ? s : `${s}@${LOCAL_ACCOUNT_DOMAIN}`;
-}
+import { usernameToEmail } from "./username";
+export { LOCAL_ACCOUNT_DOMAIN, usernameToEmail } from "./username";
 
 /** login ด้วยชื่อผู้ใช้หรืออีเมล + รหัสผ่าน แล้วตั้ง session (identity bridge) */
 export async function loginWithEmail(

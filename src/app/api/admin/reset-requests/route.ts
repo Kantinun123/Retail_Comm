@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { generateTempPassword } from "@/lib/supabase/temp-password";
+import { emailToUsername } from "@/lib/commission/username";
 
 /**
  * คำขอรีเซ็ตรหัสผ่านของร้านค้า (admin เท่านั้น ต้องมี session จริง)
@@ -50,7 +51,7 @@ export async function GET() {
   const requests = (data ?? []).map((r) => ({
     ...r,
     dealer_name: names.get(r.dealer_code as string) ?? null,
-    account_email: accounts.get(r.dealer_code as string) ?? null,
+    account_email: accounts.has(r.dealer_code as string) ? emailToUsername(accounts.get(r.dealer_code as string)) : null,
   }));
   return NextResponse.json({ ok: true, requests });
 }
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
     if (uErr) return NextResponse.json({ ok: false, error: uErr.message }, { status: 500 });
     await sb.from("profiles").update({ must_change_password: true }).eq("id", prof.id);
     await close("done");
-    return NextResponse.json({ ok: true, credentials: { email: prof.email ?? "", tempPassword } });
+    return NextResponse.json({ ok: true, credentials: { email: emailToUsername(prof.email as string), tempPassword } });
   }
 
   return NextResponse.json({ ok: false, error: "invalid action" }, { status: 400 });

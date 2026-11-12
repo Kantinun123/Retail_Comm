@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { generateTempPassword } from "@/lib/supabase/temp-password";
+import { emailToUsername, isValidStoreUsername, usernameToEmail } from "@/lib/commission/username";
 
 /**
- * จัดการคำขอสมัครผู้ใช้ (admin เท่านั้น — ต้องมี session จริงที่ role=admin เสมอ)
- * - GET  /api/admin/users?status=pending|approved|rejected
- * - POST /api/admin/users { userId, action: 'approve'|'reject'|'revoke', dealerCode?, reason? }
+ * จัดการบัญชีผู้ใช้ (admin เท่านั้น — ต้องมี session จริงที่ role=admin เสมอ)
+ * - GET  /api/admin/users?status=pending|approved|rejected  (ทุก role ยกเว้น admin)
+ * - POST /api/admin/users { userId, action, dealerCode?, reason?, username? }
+ *   create : สร้างบัญชีร้าน (username แบบเข้ม <รหัสร้าน><a-z 4 ตัว> หรืออีเมลจริง)
  *   approve: ตั้ง role=dealer + dealer_code (1 บัญชีต่อร้าน) ; reject/revoke: status=rejected + เหตุผล
+ *   reset  : ออกรหัสชั่วคราวใหม่ — ร้านค้า และ Area / Coach
  */
+
+/** role ที่เป็น Area Manager / Coach — admin รีเซ็ตรหัส / ระงับได้ แต่ไม่ผ่าน flow อนุมัติร้าน */
+const AREA_ROLES = new Set(["area", "coach", "re"]);
 
 async function requireAdmin() {
   const ctx = await getAuthContext();
@@ -32,10 +38,11 @@ export async function GET(req: NextRequest) {
   const { data, error } = await sb
     .from("profiles")
     .select(
-      "id, email, full_name, phone, status, role, dealer_code, requested_role, requested_dealer_code, reject_reason, created_at, approved_at"
+      "id, email, full_name, phone, status, role, rep_code, dealer_code, requested_role, requested_dealer_code, reject_reason, created_at, approved_at"
     )
     .eq("status", status)
-    .neq("role", "admin")
+    // role = null (pending/rejected) ต้องรวมด้วย — neq อย่างเดียวจะตัดแถว null ทิ้ง
+    .or("role.is.null,role.neq.admin")
     .order("created_at", { ascending: false })
     .limit(300);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -62,6 +69,7 @@ export async function GET(req: NextRequest) {
 
   const users = (data ?? []).map((p) => ({
     ...p,
+    username: emailToUsername(p.email),
     requested_dealer_name: p.requested_dealer_code ? names.get(p.requested_dealer_code) ?? null : null,
     dealer_name: p.dealer_code ? names.get(p.dealer_code) ?? null : null,
     existing_dealer_user: p.requested_dealer_code ? existing.get(p.requested_dealer_code) ?? null : null,
@@ -79,6 +87,7 @@ export async function POST(req: NextRequest) {
     dealerCode?: string;
     reason?: string;
     email?: string;
+    username?: string;
     fullName?: string;
   };
   try {
@@ -112,8 +121,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ไม่มีอีเมลจริง -> ใช้อีเมลสมมติตามรหัสร้าน (รีเซ็ตรหัสทางอีเมลไม่ได้ ต้องให้ admin รีเซ็ต)
-    const email = (String(body.email ?? "").trim() || `${dealerCode}@retail-comm.local`).toLowerCase();
+    // ชื่อผู้ใช้แบบเข้ม: <รหัสร้าน><a-z 4 ตัว> -> <username>@retail-comm.local ; หรือใส่อีเมลจริงก็ได้
+    const rawUser = String(body.username ?? body.email ?? "").trim().toLowerCase();
+    if (!rawUser) return NextResponse.json({ ok: false, error: "ต้องระบุชื่อผู้ใช้" }, { status: 400 });
+    if (!rawUser.includes("@") && !isValidStoreUsername(rawUser, dealerCode)) {
+      return NextResponse.json(
+        { ok: false, error: `ชื่อผู้ใช้ต้องเป็น ${dealerCode} + ตัวอักษรอังกฤษพิมพ์เล็ก 4 ตัว (เช่น ${dealerCode}abcd)` },
+        { status: 400 }
+      );
+    }
+    const email = usernameToEmail(rawUser);
     const tempPassword = generateTempPassword();
     const { data: created, error: cErr } = await sb.auth.admin.createUser({
       email,
@@ -143,7 +160,7 @@ export async function POST(req: NextRequest) {
         { status: pErr.code === "23505" ? 409 : 500 }
       );
     }
-    return NextResponse.json({ ok: true, credentials: { email, tempPassword } });
+    return NextResponse.json({ ok: true, credentials: { email: emailToUsername(email), tempPassword } });
   }
 
   if (!userId) return NextResponse.json({ ok: false, error: "missing userId" }, { status: 400 });
@@ -153,9 +170,13 @@ export async function POST(req: NextRequest) {
     .eq("id", userId)
     .single();
   if (!target) return NextResponse.json({ ok: false, error: "ไม่พบผู้ใช้" }, { status: 404 });
-  // กัน admin เผลอแก้บัญชี admin/Area/Coach ผ่านหน้านี้
-  if (target.role && target.role !== "dealer") {
+  // บัญชี admin / sales แก้ผ่านหน้านี้ไม่ได้ ; Area/Coach ทำได้แค่รีเซ็ตรหัส / ระงับ
+  const isArea = AREA_ROLES.has(target.role ?? "");
+  if (target.role && target.role !== "dealer" && !isArea) {
     return NextResponse.json({ ok: false, error: "แก้ไขบัญชีประเภทนี้ผ่านหน้านี้ไม่ได้" }, { status: 400 });
+  }
+  if (isArea && action !== "reset" && action !== "revoke") {
+    return NextResponse.json({ ok: false, error: "บัญชี Area / Coach รีเซ็ตรหัสหรือระงับได้เท่านั้น" }, { status: 400 });
   }
 
   if (action === "approve") {
@@ -202,15 +223,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "reset") {
-    if (target.role !== "dealer" || target.status !== "approved") {
-      return NextResponse.json({ ok: false, error: "รีเซ็ตได้เฉพาะบัญชีร้านค้าที่อนุมัติแล้ว" }, { status: 400 });
+    if ((target.role !== "dealer" && !isArea) || target.status !== "approved") {
+      return NextResponse.json({ ok: false, error: "รีเซ็ตได้เฉพาะบัญชีร้านค้า / Area / Coach ที่อนุมัติแล้ว" }, { status: 400 });
     }
     const tempPassword = generateTempPassword();
     const { error: uErr } = await sb.auth.admin.updateUserById(userId, { password: tempPassword });
     if (uErr) return NextResponse.json({ ok: false, error: uErr.message }, { status: 500 });
     await sb.from("profiles").update({ must_change_password: true }).eq("id", userId);
     const { data: prof } = await sb.from("profiles").select("email").eq("id", userId).single();
-    return NextResponse.json({ ok: true, credentials: { email: prof?.email ?? "", tempPassword } });
+    return NextResponse.json({ ok: true, credentials: { email: emailToUsername(prof?.email), tempPassword } });
   }
 
   if (action === "reject" || action === "revoke") {

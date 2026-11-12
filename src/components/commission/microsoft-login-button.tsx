@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+/** เปิดปุ่ม "เข้าสู่ระบบด้วย SCG" — ปิดไว้ก่อน (เฟสถัดไป) ; ตั้ง NEXT_PUBLIC_SCG_LOGIN=1 เพื่อเปิด */
+export const SCG_LOGIN_ENABLED = process.env.NEXT_PUBLIC_SCG_LOGIN === "1";
+
 /** ปุ่มเข้าสู่ระบบด้วยบัญชี Microsoft ของ SCG (Supabase Auth provider: azure)
  *  หลัง login กลับมาที่ /auth/callback -> /auth/bridge เพื่อตั้ง session ตาม role */
 export function MicrosoftLoginButton() {

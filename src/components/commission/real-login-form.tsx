@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./icon";
 import { homeForRole, loginWithEmail } from "@/lib/commission/auth-login";
-import { MicrosoftLoginButton } from "./microsoft-login-button";
+import { MicrosoftLoginButton, SCG_LOGIN_ENABLED } from "./microsoft-login-button";
 
 /** ฟอร์ม login จริง (email/password + Supabase Auth) — identity bridge ไป session เดิม */
 export function RealLoginForm() {
@@ -74,13 +74,14 @@ export function RealLoginForm() {
               เข้าสู่ระบบ
             </h2>
             <p className="text-[12px] text-red-100/90 mt-1 leading-relaxed font-light">
-              ใช้ชื่อผู้ใช้และรหัสผ่านที่ได้รับจากผู้ดูแล
+              ใช้ชื่อผู้ใช้และรหัสผ่านที่ได้รับจาก Area ที่ดูแลร้าน (หรือผู้ดูแลระบบ)
             </p>
           </div>
         </div>
       </div>
 
-      <MicrosoftLoginButton />
+      {/* เข้าด้วยบัญชี SCG (Microsoft) — เฟสถัดไป เปิดด้วย NEXT_PUBLIC_SCG_LOGIN=1 */}
+      {SCG_LOGIN_ENABLED && <MicrosoftLoginButton />}
 
       {/* Form */}
       <form className="flex flex-col space-y-3.5" onSubmit={handleSubmit}>
@@ -154,10 +155,10 @@ export function RealLoginForm() {
             </button>
             {showForgot && (
               <p className="mt-2 text-[11px] text-slate-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
-                ติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน ผู้ดูแลจะออกรหัสผ่านชั่วคราวให้
-                และระบบจะให้ตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก{" "}
+                ติดต่อ Area ที่ดูแลร้าน หรือผู้ดูแลระบบ เพื่อขอรหัสผ่านชั่วคราว
+                ระบบจะให้ตั้งรหัสผ่านใหม่ตอนเข้าครั้งแรก ·{" "}
                 <Link href="/auth/forgot" className="font-bold text-[#d32029] underline">
-                  ส่งคำขอรีเซ็ตรหัสผ่าน
+                  ส่งคำขอรีเซ็ต
                 </Link>
               </p>
             )}
@@ -172,10 +173,7 @@ export function RealLoginForm() {
           {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
         </button>
         <p className="text-center text-[12px] text-slate-500">
-          ร้านค้าใหม่?{" "}
-          <Link href="/auth/signup" className="font-bold text-[#d32029]">
-            สมัครใช้งาน
-          </Link>
+          ยังไม่มีชื่อผู้ใช้? สอบถาม Area ที่ดูแลร้านของคุณ
         </p>
       </form>
     </main>
