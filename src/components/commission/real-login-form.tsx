@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./icon";
-import { loginWithEmail } from "@/lib/commission/auth-login";
+import { homeForRole, loginWithEmail } from "@/lib/commission/auth-login";
 import { MicrosoftLoginButton } from "./microsoft-login-button";
 
 /** ฟอร์ม login จริง (email/password + Supabase Auth) — identity bridge ไป session เดิม */
@@ -25,13 +25,7 @@ export function RealLoginForm() {
     try {
       const res = await loginWithEmail(email.trim(), password);
       if (res.ok) {
-        router.push(
-          res.mustChangePassword
-            ? "/app/change-password"
-            : res.role === "sales"
-              ? "/app/home-staff"
-              : "/app/home"
-        );
+        router.push(res.mustChangePassword ? "/app/change-password" : homeForRole(res.role));
         return;
       }
       if (res.status === "pending") {
@@ -80,7 +74,7 @@ export function RealLoginForm() {
               เข้าสู่ระบบ
             </h2>
             <p className="text-[12px] text-red-100/90 mt-1 leading-relaxed font-light">
-              ใช้อีเมลและรหัสผ่านที่ได้รับอนุมัติ
+              ใช้ชื่อผู้ใช้และรหัสผ่านที่ได้รับจากผู้ดูแล
             </p>
           </div>
         </div>
@@ -92,18 +86,27 @@ export function RealLoginForm() {
       <form className="flex flex-col space-y-3.5" onSubmit={handleSubmit}>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col space-y-3.5">
           <div>
-            <span className="text-[13px] font-semibold text-slate-800 flex items-center space-x-1.5 mb-1.5">
-              <Icon name="mail" className="text-base text-[#d32029]" />
-              <span>อีเมล</span>
-            </span>
+            <label htmlFor="login-username" className="text-[13px] font-semibold text-slate-800 flex items-center space-x-1.5 mb-1.5">
+              <Icon name="person" className="text-base text-[#d32029]" />
+              <span>ชื่อผู้ใช้</span>
+            </label>
             <input
-              type="email"
+              id="login-username"
+              type="text"
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
+              placeholder="เช่น 5100895smrt หรือ name@scg.com"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-describedby="login-username-help"
               className="w-full bg-[#faf8f8] text-slate-900 text-[14px] rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus:border-[#d32029] focus:ring-2 focus:ring-[#d32029]/15 focus:bg-white transition-all"
             />
+            <p id="login-username-help" className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+              ร้านค้า: รหัสร้าน + ชื่อย่อ 4 ตัว (เช่น 5100895smrt) · Area / Coach: อีเมลบริษัท
+            </p>
           </div>
 
           <div>

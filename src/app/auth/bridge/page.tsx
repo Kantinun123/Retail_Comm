@@ -38,9 +38,10 @@ export default function AuthBridgePage() {
         if (role === "admin") {
           doLogin({ role: "admin" });
           router.replace("/app/home");
-        } else if (role === "area" || role === "re") {
+        } else if (role === "area" || role === "coach" || role === "re") {
           doLogin({ role: "area", areaStores: storeCodes ?? [], areaName: name ?? undefined });
-          router.replace("/app/stores");
+          setMustChangePassword(!!json.me.mustChangePassword);
+          router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/stores");
         } else if (role === "dealer" && json.me.dealerCode) {
           doLogin({ role: "dealer", dealerCode: json.me.dealerCode });
           setMustChangePassword(!!json.me.mustChangePassword);

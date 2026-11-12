@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
  * ตัวตนผู้ใช้จริงฝั่ง server (จาก cookie session ของ Supabase Auth + profiles)
  * - คืน null ถ้าไม่มี session จริง (รวมถึง anonymous ของโหมดเดโม) หรือโปรไฟล์ยังไม่ approved
  * - allowedDealerCodes: "all" = ทุกร้าน (admin), ไม่งั้นเป็นรายการร้านที่เข้าถึงได้
- *   - area/re : ร้านที่ผูกใน rep_store_assignments ด้วย profiles.rep_code
+ *   - area/coach/re : ร้านที่ผูกใน rep_store_assignments ด้วย profiles.rep_code
  *   - dealer  : ร้านเดียวตาม profiles.dealer_code
  */
 export interface AuthContext {
@@ -34,7 +34,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   let allowed: "all" | string[] = [];
   if (profile.role === "admin") {
     allowed = "all";
-  } else if (profile.role === "area" || profile.role === "re") {
+  } else if (profile.role === "area" || profile.role === "coach" || profile.role === "re") {
     if (profile.rep_code) {
       const svc = createServiceClient();
       const { data } = await svc

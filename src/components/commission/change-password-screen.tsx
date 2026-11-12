@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./icon";
 import { useSession } from "@/lib/commission/session";
-import { setMustChangePassword } from "@/lib/commission/auth-login";
+import { homeForRole, setMustChangePassword } from "@/lib/commission/auth-login";
 
 const MIN_LEN = 8;
 
@@ -45,7 +45,7 @@ export function ChangePasswordScreen() {
         return;
       }
       setMustChangePassword(false);
-      router.replace(session?.role === "sales" ? "/app/home-staff" : "/app/home");
+      router.replace(homeForRole(session?.role));
     } catch {
       setError("เกิดข้อผิดพลาด ลองใหม่อีกครั้ง");
     } finally {

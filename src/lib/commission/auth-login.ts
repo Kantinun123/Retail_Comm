@@ -31,8 +31,13 @@ export function setMustChangePassword(v: boolean) {
   else sessionStorage.removeItem(MUST_CHANGE_KEY);
 }
 
-/** map profile.role (6 แบบ) -> Role ของ session (3 แบบ) ชั่วคราวในเฟสนี้
- *  area/re ถือเป็นมุมมองร้าน (dealer-view), staff ถือเป็นมุมมองพนักงาน (sales-view) */
+/** profile.role ที่เป็น Area Manager / Coach (เห็นเฉพาะร้านที่ดูแลตาม rep_store_assignments) */
+export function isAreaRole(role: string | null | undefined): boolean {
+  return role === "area" || role === "coach" || role === "re";
+}
+
+/** map profile.role -> Role ของ session (area/coach ใช้ทางแยกใน loginWithEmail)
+ *  staff ถือเป็นมุมมองพนักงาน (sales-view) */
 function toSessionRole(role: string | null): Role {
   switch (role) {
     case "admin":
@@ -48,19 +53,31 @@ function toSessionRole(role: string | null): Role {
   }
 }
 
-/** login ด้วยอีเมล/รหัสผ่าน แล้วตั้ง session (identity bridge) */
+/** โดเมนอีเมลภายในของบัญชีที่ไม่มีอีเมลจริง (ร้านค้า: ชื่อผู้ใช้ = รหัสร้าน + ชื่อย่อ 4 ตัว เช่น 5100895smrt) */
+export const LOCAL_ACCOUNT_DOMAIN = "retail-comm.local";
+
+/** ชื่อผู้ใช้ -> อีเมลที่ใช้กับ Supabase Auth
+ *  - มี @ = อีเมลจริง (Area/Coach/admin)
+ *  - ไม่มี @ = ชื่อผู้ใช้ร้าน -> <username>@retail-comm.local (ต้องพิมพ์เต็ม แบบเข้ม ; ตัวพิมพ์เล็ก/ใหญ่ไม่มีผล) */
+export function usernameToEmail(input: string): string {
+  const s = input.trim().toLowerCase().replace(/\s+/g, "");
+  return s.includes("@") ? s : `${s}@${LOCAL_ACCOUNT_DOMAIN}`;
+}
+
+/** login ด้วยชื่อผู้ใช้หรืออีเมล + รหัสผ่าน แล้วตั้ง session (identity bridge) */
 export async function loginWithEmail(
-  email: string,
+  username: string,
   password: string
 ): Promise<AuthLoginResult> {
   const sb = createClient();
 
   const { data: auth, error: authErr } = await sb.auth.signInWithPassword({
-    email,
+    email: usernameToEmail(username),
     password,
   });
   if (authErr || !auth.user) {
-    return { ok: false, error: authErr?.message ?? "เข้าสู่ระบบไม่สำเร็จ" };
+    const bad = /invalid login credentials/i.test(authErr?.message ?? "");
+    return { ok: false, error: bad ? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" : authErr?.message ?? "เข้าสู่ระบบไม่สำเร็จ" };
   }
 
   // อ่าน profile ของผู้ login (RLS: read own profile)
@@ -88,6 +105,19 @@ export async function loginWithEmail(
     };
   }
 
+  // Area / Coach: ร้านที่ดูแล + ชื่อ มาจาก server (/api/me ใช้ rep_store_assignments) — เหมือน /auth/bridge
+  if (isAreaRole(profile.role)) {
+    const res = await fetch("/api/me", { cache: "no-store" });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; me?: { name?: string | null; storeCodes?: string[] | null } } | null;
+    if (!res.ok || !json?.ok || !json.me) {
+      await sb.auth.signOut();
+      return { ok: false, error: "อ่านข้อมูลร้านที่ดูแลไม่สำเร็จ ลองใหม่อีกครั้ง" };
+    }
+    doLogin({ role: "area", areaStores: json.me.storeCodes ?? [], areaName: json.me.name ?? undefined });
+    setMustChangePassword(!!profile.must_change_password);
+    return { ok: true, role: "area", mustChangePassword: !!profile.must_change_password };
+  }
+
   // identity bridge: เขียนลง sessionStorage keys เดิม
   const role = toSessionRole(profile.role);
   doLogin({
@@ -98,6 +128,11 @@ export async function loginWithEmail(
 
   setMustChangePassword(!!profile.must_change_password);
   return { ok: true, role, mustChangePassword: !!profile.must_change_password };
+}
+
+/** หน้าแรกหลัง login ตาม role ของ session */
+export function homeForRole(role: Role | undefined | null): string {
+  return role === "sales" ? "/app/home-staff" : role === "area" ? "/app/stores" : "/app/home";
 }
 
 /** ออกจากระบบทั้ง Supabase session และ sessionStorage */
