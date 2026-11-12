@@ -7,7 +7,7 @@ import { BottomNav } from "./bottom-nav";
 import { FilterPanel } from "./filter-panel";
 import { AnalysisCharts } from "./analysis-charts";
 import { periodShort, selectedPeriods } from "@/lib/commission/logic";
-import { useSession } from "@/lib/commission/session";
+import { useSession, useHomeHref } from "@/lib/commission/session";
 import type { FilterState } from "@/lib/commission/types";
 
 function analysisCaption(periods: string[]): string {
@@ -19,6 +19,8 @@ function analysisCaption(periods: string[]): string {
 
 export function AnalysisScreen() {
   const { session, ready, setFilter } = useSession();
+  // ปุ่มย้อนกลับ -> หน้าหลักตาม role (หน้า /app/dashboard เดิมเลิกใช้แล้ว)
+  const homeHref = useHomeHref();
   const [filter, setLocalFilter] = useState<FilterState | null>(null);
 
   if (!ready || !session) return null;
@@ -43,7 +45,7 @@ export function AnalysisScreen() {
       <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
         <div className="flex items-center space-x-2.5">
           <Link
-            href="/app/dashboard"
+            href={homeHref}
             className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
           >
             <Icon name="arrow_back" className="text-xl" />

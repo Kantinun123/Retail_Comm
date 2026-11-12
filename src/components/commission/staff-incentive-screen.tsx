@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { DashboardScreen } from "./dashboard-screen";
-import { useSession } from "@/lib/commission/session";
+import { useSession, useHomeHref } from "@/lib/commission/session";
 
 /**
  * หน้า "ผลประโยชน์ของพนักงานในร้าน" — ใช้ layout เดียวกับหน้าภาพรวม
@@ -12,6 +12,8 @@ import { useSession } from "@/lib/commission/session";
  */
 export function StaffIncentiveScreen() {
   const { session, ready } = useSession();
+  // ปุ่มย้อนกลับ -> หน้าหลักตาม role (หน้า /app/dashboard เดิมเลิกใช้แล้ว)
+  const homeHref = useHomeHref();
 
   if (!ready || !session) return null;
 
@@ -22,7 +24,7 @@ export function StaffIncentiveScreen() {
         <header className="flex items-center justify-between py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
           <div className="flex items-center space-x-2.5">
             <Link
-              href="/app/dashboard"
+              href={homeHref}
               className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition"
             >
               <Icon name="arrow_back" className="text-xl" />
@@ -49,7 +51,7 @@ export function StaffIncentiveScreen() {
             ใช้ได้เฉพาะบัญชีร้านค้าตัวแทนเท่านั้น
           </p>
           <Link
-            href="/app/dashboard"
+            href={homeHref}
             className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#d32029]"
           >
             <Icon name="arrow_back" className="text-lg" />

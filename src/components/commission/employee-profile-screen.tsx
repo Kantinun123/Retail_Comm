@@ -25,12 +25,14 @@ import {
   setBenefitView,
   solutionById,
 } from "@/lib/commission/logic";
-import { useSession } from "@/lib/commission/session";
+import { useSession, useHomeHref } from "@/lib/commission/session";
 import type { GroupKey } from "@/lib/commission/types";
 import { cn } from "@/lib/utils";
 
 export function EmployeeProfileScreen({ empId }: { empId: string }) {
   const { session, ready } = useSession();
+  // ปุ่มย้อนกลับ -> หน้าหลักตาม role (หน้า /app/dashboard เดิมเลิกใช้แล้ว)
+  const homeHref = useHomeHref();
   const router = useRouter();
 
   // หน้าประวัติพนักงานใช้มุมมองพนักงาน (อินเซนทีฟ) เสมอ
@@ -71,7 +73,7 @@ export function EmployeeProfileScreen({ empId }: { empId: string }) {
             {!emp ? "ไม่พบข้อมูลพนักงาน" : "คุณไม่มีสิทธิ์ดูประวัติพนักงานคนนี้"}
           </p>
           <Link
-            href="/app/dashboard"
+            href={homeHref}
             className="inline-block mt-4 text-[12px] font-semibold text-[#a11119] hover:underline"
           >
             กลับหน้าภาพรวม

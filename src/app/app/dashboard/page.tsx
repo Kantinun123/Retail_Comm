@@ -1,14 +1,9 @@
-import { Suspense } from "react";
-import { DashboardScreen } from "@/components/commission/dashboard-screen";
-import { ScreenSkeleton } from "@/components/commission/screen-skeleton";
+import { HomeRedirect } from "@/components/commission/home-redirect";
 
-// Session/dataset-driven, client-only. Opt out of instant-navigation validation.
+// หน้า "ภาพรวม" เดิมเลิกใช้แล้ว (แทนด้วยหน้าหลัก Hub) -> พาไปหน้าหลักตาม role
+// (ไฟล์ dashboard-screen.tsx ยังเก็บไว้ ไม่ได้ลบ)
 export const instant = false;
 
 export default function DashboardPage() {
-  return (
-    <Suspense fallback={<ScreenSkeleton />}>
-      <DashboardScreen />
-    </Suspense>
-  );
+  return <HomeRedirect />;
 }

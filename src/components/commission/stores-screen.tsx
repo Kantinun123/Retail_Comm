@@ -105,7 +105,7 @@ export function StoresScreen() {
             ไม่พบร้านค้าที่ผูกกับบัญชีนี้
           </p>
           <Link
-            href="/app/dashboard"
+            href={homeHref}
             className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#d32029]"
           >
             <Icon name="arrow_back" className="text-lg" />

@@ -49,6 +49,8 @@ type UploadState = {
 
 export function DatabaseScreen() {
   const { session, ready } = useSession();
+  // ปุ่มย้อนกลับ -> หน้าหลักตาม role (หน้า /app/dashboard เดิมเลิกใช้แล้ว)
+  const homeHref = useHomeHref();
   // bump to force re-read of dataset counts after an upload/reset
   const [version, setVersion] = useState(0);
   const [uploads, setUploads] = useState<Record<DatasetSection, UploadState>>({
@@ -76,7 +78,7 @@ export function DatabaseScreen() {
             กรุณาเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบ
           </p>
           <Link
-            href="/app/dashboard"
+            href={homeHref}
             className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#d32029]"
           >
             <Icon name="arrow_back" className="text-lg" />
