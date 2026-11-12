@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { doLogin } from "@/lib/commission/session";
-import { setMustChangePassword } from "@/lib/commission/auth-login";
+import { isAreaRole, setMustChangePassword } from "@/lib/commission/auth-login";
 
 interface Me {
   role: string;
@@ -38,7 +38,7 @@ export default function AuthBridgePage() {
         if (role === "admin") {
           doLogin({ role: "admin" });
           router.replace("/app/home");
-        } else if (role === "area" || role === "coach" || role === "re") {
+        } else if (isAreaRole(role)) {
           doLogin({ role: "area", areaStores: storeCodes ?? [], areaName: name ?? undefined });
           setMustChangePassword(!!json.me.mustChangePassword);
           router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/stores");

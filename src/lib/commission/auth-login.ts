@@ -33,7 +33,7 @@ export function setMustChangePassword(v: boolean) {
 
 /** profile.role ที่เป็น Area Manager / Coach (เห็นเฉพาะร้านที่ดูแลตาม rep_store_assignments) */
 export function isAreaRole(role: string | null | undefined): boolean {
-  return role === "area" || role === "coach" || role === "re";
+  return role === "area" || role === "coach" || role === "re" || role === "area_head";
 }
 
 /** map profile.role -> Role ของ session (area/coach ใช้ทางแยกใน loginWithEmail)

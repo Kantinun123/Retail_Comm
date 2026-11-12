@@ -30,6 +30,11 @@ export async function GET() {
       .maybeSingle();
     name = (data?.name as string | undefined) ?? null;
   }
+  if (!name) {
+    // ไม่มี rep_code (เช่น หัวหน้า Area / admin) -> ใช้ชื่อในโปรไฟล์
+    const { data } = await createServiceClient().from("profiles").select("full_name").eq("id", ctx.userId).maybeSingle();
+    name = (data?.full_name as string | undefined) ?? null;
+  }
 
   return NextResponse.json({
     ok: true,

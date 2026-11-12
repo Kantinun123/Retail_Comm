@@ -45,6 +45,7 @@ const ROLE_FILTERS: { key: RoleFilter; label: string }[] = [
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   dealer: { label: "ร้านค้า", cls: "bg-red-50 text-[#a11119] border-red-200" },
   area: { label: "Area", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  area_head: { label: "หัวหน้า Area", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   coach: { label: "Coach", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   re: { label: "RE", cls: "bg-slate-50 text-slate-700 border-slate-200" },
   sales: { label: "พนักงาน", cls: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -206,7 +207,8 @@ export function AdminUsersScreen() {
 
   const q = query.trim().toLowerCase();
   const shown = users.filter((u) => {
-    if (roleFilter !== "all" && (u.role ?? "") !== roleFilter) return false;
+    const r = u.role === "area_head" ? "area" : u.role ?? ""; // หัวหน้า Area อยู่ในกลุ่ม Area
+    if (roleFilter !== "all" && r !== roleFilter) return false;
     if (!q) return true;
     return [u.username, u.full_name, u.dealer_code, u.dealer_name, u.requested_dealer_code, u.requested_dealer_name, u.rep_code]
       .some((v) => (v ?? "").toLowerCase().includes(q));
@@ -408,7 +410,7 @@ export function AdminUsersScreen() {
             const storeName = u.dealer_name ?? u.requested_dealer_name;
             const storeCode = u.dealer_code ?? u.requested_dealer_code;
             const badge = u.role ? ROLE_BADGE[u.role] : undefined;
-            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re";
+            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re" || u.role === "area_head";
             return (
               <div key={u.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
                 <div className="flex items-start justify-between gap-2">

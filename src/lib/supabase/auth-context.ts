@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/service";
  * - คืน null ถ้าไม่มี session จริง (รวมถึง anonymous ของโหมดเดโม) หรือโปรไฟล์ยังไม่ approved
  * - allowedDealerCodes: "all" = ทุกร้าน (admin), ไม่งั้นเป็นรายการร้านที่เข้าถึงได้
  *   - area/coach/re : ร้านที่ผูกใน rep_store_assignments ด้วย profiles.rep_code
+ *   - area_head     : หัวหน้า Area — ทุกร้านใน rep_store_assignments (มุมมองแบบ Area)
  *   - dealer  : ร้านเดียวตาม profiles.dealer_code
  */
 export interface AuthContext {
@@ -34,6 +35,11 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   let allowed: "all" | string[] = [];
   if (profile.role === "admin") {
     allowed = "all";
+  } else if (profile.role === "area_head") {
+    // หัวหน้า Area: เห็นทุกร้านที่มี Area ดูแล (รวมของทุก Area) ในมุมมองแบบ Area
+    const svc = createServiceClient();
+    const { data } = await svc.from("rep_store_assignments").select("dealer_code");
+    allowed = Array.from(new Set((data ?? []).map((r) => r.dealer_code as string)));
   } else if (profile.role === "area" || profile.role === "coach" || profile.role === "re") {
     if (profile.rep_code) {
       const svc = createServiceClient();
