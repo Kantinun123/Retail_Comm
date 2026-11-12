@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "Retail-COMM",
     statusBarStyle: "default",
   },
-  icons: { apple: "/favicon.png" },
+  icons: { apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

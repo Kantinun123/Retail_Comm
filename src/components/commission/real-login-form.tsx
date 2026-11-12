@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "./icon";
-import { homeForRole, loginWithEmail } from "@/lib/commission/auth-login";
+import { hasRealAuthSession, homeForRole, loginWithEmail, restoreSession } from "@/lib/commission/auth-login";
+import { InstallAppHint } from "./install-app-hint";
 import { MicrosoftLoginButton, SCG_LOGIN_ENABLED } from "./microsoft-login-button";
 
 /** ฟอร์ม login จริง (email/password + Supabase Auth) — identity bridge ไป session เดิม */
@@ -17,6 +18,38 @@ export function RealLoginForm() {
   const [showForgot, setShowForgot] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // เปิดแอปใหม่แต่ยังจำการ login ไว้ -> พาเข้าแอปเลย ไม่ต้องพิมพ์รหัสซ้ำ
+  const [restoring, setRestoring] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (sessionStorage.getItem("loggedOut") === "1") return; // เพิ่งออกจากระบบ
+        if (!(await hasRealAuthSession()) || cancelled) return;
+        setRestoring(true);
+        const next = new URLSearchParams(window.location.search).get("next");
+        const dest = await restoreSession(next);
+        if (cancelled) return;
+        if (dest) router.replace(dest);
+        else setRestoring(false);
+      } catch {
+        if (!cancelled) setRestoring(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  if (restoring) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-3 text-slate-500" aria-live="polite">
+        <Icon name="progress_activity" className="text-4xl text-[#d32029] animate-spin" />
+        <p className="text-[13px]">กำลังเข้าสู่ระบบ...</p>
+      </main>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -176,6 +209,8 @@ export function RealLoginForm() {
           ยังไม่มีชื่อผู้ใช้? สอบถาม Area ที่ดูแลร้านของคุณ
         </p>
       </form>
+
+      <InstallAppHint />
     </main>
   );
 }

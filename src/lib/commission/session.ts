@@ -197,6 +197,7 @@ export interface LoginInput {
 
 export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repDealerName, repModel, areaStores, areaName }: LoginInput) {
   sessionStorage.setItem(KEYS.loggedIn, "true");
+  sessionStorage.removeItem("loggedOut");
   if (role === "area") {
     sessionStorage.setItem(KEYS.areaStores, JSON.stringify(areaStores ?? []));
     if (areaName) sessionStorage.setItem(KEYS.areaName, areaName);
@@ -267,8 +268,12 @@ export function exitAdminView() {
   emit();
 }
 
+/** ธง "เพิ่งกดออกจากระบบ" — กันหน้า login กู้ session คืนก่อน signOut ของ Supabase จะเสร็จ */
+export const LOGGED_OUT_KEY = "loggedOut";
+
 export function doLogout() {
   sessionStorage.removeItem("mustChangePw");
+  sessionStorage.setItem(LOGGED_OUT_KEY, "1");
   // ออกจาก Supabase session จริงด้วย (ไม่แตะ anonymous ของเดโม) กัน API ฝั่ง server ยัง scope ตามผู้ใช้เดิม
   const sb = createClient();
   sb.auth

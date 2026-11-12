@@ -20,7 +20,9 @@ export function AppGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (dataReady && ready && (!session || !session.loggedIn)) {
-      router.replace("/");
+      // ส่งหน้าปัจจุบันไปด้วย: ถ้า Supabase ยังจำการ login (เช่นเปิดแอปจากไอคอนใหม่)
+      // หน้า login จะกู้ session แล้วพากลับมาหน้านี้
+      router.replace(pathname && pathname !== "/app/change-password" ? `/?next=${encodeURIComponent(pathname)}` : "/");
       return;
     }
     // บัญชีที่ admin แจกให้: ต้องเปลี่ยนรหัสผ่านก่อนใช้หน้าอื่น
