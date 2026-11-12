@@ -264,3 +264,5 @@ for (let i = 0; i < delIds.length; i += 500) {
 }
 const { count } = await sb.from("design_intake_lines").select("id", { count: "exact", head: true });
 console.log(`\nDONE: เพิ่ม ${toInsert.length} | แก้ ${toUpdate.length} | ลบ ${toDelete.length} | ทั้งตาราง ${count} แถว`);
+// ยอดสรุปสำหรับเทียบเป้า (kpi_actuals_monthly)
+{ const { data, error } = await sb.rpc("refresh_kpi_actuals", { p_kind: "design_intake" }); console.log(error ? `refresh kpi ไม่สำเร็จ: ${error.message}` : `refresh kpi: ${JSON.stringify(data)}`); }

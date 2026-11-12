@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const kind = get("kind");
   let dealerCode = get("dealerCode");
   const year = get("year");
-  if (kind !== "service_sales" && kind !== "design_intake") return NextResponse.json({ ok: false, error: "invalid kind" }, { status: 400 });
+  if (kind !== "service_sales" && kind !== "design_intake" && kind !== "product_sales") return NextResponse.json({ ok: false, error: "invalid kind" }, { status: 400 });
   if (year && !/^\d{4}$/.test(year)) return NextResponse.json({ ok: false, error: "invalid year" }, { status: 400 });
 
   try {

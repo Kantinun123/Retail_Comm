@@ -27,6 +27,9 @@ import {
 import { cn } from "@/lib/utils";
 import { fetchFreshness, freshText, lastFullPeriod, type Freshness } from "@/lib/commission/freshness-store";
 import { useLinkedPeriod } from "@/lib/commission/linked-period";
+import { fetchTargets, pctLabel, tgTone, tgTotals, type TgCompare } from "@/lib/commission/targets-store";
+import { LyText, TargetBar, TargetProgress } from "./target-progress";
+import { PRODUCT_GROUP6 } from "@/lib/commission/targets-store";
 
 const TH_MONTH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -197,6 +200,9 @@ export function ProductSalesScreen() {
   const [year, setYear] = useState<string | null | undefined>(linked.year ?? undefined);
   const [selected, setSelected] = useState<string | null>(linked.period);
   const [tab, setTab] = useState<PsSource | null>(null);
+  /** กราฟรายเดือน: ยอดทุกช่องทาง (ค่าเริ่มต้น) | เฉพาะ Retail ใน 6 กลุ่ม เทียบเป้า */
+  const [chartMode, setChartMode] = useState<"all" | "tg">("all");
+  const [tgState, setTgState] = useState<{ key: string; t: TgCompare } | null>(null);
   const [drill, setDrill] = useState<Drill | null>(null);
   const [allStores, setAllStores] = useState(false);
   const [fresh, setFresh] = useState<Freshness | null>(null);
@@ -237,6 +243,21 @@ export function ProductSalesScreen() {
 
   const s = data && data.key === key ? data.s : null;
   const loading = !data || data.key !== key;
+
+  // เป้ายอดขายสินค้า (TG) — ACT = DI/Odoo เฉพาะ Retail ใน 6 กลุ่ม (ขอบเขตรายงาน Power BI) ; พนักงานไม่มีเป้ารายคน
+  const tgYearSel = year === undefined ? String(new Date().getFullYear()) : year;
+  const tgOn = !isSales && !!tgYearSel && (isAdmin || !!dealerCode);
+  const tgKey = `${dealerCode ?? ""}|${tgYearSel ?? ""}`;
+  useEffect(() => {
+    if (!ready || !session || !tgOn || !tgYearSel) return;
+    let cancelled = false;
+    fetchTargets("product_sales", dealerCode, tgYearSel).then((t) => !cancelled && setTgState({ key: tgKey, t }));
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, session, tgOn, dealerCode, tgYearSel, tgKey]);
+  const tg = tgOn && tgState?.key === tgKey && tgState.t.ok && tgState.t.hasTarget ? tgState.t : null;
+
   const months = useMemo(() => s?.months ?? [], [s]);
   const byPeriod = useMemo(() => new Map(months.map((m) => [m.period, m])), [months]);
   const years = yearsOf(months.map((m) => m.period));
@@ -291,6 +312,31 @@ export function ProductSalesScreen() {
     : [];
   const unmappedTotal = unmapped.reduce((a, [, v]) => a + v, 0);
   const unmappedAll = (s?.unmapped ?? []).reduce((a, u) => a + u.amount, 0);
+
+  // ---- เป้า (TG): แสดงเมื่อดูทุกแหล่ง (admin แท็บ "ทั้งหมด") และปีที่เลือกตรงกับปีของเป้า ----
+  const tgShow = !!tg && !tab && activeYear === tgYearSel;
+  const tgUpTo = activeYear ? (activeYear < nowP.slice(0, 4) ? `${activeYear}-12` : lastFull?.period ?? null) : null;
+  const tgYear = tgShow && tgUpTo ? tgTotals(tg!.months, (p) => p <= tgUpTo) : null;
+  const tgFocus = tgShow && focusPeriod ? tgTotals(tg!.months, (p) => p === focusPeriod) : null;
+  const tgGroups = tgShow && focusPeriod
+    ? PRODUCT_GROUP6.map((g) => ({ g, t: tgTotals(tg!.months, (p) => p === focusPeriod, g) })).filter((x) => x.t.target > 0 || x.t.actual > 0)
+    : [];
+  const tgByMonth = new Map<string, { target: number; actual: number; ly: number }>();
+  if (tgShow) tg!.months.forEach((c) => {
+    const o = tgByMonth.get(c.period) ?? { target: 0, actual: 0, ly: 0 };
+    o.target += c.target; o.actual += c.actual; o.ly += c.ly;
+    tgByMonth.set(c.period, o);
+  });
+  const tgMode = tgShow && chartMode === "tg";
+  // โหมดเทียบเป้า: แท่ง = ยอด Retail ใน 6 กลุ่ม ; ขยายสเกลให้เห็นเส้นเป้า/จุด LY
+  const chartRows = tgMode
+    ? chart.map((m) => ({ period: m.period, amount: tgByMonth.get(m.period)?.actual ?? 0 }))
+    : chart.map((m) => ({ period: m.period, amount: m.amount }));
+  const chartMax = Math.max(
+    1,
+    ...chartRows.map((m) => m.amount),
+    ...(tgMode ? chart.map((m) => Math.max(tgByMonth.get(m.period)?.target ?? 0, tgByMonth.get(m.period)?.ly ?? 0)) : [maxAmt])
+  );
 
   const sourceText = (s?.sources ?? []).map((x) => SOURCE_LABEL[x]).join(" + ");
   const scopeLabel = isSales ? "ยอดที่คุณขาย" : dealerCode ? "ยอดขายของร้าน" : "ยอดขายสินค้า · ทุกร้าน";
@@ -376,6 +422,13 @@ export function ProductSalesScreen() {
                 <p className="text-[10px] text-red-100/70">{topGroup && ytd ? `${((topGroup[1] / ytd) * 100).toFixed(0)}% ของยอด` : ""}</p>
               </div>
             </div>
+            {!loading && tgYear && tgYear.target > 0 && (
+              <div className="mt-3 rounded-xl bg-black/10 px-3 py-2">
+                <p className="text-[10px] text-red-100/80 mb-1">เทียบเป้า · เฉพาะยอด Retail ใน 6 กลุ่มสินค้า</p>
+                <TargetProgress t={tgYear} fmt={mil} dark label={tgUpTo ? `สะสมถึง ${monthShort(tgUpTo)}` : undefined} />
+                {adminAll && <p className="text-[9.5px] text-red-100/70 mt-1">เฉพาะร้าน HE / SCG Home ที่ยังเป็นตัวแทน</p>}
+              </div>
+            )}
           </div>
         </section>
 
@@ -392,10 +445,27 @@ export function ProductSalesScreen() {
 
         {/* กราฟรายเดือน */}
         <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-          <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-3">
-            <Icon name="bar_chart" className="text-lg text-[#d32029]" />
-            ยอดขายรายเดือน
-          </h3>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5">
+              <Icon name="bar_chart" className="text-lg text-[#d32029]" />
+              ยอดขายรายเดือน
+            </h3>
+            {tgShow && (
+              <div className="inline-flex rounded-full bg-slate-100 p-0.5 text-[10.5px] font-bold" role="group" aria-label="มุมมองกราฟ">
+                {(["all", "tg"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={chartMode === k}
+                    onClick={() => setChartMode(k)}
+                    className={cn("rounded-full px-2.5 py-1 transition", chartMode === k ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}
+                  >
+                    {k === "all" ? "ทุกช่องทาง" : "Retail · เทียบเป้า"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {loading ? (
             <div className="py-8 text-center text-slate-300"><Icon name="progress_activity" className="animate-spin text-3xl" /></div>
           ) : chart.length === 0 ? (
@@ -403,10 +473,11 @@ export function ProductSalesScreen() {
           ) : (
             <>
               <div className="flex items-end gap-1 h-36 overflow-x-auto no-scrollbar">
-                {chart.map((m) => {
+                {chartRows.map((m) => {
                   const active = m.period === focusPeriod;
                   const partial = m.period === nowP;
-                  const h = Math.max(3, (m.amount / maxAmt) * 100);
+                  const h = Math.max(3, (m.amount / chartMax) * 100);
+                  const t = tgMode ? tgByMonth.get(m.period) : undefined;
                   return (
                     <button
                       key={m.period}
@@ -419,19 +490,34 @@ export function ProductSalesScreen() {
                       <span className={cn("tnum text-[9px] mb-0.5", active ? "text-[#a11119] font-bold" : "text-slate-400")}>
                         {(m.amount / 1e6).toFixed(m.amount >= 1e7 ? 0 : 1)}
                       </span>
-                      <span
-                        className={cn(
-                          "w-full rounded-t-md transition-all duration-500",
-                          active ? "bg-[#d32029]" : partial ? "bg-red-200 border border-dashed border-red-300" : "bg-red-300/80 group-hover:bg-red-400"
+                      <span className="relative w-full flex-1 flex items-end">
+                        <span
+                          className={cn(
+                            "w-full rounded-t-md transition-all duration-500",
+                            active ? "bg-[#d32029]" : partial ? "bg-red-200 border border-dashed border-red-300" : "bg-red-300/80 group-hover:bg-red-400"
+                          )}
+                          style={{ height: `${h}%` }}
+                        />
+                        {t && t.target > 0 && (
+                          <span className="absolute -left-0.5 -right-0.5 h-[2px] bg-slate-900 rounded" style={{ bottom: `${(t.target / chartMax) * 100}%` }} aria-hidden="true" />
                         )}
-                        style={{ height: `${h}%` }}
-                      />
+                        {t && t.ly > 0 && (
+                          <span className="absolute left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-slate-500 ring-1 ring-white" style={{ bottom: `calc(${(t.ly / chartMax) * 100}% - 3px)` }} aria-hidden="true" />
+                        )}
+                      </span>
                       <span className={cn("text-[10px] mt-1", active ? "text-[#a11119] font-bold" : "text-slate-500")}>{monthShort(m.period)}</span>
                     </button>
                   );
                 })}
               </div>
               <p className="text-[10.5px] text-slate-400 mt-2">หน่วย: ล้านบาท · กดที่แท่งเพื่อดูรายละเอียดเดือนนั้น{chart.some((m) => m.period === nowP) ? " · แท่งเส้นประ = เดือนปัจจุบัน (ยังไม่ครบเดือน)" : ""}</p>
+              {tgMode && (
+                <p className="text-[10.5px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span>แท่ง = ยอด Retail ใน 6 กลุ่ม</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-[2px] bg-slate-900 rounded" aria-hidden="true" />เป้า (TG)</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-500" aria-hidden="true" />ปีก่อน (LY)</span>
+                </p>
+              )}
             </>
           )}
         </section>
@@ -452,6 +538,37 @@ export function ProductSalesScreen() {
                 </p>
               </div>
             </div>
+
+            {/* เป้ายอดขายสินค้าของเดือนที่เลือก · 6 กลุ่มตาม Power BI */}
+            {tgFocus && tgFocus.target > 0 && (
+              <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 animate-fade-up">
+                <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5 mb-2">
+                  <Icon name="flag" className="text-lg text-[#d32029]" />
+                  เทียบเป้า · {monthShort(focus.period)}
+                  <span className="text-[10.5px] font-normal text-slate-400">ยอด Retail ใน 6 กลุ่มสินค้า</span>
+                </h3>
+                <TargetProgress t={tgFocus} fmt={mil} partial={focus.period === nowP} />
+                <ul className="mt-3 pt-2 border-t border-slate-50 space-y-2">
+                  {tgGroups.map(({ g, t }) => (
+                    <li key={g}>
+                      <div className="flex items-center justify-between gap-2 text-[11.5px]">
+                        <span className="font-semibold text-slate-800">{g}</span>
+                        <span className="text-slate-500 tnum">
+                          <b className="text-slate-900">{mil(t.actual)}</b> / {t.target > 0 ? mil(t.target) : "ไม่มีเป้า"}
+                          {t.target > 0 && <> · <b className={tgTone(t.pct).text}>{pctLabel(t.pct)}</b></>}
+                        </span>
+                      </div>
+                      {t.target > 0 && <TargetBar pct={t.pct} className="mt-1" />}
+                      <p className="text-[10px] mt-0.5 text-right"><LyText t={t} fmt={mil} /></p>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                  เป้าไม่รวม VAT · ยอด Project และสินค้านอก 6 กลุ่ม (เช่น แป ตะปู เคมีภัณฑ์) ไม่นับในการเทียบเป้า ตามรายงาน Power BI
+                  {tgGroups.some((x) => x.g === "WINDSOR") && " · เป้า WINDSOR ใช้ตามไฟล์เป้า (สูงกว่ารายงาน Power BI รอทีมยืนยัน)"}
+                </p>
+              </section>
+            )}
 
             {/* admin: สรุปตามโมเดล + อันดับร้าน + ไม่ระบุร้าน */}
             {adminAll && (

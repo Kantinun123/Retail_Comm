@@ -6,7 +6,9 @@
             แถวที่คอลัมน์ไม่ครบ (ต้นทางส่งออกขาด): ใช้เฉพาะช่องที่ยังอยู่ตำแหน่งเดิม ช่องที่ไม่แน่ใจ -> "ไม่ระบุ"
    - odoo : odoo_hpb_vendor_sales_detail.xlsx (อ่านแบบ stream) — SCG Home
             วันที่ date, ยอด sales, จำนวน qty, กลุ่ม MCH2, พนักงาน sale_pc_name
-   - ระดับ: เดือน × ร้าน × กลุ่มสินค้า × พนักงาน ; ตั้งแต่ 2025-01 ; ไม่เก็บลูกค้า/เลขบิล
+   - ระดับ: เดือน × ร้าน × กลุ่มสินค้า × พนักงาน (× ช่องทาง DI Retail/Project) ; ตั้งแต่ 2025-01 ; ไม่เก็บลูกค้า/เลขบิล
+   - group6 = 6 กลุ่มตาม Power BI (DI COMPANY_NAME / Odoo MCH2+MCH3) ; channel = DI Channel (Odoo = Retail)
+     เทียบเป้า (TG) ใช้เฉพาะ channel = Retail และ group6 ไม่ว่าง (ขอบเขตเดียวกับรายงาน Power BI) ; หน้ายอดขายยังแสดงทุกช่องทาง
    - sync ด้วย row_key (เพิ่ม/แก้/ลบ ต่อแหล่ง) ; กันพัง: ยอดรวมของแหล่งลดลงเกิน 30% -> หยุด (--force)
    ไฟล์ดีฟอลต์อยู่ในโฟลเดอร์ OneDrive ที่ sync จาก SharePoint RFS ; เปลี่ยนด้วย --di <path> / --odoo <path>
 
@@ -99,13 +101,35 @@ const OVERRIDE = {
 // ที่เหลือ (ไม่มีในแอป / ไม่ได้ขายภายใต้ร้าน เช่น 8B10 สำนักงานกลาง, 8B20 Ecommerce, Promptplus) -> dealer_code = null (ไม่ระบุร้าน)
 
 const clean = (v) => { const s = String(v ?? "").replace(/\s+/g, " ").trim(); return s && s !== "-" ? s : null; };
+
+/* 6 กลุ่มตามรายงาน Power BI (Structure L1 = 1.MATERIAL) — ใช้เทียบเป้า (TG) ยอดขายสินค้า
+   ไม่อยู่ใน 6 กลุ่ม (เช่น DI HOME IMPROVEMENT: แป/ตะปู/เคมีภัณฑ์, Odoo [01BM07]) = null -> ไม่นับในการเทียบเป้า (ตาม Power BI) */
+const DI_GROUP6 = {
+  "ROOF&FITTING": "ROOF",
+  "ROOF C&W ACCESSORIES": "ROOF C&W ACCESSORIES",
+  "CEILING&WALL": "CW",
+  "CEMENT BOARD": "CW",
+  LANDSCAPE: "LANDSCAPE",
+  SFG: "SFG",
+  WINDSOR: "WINDSOR",
+};
+function odooGroup6(mch2, mch3) {
+  const c2 = String(mch2 ?? "").match(/^\[(\w+)\]/)?.[1] ?? "";
+  const c3 = String(mch3 ?? "").match(/^\[(\w+)\]/)?.[1] ?? "";
+  if (c2 === "01BM01") return c3 === "01BM0106" ? "ROOF C&W ACCESSORIES" : "ROOF"; // อุปกรณ์ติดตั้งหลังคา = Accessories
+  if (c2 === "01BM03" || c2 === "01BM04" || c2 === "01BM05") return "CW";          // ยิปซั่ม / แผ่นบอร์ด / ไม้ตกแต่ง
+  if (c2 === "01BM06") return "LANDSCAPE";
+  if (c2 === "01BM02") return "SFG";                                                // ฉนวน
+  if (c2.startsWith("08DW") || c2.startsWith("09PB")) return "WINDSOR";              // ประตูหน้าต่างไวนิล / รางน้ำ
+  return null;
+}
 const num = (v) => { const n = Number(String(v ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : 0; };
 
 /** เพิ่มยอดเข้ากลุ่มสรุป */
 function makeAgg(source) {
   const map = new Map();
-  const stat = { lines: 0, before: 0, badDate: 0, unknownDealer: new Map(), shifted: 0, naGroup: 0, naSales: 0, amount: 0 };
-  const add = ({ date, dealer, group, sales, amount, qty }) => {
+  const stat = { lines: 0, before: 0, badDate: 0, unknownDealer: new Map(), shifted: 0, naGroup: 0, naSales: 0, amount: 0, ch: {}, g6: {} };
+  const add = ({ date, dealer, group, sales, amount, qty, group6 = null, channel = "Retail" }) => {
     stat.lines++;
     const period = date.slice(0, 7);
     const mapped = OVERRIDE[source]?.[dealer] ?? dealer;
@@ -115,10 +139,15 @@ function makeAgg(source) {
     if (!group) stat.naGroup++;
     if (!sales) stat.naSales++;
     stat.amount += amount;
-    const key = [source, period, code ?? `?${dealer ?? ""}`, g, s].join("|");
+    // key เดิม + ต่อท้ายเฉพาะกรณีที่ต้องแยกแถว (คง row_key เดิมของแถว Retail ไว้)
+    //   DI Channel Project -> "|PRJ" ; Odoo อุปกรณ์ติดตั้งหลังคา (MCH3 01BM0106) แยกจากหลังคาใน MCH2 เดียวกัน -> "|ACC"
+    const suffix = (channel !== "Retail" ? "|PRJ" : "") + (source === "odoo" && group6 === "ROOF C&W ACCESSORIES" ? "|ACC" : "");
+    const key = [source, period, code ?? `?${dealer ?? ""}`, g, s].join("|") + suffix;
+    stat.ch[channel] = (stat.ch[channel] ?? 0) + amount;
+    stat.g6[group6 ?? "(ไม่อยู่ใน 6 กลุ่ม)"] = (stat.g6[group6 ?? "(ไม่อยู่ใน 6 กลุ่ม)"] ?? 0) + amount;
     let a = map.get(key);
     if (!a) {
-      a = { row_key: key, source, period, dealer_code: code, source_dealer: dealer, product_group: g, salesperson: s, rep_code: code ? matchRep(code, s) : null, amount: 0, qty: 0, line_count: 0, last_sale_date: null };
+      a = { row_key: key, source, period, dealer_code: code, source_dealer: dealer, product_group: g, group6, channel, salesperson: s, rep_code: code ? matchRep(code, s) : null, amount: 0, qty: 0, line_count: 0, last_sale_date: null };
       map.set(key, a);
     }
     a.amount += amount; a.qty += qty; a.line_count++;
@@ -138,7 +167,7 @@ async function readDi() {
     if (!head) {
       head = split(line.replace(/^\uFEFF/, "")).map((h) => h.trim());
       I = Object.fromEntries(head.map((h, i) => [h, i]));
-      for (const k of ["DealerCode", "ReformatSalesDate", "Netamount", "Qty", "MISL5_Name", "SaleName", "SaleCode"]) if (!(k in I)) throw new Error(`DI: ไม่พบคอลัมน์ ${k}`);
+      for (const k of ["DealerCode", "ReformatSalesDate", "Netamount", "Qty", "MISL5_Name", "SaleName", "SaleCode", "COMPANY_NAME", "Channel"]) if (!(k in I)) throw new Error(`DI: ไม่พบคอลัมน์ ${k}`);
       return;
     }
     const r = split(line);
@@ -160,6 +189,8 @@ async function readDi() {
       sales: clean(at("SaleName")) ?? clean(at("SaleCode")),
       amount: num(at("Netamount")),
       qty: num(at("Qty")),
+      group6: DI_GROUP6[clean(at("COMPANY_NAME"))] ?? null,
+      channel: clean(at("Channel")) === "Project" ? "Project" : "Retail",
     });
   };
   const dec = new TextDecoder("windows-874");
@@ -197,6 +228,8 @@ async function readOdoo() {
       sales: clean(r[I.sale_pc_name]),
       amount: num(r[I.sales]),
       qty: num(r[I.qty]),
+      group6: odooGroup6(r[I.MCH2], I.MCH3 != null ? r[I.MCH3] : null),
+      channel: "Retail",
     });
   }
   return agg;
@@ -213,6 +246,8 @@ async function syncSource(source, file, reader) {
   console.log(`\n===== ${source.toUpperCase()} | ${file.split("/").pop()} (${(st.size / 1048576).toFixed(0)} MB, แก้ไข ${st.mtime.toISOString().slice(0, 16)}) | อ่าน ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   console.log(`รายการที่ใช้ ${s.lines.toLocaleString()} | ก่อน ${SINCE} ${s.before.toLocaleString()} | วันที่อ่านไม่ได้ ${s.badDate} | แถวคอลัมน์ไม่ครบ ${s.shifted.toLocaleString()}`);
   console.log(`ยอดรวม ฿${f0(s.amount)} | กลุ่มไม่ระบุ ${s.naGroup.toLocaleString()} | พนักงานไม่ระบุ ${s.naSales.toLocaleString()} รายการ`);
+  console.log(`ช่องทาง: ${Object.entries(s.ch).map(([k, v]) => `${k} ฿${f0(v)}`).join(" | ")}`);
+  console.log(`6 กลุ่ม: ${Object.entries(s.g6).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(v / 1e6).toFixed(1)}M`).join(" | ")}`);
   console.log(`ร้านที่ไม่อยู่ในระบบ: ${s.unknownDealer.size ? [...s.unknownDealer.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join(" ") : "ไม่มี"}`);
   const per = {};
   rows.forEach((r) => (per[r.period] = (per[r.period] ?? 0) + r.amount));
@@ -227,7 +262,7 @@ async function syncSource(source, file, reader) {
   // อ่านแบบ keyset (id > ล่าสุด) ไม่ใช่ offset — offset ลึก ๆ บนตาราง 200k แถวเคย statement timeout
   const db = [];
   for (let lastId = 0; ; ) {
-    const { data, error } = await sb.from("product_sales_lines").select("id,row_key,amount,qty,line_count,last_sale_date,dealer_code,rep_code").eq("source", source).gt("id", lastId).order("id").limit(1000);
+    const { data, error } = await sb.from("product_sales_lines").select("id,row_key,amount,qty,line_count,last_sale_date,dealer_code,rep_code,group6,channel").eq("source", source).gt("id", lastId).order("id").limit(1000);
     if (error) throw new Error("อ่านฐานข้อมูลไม่สำเร็จ: " + error.message);
     db.push(...data);
     if (data.length < 1000) break;
@@ -236,7 +271,7 @@ async function syncSource(source, file, reader) {
   const dbMap = new Map(db.map((x) => [x.row_key, x]));
   const toUp = rows.filter((r) => {
     const c = dbMap.get(r.row_key);
-    return !c || Number(c.amount) !== r.amount || Number(c.qty) !== r.qty || c.line_count !== r.line_count || c.last_sale_date !== r.last_sale_date || c.dealer_code !== r.dealer_code || (c.rep_code ?? null) !== r.rep_code;
+    return !c || Number(c.amount) !== r.amount || Number(c.qty) !== r.qty || c.line_count !== r.line_count || c.last_sale_date !== r.last_sale_date || c.dealer_code !== r.dealer_code || (c.rep_code ?? null) !== r.rep_code || (c.group6 ?? null) !== r.group6 || (c.channel ?? null) !== r.channel;
   });
   const keys = new Set(rows.map((r) => r.row_key));
   const toDel = db.filter((x) => !keys.has(x.row_key));
@@ -273,4 +308,9 @@ try {
   process.exit(1);
 }
 if (!APPLY) console.log("\n(DRY RUN) เพิ่ม --apply เพื่อ sync จริง");
+else {
+  // ยอดสรุปสำหรับเทียบเป้า (kpi_actuals_monthly)
+  const { data, error } = await sb.rpc("refresh_kpi_actuals", { p_kind: "product_sales" });
+  console.log(error ? `refresh kpi ไม่สำเร็จ: ${error.message}` : `refresh kpi: ${JSON.stringify(data)}`);
+}
 process.exit(code);

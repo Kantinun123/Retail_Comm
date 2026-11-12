@@ -241,3 +241,8 @@ const { count } = await sb.from("ba_service_sales_lines").select("id", { count: 
 console.log(`\nDONE: เพิ่ม ${toInsert.length} | แก้ ${toUpdate.length} | ลบ ${toDelete.length} | ในตารางตอนนี้ ${count} งาน`);
 // ผูกพนักงาน (rep_code/sales_name จาก ba_incentive_lines ด้วย job_code) ให้งานใหม่
 { const { data, error } = await sb.rpc("refresh_service_sales_reps"); console.log(error ? `refresh reps ไม่สำเร็จ: ${error.message}` : `refresh reps: ${JSON.stringify(data)}`); }
+// ยอดสรุปสำหรับเทียบเป้า (kpi_actuals_monthly) — เฉพาะรอบที่มีการเปลี่ยนแปลง
+if (toInsert.length || toUpdate.length || toDelete.length) {
+  const { data, error } = await sb.rpc("refresh_kpi_actuals", { p_kind: "service_sales" });
+  console.log(error ? `refresh kpi ไม่สำเร็จ: ${error.message}` : `refresh kpi: ${JSON.stringify(data)}`);
+}

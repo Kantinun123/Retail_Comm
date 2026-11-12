@@ -24,7 +24,7 @@ import { fetchCustSatSummary, type CsSummary } from "@/lib/commission/cust-sat-s
 import { fetchServiceSalesSummary, type SsSummary } from "@/lib/commission/service-sales-store";
 import { fetchDesignIntake, type DiSummary } from "@/lib/commission/design-intake-store";
 import { fetchProductSales, type PsSummary } from "@/lib/commission/product-sales-store";
-import { fetchTargets, tgTotals, type TgCompare } from "@/lib/commission/targets-store";
+import { PRODUCT_GROUP6, fetchTargets, tgTotals, type TgCompare } from "@/lib/commission/targets-store";
 import { withPeriod } from "@/lib/commission/linked-period";
 import { LyText, TargetBar, TargetProgress } from "./target-progress";
 import { pctLabel, tgTone } from "@/lib/commission/targets-store";
@@ -335,12 +335,17 @@ export function HomeHubScreen() {
   // เป้า (TG) ของปีที่เลือก: ยอดขายงานบริการ + แบบรับเข้า (dealerCode ว่าง = admin ทุกร้าน)
   const tgYear = pick.mode === "month" ? pick.period.slice(0, 4) : pick.year;
   const tgKey = `${dealerCode ?? ""}|${tgYear}`;
-  const [tgs, setTgs] = useState<{ key: string; svc: TgCompare | null; di: TgCompare | null } | null>(null);
+  const [tgs, setTgs] = useState<{ key: string; svc: TgCompare | null; di: TgCompare | null; prod: TgCompare | null } | null>(null);
   useEffect(() => {
     if (!ready || !session) return;
     let cancelled = false;
-    Promise.all([fetchTargets("service_sales", dealerCode, tgYear), fetchTargets("design_intake", dealerCode, tgYear)]).then(([svc, di2]) => {
-      if (!cancelled) setTgs({ key: tgKey, svc: svc.ok && svc.hasTarget ? svc : null, di: di2.ok && di2.hasTarget ? di2 : null });
+    Promise.all([
+      fetchTargets("service_sales", dealerCode, tgYear),
+      fetchTargets("design_intake", dealerCode, tgYear),
+      fetchTargets("product_sales", dealerCode, tgYear),
+    ]).then(([svc, di2, prod]) => {
+      if (!cancelled)
+        setTgs({ key: tgKey, svc: svc.ok && svc.hasTarget ? svc : null, di: di2.ok && di2.hasTarget ? di2 : null, prod: prod.ok && prod.hasTarget ? prod : null });
     });
     return () => {
       cancelled = true;
@@ -443,6 +448,11 @@ export function HomeHubScreen() {
     ? ["ROOF SERVICE", "Qchang", "SMART SOLUTION"].map((g) => ({ g, t: tgTotals(tgNow.svc!.months, tgKeepView, g) })).filter((x) => x.t.target > 0)
     : [];
   const mil = (v: number) => (Math.abs(v) >= 1e6 ? `฿${(v / 1e6).toFixed(2)}M` : Math.abs(v) >= 1e3 ? `฿${(v / 1e3).toFixed(0)}K` : baht(v));
+  // เป้ายอดขายสินค้า: ACT = Retail ใน 6 กลุ่ม (ตาม Power BI)
+  const prodT = tgNow?.prod ? tgTotals(tgNow.prod.months, tgKeepView) : null;
+  const prodGroupsT = tgNow?.prod
+    ? PRODUCT_GROUP6.map((g) => ({ g, t: tgTotals(tgNow.prod!.months, tgKeepView, g) })).filter((x) => x.t.target > 0)
+    : [];
 
   // ---- ผลงานร้าน + เรื่องที่ควรดู (เรื่องที่ควรดูอิงข้อมูลล่าสุดเสมอ) ----
   const attention = adminAllStores ? [] : buildAttention({ evalSum, evalFails, csSum, di });
@@ -594,6 +604,44 @@ export function HomeHubScreen() {
                   fresh={fr(prodJobs)}
                   href={lp("/app/product-sales")}
                 />
+                {prodT && prodT.target > 0 && (
+                  <Link
+                    href={lp("/app/product-sales")}
+                    className="mt-2.5 block rounded-2xl bg-white border border-slate-100 shadow-sm p-3.5 hover:border-red-200 hover:-translate-y-0.5 active:scale-[0.99] transition-all"
+                  >
+                    <p className="text-[12px] font-bold text-slate-900 flex items-center gap-1.5 mb-2">
+                      <Icon name="flag" className="text-[#d32029]" style={{ fontSize: 16 }} />
+                      เป้ายอดขายสินค้า
+                      {adminAllStores && <span className="text-[10px] font-normal text-slate-400">· ร้าน HE / SCG Home</span>}
+                    </p>
+                    <TargetProgress t={prodT} fmt={mil} label={tgLabel} partial={view.mode === "month" && view.period === curP} />
+                    {prodGroupsT.length > 0 && (
+                      <ul className="mt-2.5 pt-2 border-t border-slate-50 space-y-1.5">
+                        {prodGroupsT.map(({ g, t }) => (
+                          <li key={g}>
+                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="text-slate-700">{g}</span>
+                              <span className="text-slate-500 tnum">
+                                <b className="text-slate-900">{mil(t.actual)}</b> / {mil(t.target)} · <b className={tgTone(t.pct).text}>{pctLabel(t.pct)}</b>
+                              </span>
+                            </div>
+                            <TargetBar pct={t.pct} className="mt-1" />
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!adminAllStores && productSalesTotal - prodT.actual > 1 && (
+                      <p className="mt-2.5 rounded-xl bg-slate-50 px-3 py-2 text-[10.5px] text-slate-600 leading-relaxed">
+                        ยอดขายสินค้ารวม <b className="tnum">{mil(productSalesTotal)}</b> = Retail ใน 6 กลุ่ม (นับเป้า) <b className="tnum">{mil(prodT.actual)}</b> + Project / สินค้านอก 6 กลุ่ม (ไม่นับเป้า){" "}
+                        <b className="tnum">{mil(productSalesTotal - prodT.actual)}</b>
+                      </p>
+                    )}
+                    <p className="text-[9.5px] text-slate-400 mt-2 flex justify-between gap-2">
+                      <span>เป้าไม่รวม VAT · ขอบเขตเดียวกับรายงาน Power BI</span>
+                      <LyText t={prodT} fmt={mil} />
+                    </p>
+                  </Link>
+                )}
               </div>
             )}
             {showServiceSales && (

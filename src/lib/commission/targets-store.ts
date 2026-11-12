@@ -7,7 +7,10 @@
    - LY = ยอดเดือนเดียวกันของปีก่อน ; % ถึงเป้า = ACT ÷ TG (ไม่ปรับฐาน VAT เหมือน Power BI)
    ============================================================= */
 
-export type TargetKind = "service_sales" | "design_intake";
+export type TargetKind = "service_sales" | "design_intake" | "product_sales";
+
+/** 6 กลุ่มสินค้าตามรายงาน Power BI (ลำดับเดียวกับรายงาน) — product_sales_lines.group6 / sales_targets.group3 */
+export const PRODUCT_GROUP6 = ["ROOF", "ROOF C&W ACCESSORIES", "CW", "LANDSCAPE", "SFG", "WINDSOR"] as const;
 
 export interface TgCell {
   period: string;          // 'YYYY-MM' (LY ถูกเลื่อนมาไว้ที่เดือนเดียวกันของปีนี้แล้ว)

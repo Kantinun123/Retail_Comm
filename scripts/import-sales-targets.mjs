@@ -8,6 +8,8 @@
                        H3 ROOF SYSTEM / METAL ROOF -> ROOF SERVICE ; H3 HOME RENOVATION SYSTEM หรือ H2 3.Q-Chang -> Qchang ;
                        H2 2.Smart Solution -> SMART SOLUTION
                      หมายเหตุ: header ในไฟล์มีช่องว่าง (" plan_amount_excl_vat ") จึง trim ชื่อคอลัมน์ก่อนใช้
+   --kind product  : opbychannel.xlsx sheet "Plan" (WIN CONTRACT, BusinessType = Product Material) -> kind product_sales
+                     group3 = 6 กลุ่มสินค้า (H2 SCGR -> ROOF / H3 ACCESSORIES -> ROOF C&W ACCESSORIES ; CW ; LANDSCAPE ; SFG ; WINDSOR)
    ร้าน: channel_detail_name -> dealers ด้วยชื่อทุกคอลัมน์ใน Master_Dealer.csv + OVERRIDE (ชุดเดียวกับ sync-design-intake)
          map ไม่ได้ -> dealer_code = null (เก็บชื่อร้านไว้)
    DRY RUN: node scripts/import-sales-targets.mjs --kind design|service [--file <path>]
@@ -20,10 +22,10 @@ import { createClient } from "@supabase/supabase-js";
 const arg = (k) => { const i = process.argv.indexOf(k); return i > -1 ? process.argv[i + 1] : null; };
 const APPLY = process.argv.includes("--apply");
 const KIND = arg("--kind");
-if (!["design", "service"].includes(KIND)) { console.error("ระบุ --kind design หรือ --kind service"); process.exit(1); }
+if (!["design", "service", "product"].includes(KIND)) { console.error("ระบุ --kind design | service | product"); process.exit(1); }
 const DIR = "D:/OneDrive - The Siam Cement Public Company Limited/RSS  System - rawdata_op/";
 const FILE = arg("--file") ?? DIR + (KIND === "design" ? "opbyhomedesign.xlsx" : "opbychannel.xlsx");
-const DB_KIND = KIND === "design" ? "design_intake" : "service_sales";
+const DB_KIND = { design: "design_intake", service: "service_sales", product: "product_sales" }[KIND];
 
 const env = {};
 for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
@@ -79,7 +81,7 @@ const raw = XLSX.utils.sheet_to_json(wb.Sheets[SHEET], { defval: null, raw: true
   .map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.trim(), v])));
 const need = KIND === "design"
   ? ["order_created_year", "order_created_month", "channel_detail_name", "TG แบบบ้าน", "rept_gp_shopmodel"]
-  : ["order_created_year", "order_created_month", "channel_detail_name", "plan_amount_excl_vat", "DataType02", "BusinessType", "H2", "H3", "H5", "rept_gp_shopmodel"];
+  : ["order_created_year", "order_created_month", "channel_detail_name", "plan_amount_excl_vat", "DataType02", "BusinessType", "H2", "H3", ...(KIND === "service" ? ["H5"] : []), "rept_gp_shopmodel"];
 const missing = need.filter((k) => !(k in (raw[0] ?? {})));
 if (missing.length) { console.error(`ไม่พบคอลัมน์: ${missing.join(", ")} — ยกเลิก`); process.exit(1); }
 
@@ -88,6 +90,17 @@ const group3Of = (r) => {
   if (h3 === "ROOF SYSTEM" || h3 === "METAL ROOF") return "ROOF SERVICE";
   if (h3 === "HOME RENOVATION SYSTEM" || h2 === "3.Q-Chang") return "Qchang";
   if (h2 === "2.Smart Solution") return "SMART SOLUTION";
+  return null;
+};
+/* ยอดขายสินค้า: 6 กลุ่มตามรายงาน Power BI (ตรงกับ product_sales_lines.group6) — ตรวจ 2026: ตรง PBI 3,754/4,066 ร้าน×กลุ่ม×เดือน
+   (WINDSOR ในไฟล์ 30.0M สูงกว่า PBI 6.3M — ยังไม่ทราบตัวกรองของ PBI จึงใช้ตามไฟล์) */
+const group6Of = (r) => {
+  const h2 = str(r.H2), h3 = str(r.H3);
+  if (h2 === "SCGR") return h3 === "ACCESSORIES" ? "ROOF C&W ACCESSORIES" : "ROOF";
+  if (h2 === "CW") return "CW";
+  if (h2 === "LANDSCAPE") return "LANDSCAPE";
+  if (h2 === "SFG") return "SFG";
+  if (h2 === "WINDSOR") return "WINDSOR";
   return null;
 };
 
@@ -100,8 +113,9 @@ for (const r of raw) {
   let group3 = null, h5 = null, target;
   if (KIND === "design") target = Number(r["TG แบบบ้าน"]) || 0;
   else {
-    if (r.DataType02 !== "WIN CONTRACT" || r.BusinessType !== "Service Solution") { skipped++; continue; }
-    group3 = group3Of(r); h5 = str(r.H5);
+    const wantBT = KIND === "product" ? "Product Material" : "Service Solution";
+    if (r.DataType02 !== "WIN CONTRACT" || r.BusinessType !== wantBT) { skipped++; continue; }
+    group3 = KIND === "product" ? group6Of(r) : group3Of(r); h5 = KIND === "product" ? null : str(r.H5);
     if (!group3) { const k = `${r.H2}/${r.H3}`; unknownH.set(k, (unknownH.get(k) ?? 0) + 1); continue; }
     target = Number(r.plan_amount_excl_vat) || 0;
   }
