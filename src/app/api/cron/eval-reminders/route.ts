@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { bangkokToday, buildTracking, daysInMonth } from "@/lib/server/eval-tracking";
-import { pushConfigured, pushToUser } from "@/lib/server/push";
+import { pushConfigError, pushConfigured, pushToUser } from "@/lib/server/push";
 import { thaiMonth } from "@/lib/server/thai-month";
 
 /**
@@ -108,7 +108,10 @@ export async function GET(req: NextRequest) {
       );
   }
 
-  if (dry) return NextResponse.json({ ok: true, dry: true, today, pushReady: pushConfigured(), plan });
+  if (dry) {
+    const pushReady = pushConfigured();
+    return NextResponse.json({ ok: true, dry: true, today, pushReady, pushError: pushReady ? null : pushConfigError, plan });
+  }
 
   // ส่งจริง: ข้ามที่ส่งไปแล้ววันนี้
   let sent = 0;

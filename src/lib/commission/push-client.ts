@@ -4,7 +4,8 @@
    - Android/Chrome/desktop: ใช้ได้ทันที
    - iPhone/iPad: ต้อง "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดจากไอคอน (iOS 16.4 ขึ้นไป) */
 
-const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+// ตัดช่องว่าง/เครื่องหมายคำพูดที่อาจติดมาจากการวางค่าใน Vercel
+const PUBLIC_KEY = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "").trim().replace(/^["']|["']$/g, "").trim();
 
 export type PushState = "unsupported" | "needs-install" | "denied" | "off" | "on";
 

@@ -6,12 +6,31 @@ import type { createServiceClient } from "@/lib/supabase/service";
 type Sb = ReturnType<typeof createServiceClient>;
 
 let configured = false;
+/** เหตุผลที่ตั้งค่า push ไม่ได้ (ข้อความจาก web-push ไม่มีค่าคีย์) — ใช้แสดงใน cron dry-run */
+export let pushConfigError: string | null = null;
+
+// ค่าที่วางใน Vercel อาจติดช่องว่าง/ขึ้นบรรทัด/เครื่องหมายคำพูดมา -> ตัดออกก่อนใช้
+const envClean = (v: string | undefined) => (v ?? "").trim().replace(/^["']|["']$/g, "").trim();
+
 export function pushConfigured(): boolean {
   if (configured) return true;
-  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const priv = process.env.VAPID_PRIVATE_KEY;
-  if (!pub || !priv) return false;
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:admin@example.com", pub, priv);
+  const pub = envClean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+  const priv = envClean(process.env.VAPID_PRIVATE_KEY);
+  if (!pub || !priv) {
+    pushConfigError = `missing ${!pub ? "NEXT_PUBLIC_VAPID_PUBLIC_KEY" : ""}${!pub && !priv ? " + " : ""}${!priv ? "VAPID_PRIVATE_KEY" : ""}`;
+    return false;
+  }
+  try {
+    // subject ต้องเป็น mailto: หรือ https: — ถ้าใส่มาแค่อีเมล เติม mailto: ให้
+    const subjRaw = envClean(process.env.VAPID_SUBJECT) || "mailto:admin@example.com";
+    const subject = /^(mailto:|https:)/i.test(subjRaw) ? subjRaw : subjRaw.includes("@") ? `mailto:${subjRaw}` : subjRaw;
+    webpush.setVapidDetails(subject, pub, priv);
+  } catch (e) {
+    // คีย์/subject ผิดรูปแบบ: ไม่ให้ทั้ง route พัง (500) แค่ถือว่ายังส่งไม่ได้
+    pushConfigError = e instanceof Error ? e.message : "invalid VAPID config";
+    return false;
+  }
+  pushConfigError = null;
   configured = true;
   return true;
 }
