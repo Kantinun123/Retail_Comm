@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useSession } from "@/lib/commission/session";
+import { AREA_HOME, useSession } from "@/lib/commission/session";
 import { useDatasetReady } from "@/lib/commission/dataset";
 
 /** หน้าที่ Area ใช้ได้โดยยังไม่ต้องเลือกร้าน (ที่เหลือเป็นหน้าข้อมูลรายร้าน) */
-const AREA_NO_STORE_OK = ["/app/stores", "/app/store", "/app/change-password", "/app/chat", "/app/member", "/app/employee-requests", "/app/eval-tracking"];
+const AREA_NO_STORE_OK = [AREA_HOME, "/app/stores", "/app/store", "/app/change-password", "/app/chat", "/app/member", "/app/employee-requests", "/app/eval-tracking"];
 
 /** Redirects to the login page when there is no active session. */
 export function AppGuard({ children }: { children: React.ReactNode }) {
@@ -30,7 +30,7 @@ export function AppGuard({ children }: { children: React.ReactNode }) {
     }
     // Area/Coach/หัวหน้า Area: หน้าข้อมูลต้องเลือกร้านก่อน (เลือกจากหน้าร้านที่ดูแล)
     if (session?.loggedIn && session.isArea && !session.areaViewDealer && pathname && !AREA_NO_STORE_OK.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
-      router.replace("/app/stores");
+      router.replace(AREA_HOME);
       return;
     }
     // บัญชีที่ admin แจกให้: ต้องเปลี่ยนรหัสผ่านก่อนใช้หน้าอื่น

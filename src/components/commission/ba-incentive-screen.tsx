@@ -253,9 +253,9 @@ export function BaIncentiveScreen() {
   const [showDownload, setShowDownload] = useState(false);
 
   // dealer -> ร้านตัวเอง; admin -> storeFilter (null = ทุกร้าน); sales -> scope ด้วย repCode
-  const repCode = session?.isSales ? session.repCode : null;
+  const repCode = session?.isSales ? session.repCode : (session?.viewRep ?? null);
   const dealerCode = session
-    ? session.isAdmin
+    ? session.viewRep && !session.isSales ? null : session.isAdmin
       ? session.storeFilter
       : session.isSales
         ? null

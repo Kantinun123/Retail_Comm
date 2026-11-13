@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
-import { doLogout, useSession } from "@/lib/commission/session";
+import { AREA_HOME, doLogout, useSession } from "@/lib/commission/session";
 import { ProfileCard } from "./profile-card";
 import { fetchCommissionSummary, type CommissionSummary } from "@/lib/commission/commission-product-store";
 import { fetchBaSummary, type BaSummary } from "@/lib/commission/ba-incentive-store";
@@ -120,8 +120,9 @@ export function HomeStaffHubScreen() {
   const { session, ready } = useSession();
   const router = useRouter();
   // sales = ตัวเอง ; admin ที่ "ดูในมุมมองพนักงาน" = rep ที่เลือก
-  const adminStaffView = !!session?.isAdmin && session.adminViewMode === "staff" && !!session.adminViewRep;
-  const repCode = adminStaffView ? session!.adminViewRep : (session?.repCode ?? null);
+  // มุมมองพนักงาน: admin หรือ Area/Coach/หัวหน้า Area ที่เลือกพนักงานในร้านที่ดูแล (เซิร์ฟเวอร์ตรวจสิทธิ์ซ้ำ)
+  const staffView = !session?.isSales && !!session?.viewRep;
+  const repCode = staffView ? session!.viewRep : (session?.repCode ?? null);
 
   const [cp, setCp] = useState<CommissionSummary | null>(null);
   const [ba, setBa] = useState<BaSummary | null>(null);
@@ -135,10 +136,10 @@ export function HomeStaffHubScreen() {
 
   // หน้านี้เฉพาะพนักงานขาย (หรือ admin ที่กำลังดูมุมมองพนักงาน); role อื่นกลับหน้าของตัวเอง
   useEffect(() => {
-    if (ready && session && !session.isSales && !adminStaffView) {
+    if (ready && session && !session.isSales && !staffView) {
       router.replace("/app/home");
     }
-  }, [ready, session, router, adminStaffView]);
+  }, [ready, session, router, staffView]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,7 +176,7 @@ export function HomeStaffHubScreen() {
   }, [repCode]);
 
   if (!ready || !session) return null;
-  if (!session.isSales && !adminStaffView) return null;
+  if (!session.isSales && !staffView) return null;
 
   const view = toView(pick);
   const viewTitle = viewLabel(view);
@@ -247,10 +248,18 @@ export function HomeStaffHubScreen() {
       <div className="space-y-5 pb-4">
         {session.isAdmin && <ViewModeBar />}
 
-        {adminStaffView && session.adminViewRepName && (
+        {staffView && (
           <div className="rounded-xl bg-violet-50 border border-violet-200 px-3 py-2 text-[12px] text-violet-800 flex items-center gap-1.5">
             <Icon name="visibility" style={{ fontSize: 15 }} />
-            กำลังดูมุมมองพนักงาน: <span className="font-bold">{session.adminViewRepName}</span>
+            <span className="min-w-0 flex-1 truncate">
+              กำลังดูมุมมองพนักงาน: <span className="font-bold">{session.viewRepName ?? session.viewRep}</span>
+              {session.isArea && session.dealer.name ? ` · ${session.dealer.name}` : ""}
+            </span>
+            {session.isArea && (
+              <Link href={AREA_HOME} className="shrink-0 rounded-full bg-white border border-violet-200 px-2.5 py-0.5 font-bold">
+                เปลี่ยน
+              </Link>
+            )}
           </div>
         )}
 

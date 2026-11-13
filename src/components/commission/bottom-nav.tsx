@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { Icon } from "./icon";
 import { NotificationBell } from "./notification-bell";
-import { useSession } from "@/lib/commission/session";
+import { AREA_HOME, useSession } from "@/lib/commission/session";
 import { cn } from "@/lib/utils";
 
 type NavKey =
   | "home"
+  | "areaHome"
   | "dashboard"
   | "staffIncentive"
   | "backMargin"
@@ -170,9 +171,14 @@ export function BottomNav({ active }: { active: NavKey }) {
   let items: { key: NavKey; href: string; icon: string; label: string }[];
   if (session?.isArea) {
     // Area/Coach/หัวหน้า Area: รายชื่อร้านที่ดูแล + หน้าหลักของร้านที่เลือก (ถ้าเลือกแล้ว) + สอบถาม
+    // หน้าหลัก = การ์ดเลือกเรื่อง ; กำลังดูร้าน/พนักงานอยู่ -> มีเมนูกลับไปหน้าข้อมูลนั้น
     items = [
-      { key: "database", href: "/app/stores", icon: "store", label: "ร้านที่ดูแล" },
-      ...(session.areaViewDealer ? [{ ...HOME_ITEM, label: "ข้อมูลร้าน" }] : []),
+      { key: "areaHome", href: AREA_HOME, icon: "home", label: "หน้าหลัก" },
+      ...(session.areaViewRep
+        ? [{ key: "home" as NavKey, href: "/app/home-staff", icon: "badge", label: "ข้อมูลพนักงาน" }]
+        : session.areaViewDealer
+          ? [{ ...HOME_ITEM, icon: "storefront", label: "ข้อมูลร้าน" }]
+          : []),
       CHAT_ITEM,
     ];
   } else if (inStaffView) {

@@ -49,11 +49,17 @@ const KEYS = {
   areaName: "areaName",
   // Area/Coach/หัวหน้า Area: ร้านที่เลือกดูข้อมูล (ต้องอยู่ใน areaStores)
   areaViewDealer: "areaViewDealer",
+  // Area/Coach/หัวหน้า Area: พนักงานที่เลือกดู "มุมมองพนักงาน" (ต้องอยู่ในร้าน areaViewDealer)
+  areaViewRep: "areaViewRep",
+  areaViewRepName: "areaViewRepName",
   // บทบาทจริงของกลุ่ม area: area | coach | re | area_head
   areaKind: "areaKind",
 } as const;
 
 export type AdminViewMode = "admin" | "store" | "staff";
+
+/** หน้าหลักของ Area / Coach / หัวหน้า Area (การ์ดเลือกเรื่อง) */
+export const AREA_HOME = "/app/area-home";
 
 export interface SessionData {
   loggedIn: boolean;
@@ -84,6 +90,15 @@ export interface SessionData {
   areaName: string | null;
   /** ร้านที่ Area/Coach/หัวหน้า Area เลือกดูข้อมูล (null = ยังไม่เลือก -> ต้องเลือกจากหน้าร้านที่ดูแล) */
   areaViewDealer: string | null;
+  /** พนักงานที่ Area/Coach/หัวหน้า Area เลือกดูในมุมมองพนักงาน (null = ไม่ได้อยู่ในมุมมองพนักงาน) */
+  areaViewRep: string | null;
+  /**
+   * พนักงานที่กำลังดูใน "มุมมองพนักงาน" — รวมของ admin และกลุ่ม Area (null = ไม่ได้อยู่ในมุมมองพนักงาน)
+   * หน้าผลประโยชน์/ยอดขายรายคนใช้ค่านี้แทน repCode ของตัวเอง
+   */
+  viewRep: string | null;
+  /** ชื่อพนักงานที่กำลังดูในมุมมองพนักงาน */
+  viewRepName: string | null;
   /** บทบาทจริงของกลุ่ม area (area | coach | re | area_head) ; null = ไม่ใช่กลุ่ม area */
   areaKind: string | null;
   /**
@@ -139,6 +154,8 @@ function readSession(): SessionData {
   const areaPick = isArea ? sessionStorage.getItem(KEYS.areaViewDealer) || null : null;
   const areaViewDealer = areaPick && areaStores.includes(areaPick) ? areaPick : null;
   const areaKind = isArea ? sessionStorage.getItem(KEYS.areaKind) || "area" : null;
+  const areaViewRep = areaViewDealer ? sessionStorage.getItem(KEYS.areaViewRep) || null : null;
+  const areaViewRepName = areaViewRep ? sessionStorage.getItem(KEYS.areaViewRepName) || null : null;
   // admin "ดูในมุมมอง" (store/staff) — role อื่นไม่ใช้
   const adminViewMode = (isAdmin
     ? (sessionStorage.getItem(KEYS.adminViewMode) as AdminViewMode) || "admin"
@@ -187,6 +204,9 @@ function readSession(): SessionData {
     areaStores,
     areaName,
     areaViewDealer,
+    areaViewRep,
+    viewRep: adminViewMode === "staff" && adminViewRep ? adminViewRep : areaViewRep,
+    viewRepName: adminViewMode === "staff" && adminViewRep ? adminViewRepName : areaViewRepName,
     areaKind,
     storeFilter,
     adminViewMode,
@@ -230,6 +250,8 @@ export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repD
   }
   // login ใหม่ -> ยังไม่เลือกร้าน (Area เลือกจากหน้าร้านที่ดูแล)
   sessionStorage.removeItem(KEYS.areaViewDealer);
+  sessionStorage.removeItem(KEYS.areaViewRep);
+  sessionStorage.removeItem(KEYS.areaViewRepName);
   if (dealerCode) sessionStorage.setItem(KEYS.dealerCode, dealerCode);
   else sessionStorage.removeItem(KEYS.dealerCode);
   sessionStorage.setItem(KEYS.role, role);
@@ -271,6 +293,18 @@ export function setStoreFilter(code: string | null) {
 export function setAreaStore(code: string | null) {
   if (code) sessionStorage.setItem(KEYS.areaViewDealer, code);
   else sessionStorage.removeItem(KEYS.areaViewDealer);
+  // เลือกดูระดับร้าน -> ออกจากมุมมองพนักงาน
+  sessionStorage.removeItem(KEYS.areaViewRep);
+  sessionStorage.removeItem(KEYS.areaViewRepName);
+  emit();
+}
+
+/** Area/Coach/หัวหน้า Area: เข้า "มุมมองพนักงาน" ของพนักงานในร้านที่ดูแล (เซิร์ฟเวอร์ตรวจสิทธิ์ซ้ำ) */
+export function setAreaStaff(dealerCode: string, repCode: string, repName?: string | null) {
+  sessionStorage.setItem(KEYS.areaViewDealer, dealerCode);
+  sessionStorage.setItem(KEYS.areaViewRep, repCode);
+  if (repName) sessionStorage.setItem(KEYS.areaViewRepName, repName);
+  else sessionStorage.removeItem(KEYS.areaViewRepName);
   emit();
 }
 
@@ -329,6 +363,8 @@ export function doLogout() {
   sessionStorage.removeItem(KEYS.areaStores);
   sessionStorage.removeItem(KEYS.areaName);
   sessionStorage.removeItem(KEYS.areaViewDealer);
+  sessionStorage.removeItem(KEYS.areaViewRep);
+  sessionStorage.removeItem(KEYS.areaViewRepName);
   sessionStorage.removeItem(KEYS.areaKind);
   sessionStorage.removeItem(KEYS.adminViewMode);
   sessionStorage.removeItem(KEYS.adminViewDealer);
@@ -385,8 +421,8 @@ export function useSession(): {
 export function useHomeHref(): string {
   const { session } = useSession();
   if (session && session.isSales) return "/app/home-staff";
-  // Area: เลือกร้านแล้ว -> หน้าหลักของร้านนั้น ; ยังไม่เลือก -> รายชื่อร้านที่ดูแล
-  if (session && session.isArea) return session.areaViewDealer ? "/app/home" : "/app/stores";
+  // Area: มุมมองพนักงาน -> หน้าหลักพนักงาน ; เลือกร้านแล้ว -> หน้าหลักของร้านนั้น ; ยังไม่เลือก -> หน้าหลัก (การ์ดเลือกเรื่อง)
+  if (session && session.isArea) return session.areaViewRep ? "/app/home-staff" : session.areaViewDealer ? "/app/home" : AREA_HOME;
   // admin ใช้ Hub ร่วมกับร้านค้า (เวอร์ชันทุกร้าน)
   return "/app/home";
 }

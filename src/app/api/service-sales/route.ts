@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { REAL_AUTH } from "@/lib/supabase/api-scope";
-import { canAccessDealer, getAuthContext } from "@/lib/supabase/auth-context";
+import { canAccessDealer, getAuthContext, repDealerIfAllowed } from "@/lib/supabase/auth-context";
 
 /**
  * Service Sales API (ยอดขายงานบริการ)
@@ -50,15 +50,18 @@ export async function GET(req: NextRequest) {
         repCode = ctx.repCode;
         dealerCode = null;
         sales = null;
+      } else if (repCode && ctx.allowedDealerCodes !== "all") {
+        // ร้าน / Area / Coach ดูพนักงานรายคน: ต้องเป็นพนักงานในร้านที่เข้าถึงได้ -> เห็นงานทั้งหมดของคนนั้น
+        if (!(await repDealerIfAllowed(ctx, repCode, dealerCode))) {
+          return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+        }
+        dealerCode = null;
+        sales = null;
       } else {
         if (dealerCode && !canAccessDealer(ctx, dealerCode)) {
           return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
         }
-        if (!dealerCode && !repCode && ctx.allowedDealerCodes !== "all") {
-          return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-        }
-        // ร้าน/area ดูพนักงานรายคนได้เฉพาะในร้านที่เข้าถึงได้
-        if (repCode && !dealerCode && ctx.allowedDealerCodes !== "all") {
+        if (!dealerCode && ctx.allowedDealerCodes !== "all") {
           return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
         }
       }

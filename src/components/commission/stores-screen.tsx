@@ -15,8 +15,7 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { useSession, useHomeHref, setAreaStore, doLogout } from "@/lib/commission/session";
 import { getStoreTeamCaps } from "@/lib/commission/permissions";
-import { EmployeeRequestCard } from "./employee-request-card";
-import { EvalProgressCard } from "./eval-progress-card";
+import { chronicText, fetchTracking, shortDate, type TrackStore } from "@/lib/commission/eval-tracking-store";
 import {
   fetchStores,
   setStoreActive,
@@ -49,6 +48,23 @@ export function StoresScreen() {
   const [showInactive, setShowInactive] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  // Area/Coach: สถานะตรวจประเมินเดือนนี้รายร้าน (ป้ายบนการ์ดร้าน)
+  const [evalMap, setEvalMap] = useState<{ map: Map<string, TrackStore>; inProgress: boolean } | null>(null);
+  const isAreaUser = !!session?.isArea;
+
+  useEffect(() => {
+    if (!ready || !isAreaUser) return;
+    let cancelled = false;
+    fetchTracking().then((r) => {
+      if (cancelled || !r.ok) return;
+      const map = new Map<string, TrackStore>();
+      r.coaches.forEach((c) => c.stores.forEach((s) => map.set(s.code, s)));
+      setEvalMap({ map, inProgress: r.period === r.today.slice(0, 7) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, isAreaUser]);
 
   useEffect(() => {
     if (!ready || !session || !caps.canViewAllStores) return;
@@ -165,15 +181,15 @@ export function StoresScreen() {
       <Header homeHref={homeHref} />
 
       <div className="space-y-4 pb-4">
-        {/* Coach / Area / หัวหน้า Area: การ์ดงานแจ้งเพิ่มพนักงานใหม่ */}
-        {session.isArea && <EvalProgressCard />}
-        {session.isArea && <EmployeeRequestCard />}
-
-        {/* ตัวนับร้าน */}
+        {/* ตัวนับร้าน — Area/Coach เห็นเฉพาะร้านที่เปิดอยู่ จึงแสดงจำนวนที่ตรวจเดือนนี้แทน "ปิด/ยกเลิก" */}
         <section className="grid grid-cols-3 gap-2">
           <Stat label="ร้านทั้งหมด" value={stores.length} tone="slate" />
           <Stat label="เปิดใช้งาน" value={activeCount} tone="emerald" />
-          <Stat label="ปิด/ยกเลิก" value={inactiveCount} tone="red" />
+          {session.isArea ? (
+            <Stat label="ตรวจแล้วเดือนนี้" value={stores.filter((s) => evalMap?.map.get(s.code)?.status === "done").length} tone="slate" />
+          ) : (
+            <Stat label="ปิด/ยกเลิก" value={inactiveCount} tone="red" />
+          )}
         </section>
 
         {/* สรุปพนักงานแยกตำแหน่ง (รวมทุกร้าน) */}
@@ -309,6 +325,7 @@ export function StoresScreen() {
                       >
                         {s.isActive ? "Active" : "Non-active"}
                       </span>
+                      {session.isArea && evalMap?.map.get(s.code) && <EvalChip s={evalMap.map.get(s.code)!} inProgress={evalMap.inProgress} />}
                     </div>
                     <p className="text-[14px] font-bold text-slate-900 mt-1 leading-tight group-hover:text-[#d32029] transition flex items-center gap-1">
                       {s.name}
@@ -372,9 +389,11 @@ export function StoresScreen() {
           </div>
         )}
 
-        <p className="text-[11px] text-slate-400 text-center">
-          ปิดใช้งาน = ร้านยกเลิก/พักไว้ (ไม่ลบข้อมูล) · เปิดใหม่ได้ทุกเมื่อ
-        </p>
+        {caps.canToggleStore && (
+          <p className="text-[11px] text-slate-400 text-center">
+            ปิดใช้งาน = ร้านยกเลิก/พักไว้ (ไม่ลบข้อมูล) · เปิดใหม่ได้ทุกเมื่อ
+          </p>
+        )}
       </div>
 
       <BottomNav active="database" />
@@ -383,6 +402,18 @@ export function StoresScreen() {
 }
 
 /* ---------- ย่อย ---------- */
+/** ป้ายสถานะตรวจประเมินเดือนนี้ของร้าน (Area/Coach) */
+function EvalChip({ s, inProgress }: { s: TrackStore; inProgress: boolean }) {
+  const chronic = chronicText(s, inProgress);
+  const [text, cls] =
+    s.status === "done"
+      ? [`✓ ตรวจแล้ว ${shortDate(s.submissions[0]?.evalDate ?? null)}`, "bg-emerald-50 text-emerald-700 border-emerald-200"]
+      : chronic
+        ? [chronic, "bg-red-600 text-white border-red-600"]
+        : ["ยังไม่ตรวจเดือนนี้", "bg-amber-50 text-amber-800 border-amber-200"];
+  return <span className={cn("text-[9.5px] font-bold px-1.5 py-0.5 rounded-md border", cls)}>{text}</span>;
+}
+
 function PosStat({
   label,
   value,

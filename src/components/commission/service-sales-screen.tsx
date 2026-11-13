@@ -492,14 +492,15 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   // ขอบเขต: ร้าน / พนักงาน (เฉพาะงานตัวเอง) / admin (ทุกร้าน, เจาะร้าน, มุมมองร้าน/พนักงาน)
   const isAdmin = !!session?.isAdmin;
   const adminStoreView = isAdmin && session?.adminViewMode === "store" && !!session.adminViewDealer;
-  const adminStaffView = isAdmin && session?.adminViewMode === "staff" && !!session.adminViewRep;
-  const isSales = !!session?.isSales || adminStaffView;
+  // มุมมองพนักงาน (admin หรือ Area/Coach เลือกพนักงานในร้านที่ดูแล) -> เห็นเหมือนพนักงานคนนั้น
+  const staffView = !session?.isSales && !!session?.viewRep;
+  const isSales = !!session?.isSales || staffView;
   const dealerCode = session
     ? isAdmin
-      ? adminStaffView ? null : adminStoreView ? session.adminViewDealer : session.storeFilter
+      ? staffView ? null : adminStoreView ? session.adminViewDealer : session.storeFilter
       : isSales ? null : session.dealer.code || null
     : null;
-  const repCode = adminStaffView ? session?.adminViewRep ?? null : isSales ? session?.repCode ?? session?.empId ?? null : null;
+  const repCode = staffView ? session?.viewRep ?? null : isSales ? session?.repCode ?? session?.empId ?? null : null;
   const adminAll = isAdmin && !dealerCode && !repCode;
   const canFetch = !!session && (isAdmin || !!dealerCode || !!repCode);
   const sumKey = `${dealerCode ?? ""}|${repCode ?? ""}|${source ?? ""}`;

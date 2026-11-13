@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
-import { doLogout, useSession } from "@/lib/commission/session";
+import { AREA_HOME, doLogout, useSession } from "@/lib/commission/session";
 import { ProfileCard } from "./profile-card";
 import { fetchBackMarginSummary, type BackMarginSummary } from "@/lib/commission/back-margin-store";
 import { fetchProfitShareSummary, type ProfitShareSummary } from "@/lib/commission/ba-profit-share-store";
@@ -533,7 +533,7 @@ export function HomeHubScreen() {
               <p className="text-[13px] font-bold text-blue-950 truncate">{session.dealer.name} ({session.dealer.code})</p>
             </div>
             <Link
-              href="/app/stores"
+              href={AREA_HOME}
               className="shrink-0 px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-[12px] font-bold text-blue-700 hover:-translate-y-0.5 transition-all"
             >
               เปลี่ยนร้าน

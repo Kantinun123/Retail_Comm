@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canAccessDealer, getAuthContext, type AuthContext } from "@/lib/supabase/auth-context";
+import { canAccessDealer, getAuthContext, repDealerIfAllowed, type AuthContext } from "@/lib/supabase/auth-context";
 
 /** โหมด login จริง (production) — ต้องมี session จริงทุก request ; ไม่ตั้ง = โหมดเดโม (พฤติกรรมเดิม) */
 export const REAL_AUTH = process.env.NEXT_PUBLIC_REAL_AUTH === "1";
@@ -43,6 +43,13 @@ export async function resolveScope(
   }
 
   if (ctx.allowedDealerCodes === "all") return { ok: true, ctx, dealerCode, repCode };
+
+  // ดูรายพนักงาน: พนักงานต้องอยู่ในร้านที่เข้าถึงได้ -> แสดงงานทั้งหมดของคนนั้น (เหมือนที่พนักงานเห็นเอง)
+  if (repCode && opts.perRep) {
+    const repDealer = await repDealerIfAllowed(ctx, repCode, dealerCode);
+    if (!repDealer) return deny(403, "forbidden");
+    return { ok: true, ctx, dealerCode: null, repCode };
+  }
 
   let dc = dealerCode;
   if (!dc) {

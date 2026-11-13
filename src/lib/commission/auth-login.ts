@@ -9,7 +9,7 @@
       โดยไม่ต้องแก้ทุก screen
    ============================================================= */
 import { createClient } from "@/lib/supabase/client";
-import { doLogin, LOGGED_OUT_KEY } from "./session";
+import { AREA_HOME, doLogin, LOGGED_OUT_KEY } from "./session";
 import type { Role } from "./types";
 
 export interface AuthLoginResult {
@@ -124,7 +124,7 @@ export async function loginWithEmail(
 
 /** หน้าแรกหลัง login ตาม role ของ session */
 export function homeForRole(role: Role | undefined | null): string {
-  return role === "sales" ? "/app/home-staff" : role === "area" ? "/app/stores" : "/app/home";
+  return role === "sales" ? "/app/home-staff" : role === "area" ? AREA_HOME : "/app/home";
 }
 
 /** มี Supabase session จริง (ไม่ใช่ anonymous ของเดโม) ค้างอยู่ในเครื่องหรือไม่ — อ่านจาก storage ในเครื่อง ไม่ยิง network */

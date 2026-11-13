@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { REAL_AUTH } from "@/lib/supabase/api-scope";
-import { canAccessDealer, getAuthContext } from "@/lib/supabase/auth-context";
+import { canAccessDealer, getAuthContext, repDealerIfAllowed } from "@/lib/supabase/auth-context";
 
 /**
  * ยอดขายสินค้า (DI = Housing Expert, Odoo = SCG Home) — สรุปรายเดือน × กลุ่มสินค้า × พนักงาน
@@ -32,6 +32,13 @@ export async function GET(req: NextRequest) {
         // พนักงานเห็นเฉพาะยอดที่ตัวเองขาย (เหมือนผลประโยชน์อื่น)
         if (!ctx.repCode) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
         repCode = ctx.repCode;
+        dealerCode = null;
+        salesperson = null;
+      } else if (repCode && ctx.allowedDealerCodes !== "all") {
+        // ร้าน / Area / Coach ดูรายพนักงาน: ต้องเป็นพนักงานในร้านที่เข้าถึงได้ -> เห็นยอดทั้งหมดของคนนั้น
+        if (!(await repDealerIfAllowed(ctx, repCode, dealerCode))) {
+          return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+        }
         dealerCode = null;
         salesperson = null;
       } else {

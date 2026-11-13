@@ -64,6 +64,20 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   };
 }
 
+/**
+ * ผู้ใช้ที่ไม่ใช่ admin/พนักงาน (ร้าน / Area / Coach / หัวหน้า Area) ขอดูข้อมูลรายพนักงาน (repCode):
+ * พนักงานต้องสังกัดร้านที่ผู้ใช้เข้าถึงได้ (และตรงกับ dealerCode ถ้าระบุมา)
+ * — กันการเปลี่ยน repCode ไปดูพนักงานร้านอื่น (RPC รายคนบางตัวไม่สนใจ p_dealer เมื่อมี p_rep)
+ * คืนรหัสร้านที่พนักงานสังกัด หรือ null = ไม่อนุญาต
+ */
+export async function repDealerIfAllowed(ctx: AuthContext, repCode: string, dealerCode: string | null): Promise<string | null> {
+  const { data } = await createServiceClient().from("sale_reps").select("dealer_code").eq("rep_code", repCode).maybeSingle();
+  const repDealer = (data?.dealer_code as string | null) ?? null;
+  if (!repDealer) return ctx.allowedDealerCodes === "all" ? "" : null;
+  if (dealerCode && dealerCode !== repDealer) return null;
+  return canAccessDealer(ctx, repDealer) ? repDealer : null;
+}
+
 /** ร้าน dealerCode อยู่ในขอบเขตของผู้ใช้หรือไม่ */
 export function canAccessDealer(ctx: AuthContext, dealerCode: string): boolean {
   return ctx.allowedDealerCodes === "all" || ctx.allowedDealerCodes.includes(dealerCode);

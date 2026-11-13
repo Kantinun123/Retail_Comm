@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { doLogin } from "@/lib/commission/session";
+import { AREA_HOME, doLogin } from "@/lib/commission/session";
 import { isAreaRole, setMustChangePassword } from "@/lib/commission/auth-login";
 
 interface Me {
@@ -41,7 +41,7 @@ export default function AuthBridgePage() {
         } else if (isAreaRole(role)) {
           doLogin({ role: "area", areaStores: storeCodes ?? [], areaName: name ?? undefined, areaKind: role });
           setMustChangePassword(!!json.me.mustChangePassword);
-          router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/stores");
+          router.replace(json.me.mustChangePassword ? "/app/change-password" : AREA_HOME);
         } else if (role === "dealer" && json.me.dealerCode) {
           doLogin({ role: "dealer", dealerCode: json.me.dealerCode });
           setMustChangePassword(!!json.me.mustChangePassword);

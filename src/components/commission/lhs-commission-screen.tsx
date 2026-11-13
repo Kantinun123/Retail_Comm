@@ -234,9 +234,9 @@ export function LhsCommissionScreen() {
   const [downloading, setDownloading] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
 
-  const repCode = session?.isSales ? session.repCode : null;
+  const repCode = session?.isSales ? session.repCode : (session?.viewRep ?? null);
   const dealerCode = session
-    ? session.isAdmin
+    ? session.viewRep && !session.isSales ? null : session.isAdmin
       ? session.storeFilter
       : session.isSales
         ? null
