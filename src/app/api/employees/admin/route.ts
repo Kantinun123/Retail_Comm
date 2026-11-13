@@ -73,6 +73,8 @@ function buildRow(body: Record<string, unknown>, forUpdate: boolean) {
   setStr("start_date", "startDate");
   setStr("notes", "notes");
   setStr("photo_url", "photoUrl");
+  setStr("education", "education");
+  setStr("major", "major");
   if ("skills" in body) {
     row.skills = Array.isArray(body.skills)
       ? (body.skills as unknown[]).map(String).filter(Boolean)

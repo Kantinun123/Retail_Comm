@@ -73,6 +73,9 @@ export interface Employee {
   /** เฉพาะ roster: เป็นหัวหน้า (area/coach) ที่ดูแลร้านนี้ผ่าน assignment ไหม */
   isSupervisor: boolean;
   roleInStore: string | null;
+  /** วุฒิการศึกษา / สาขาที่จบ */
+  education: string | null;
+  major: string | null;
 }
 
 export interface StoreInfo {
@@ -122,6 +125,8 @@ type RawEmployee = {
   dealer_code: string | null;
   is_supervisor?: boolean;
   role_in_store?: string | null;
+  education?: string | null;
+  major?: string | null;
 };
 
 export function mapEmployee(r: RawEmployee): Employee {
@@ -145,6 +150,8 @@ export function mapEmployee(r: RawEmployee): Employee {
     dealerCode: r.dealer_code,
     isSupervisor: !!r.is_supervisor,
     roleInStore: r.role_in_store ?? null,
+    education: r.education ?? null,
+    major: r.major ?? null,
   };
 }
 
@@ -287,6 +294,8 @@ export interface EmployeeInput {
   notes?: string | null;
   photoUrl?: string | null;
   isActive?: boolean;
+  education?: string | null;
+  major?: string | null;
 }
 
 export interface SaveResult {

@@ -203,8 +203,9 @@ export function NotificationBell({
                 <ul className="divide-y divide-amber-100 border-b border-slate-100 bg-amber-50/60">
                   {(
                     [
-                      { n: pending.signups, icon: "how_to_reg", title: "คำขอสมัครรออนุมัติ", detail: "ร้านค้าที่สมัครและรอ admin อนุมัติ" },
-                      { n: pending.resets, icon: "key", title: "คำขอรีเซ็ตรหัสผ่าน", detail: "ร้านค้าขอรหัสผ่านชั่วคราวใหม่" },
+                      { n: pending.employees, icon: "person_add", title: "คำขอเพิ่มพนักงาน", detail: "Coach / Area แจ้งพนักงานใหม่ รอ admin อนุมัติ", href: "/app/employee-requests" },
+                      { n: pending.signups, icon: "how_to_reg", title: "คำขอสมัครรออนุมัติ", detail: "ร้านค้าที่สมัครและรอ admin อนุมัติ", href: "/app/admin-users" },
+                      { n: pending.resets, icon: "key", title: "คำขอรีเซ็ตรหัสผ่าน", detail: "ร้านค้าขอรหัสผ่านชั่วคราวใหม่", href: "/app/admin-users" },
                     ] as const
                   )
                     .filter((p) => p.n > 0)
@@ -214,7 +215,7 @@ export function NotificationBell({
                           type="button"
                           onClick={() => {
                             setOpen(false);
-                            router.push("/app/admin-users");
+                            router.push(p.href);
                           }}
                           className="w-full text-left px-3.5 py-2.5 flex items-start space-x-2.5 hover:bg-amber-50 transition"
                         >

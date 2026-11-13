@@ -9,7 +9,7 @@ export async function GET() {
   if (ctx.role !== "admin") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
   const sb = createServiceClient();
-  const [signups, resets] = await Promise.all([
+  const [signups, resets, employees] = await Promise.all([
     sb
       .from("profiles")
       .select("id", { count: "exact", head: true })
@@ -19,9 +19,13 @@ export async function GET() {
       .from("password_reset_requests")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending"),
+    sb
+      .from("employee_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
   ]);
-  if (signups.error || resets.error) {
+  if (signups.error || resets.error || employees.error) {
     return NextResponse.json({ ok: false, error: "query failed" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, signups: signups.count ?? 0, resets: resets.count ?? 0 });
+  return NextResponse.json({ ok: true, signups: signups.count ?? 0, resets: resets.count ?? 0, employees: employees.count ?? 0 });
 }

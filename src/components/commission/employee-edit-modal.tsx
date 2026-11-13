@@ -25,6 +25,7 @@ import {
   type StoreInfo,
 } from "@/lib/commission/employee-store";
 import { cn } from "@/lib/utils";
+import { EDUCATION_OPTIONS } from "@/lib/commission/employee-request-shared";
 
 const POSITIONS: PositionKey[] = [
   "store_exec",
@@ -55,6 +56,8 @@ function toForm(e: Employee | null, defaultDealer: string | null): FormState {
       photoUrl: null,
       isActive: true,
       skillsText: "",
+      education: "",
+      major: "",
     };
   }
   return {
@@ -74,6 +77,8 @@ function toForm(e: Employee | null, defaultDealer: string | null): FormState {
     photoUrl: e.photoUrl,
     isActive: e.isActive,
     skillsText: e.skills.join(", "),
+    education: e.education ?? "",
+    major: e.major ?? "",
   };
 }
 
@@ -164,6 +169,8 @@ export function EmployeeEditModal({
       notes: form.notes || null,
       skills,
       isActive: form.isActive,
+      education: form.education || null,
+      major: form.major || null,
     };
     const moved = !!form.repCode && form.dealerCode !== originalDealer;
     const res = await saveEmployee(input);
@@ -370,6 +377,31 @@ export function EmployeeEditModal({
                     อายุงาน {tenureFromStartDate(form.startDate ?? null)}
                   </span>
                 )}
+              </Field>
+            </div>
+          )}
+
+          {!isSupervisorPos && (
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="วุฒิการศึกษา">
+                <select
+                  value={form.education ?? ""}
+                  onChange={(e) => patch({ education: e.target.value })}
+                  className="form-in"
+                >
+                  <option value="">ไม่ระบุ</option>
+                  {EDUCATION_OPTIONS.map((o) => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="สาขาที่จบ">
+                <input
+                  value={form.major ?? ""}
+                  onChange={(e) => patch({ major: e.target.value })}
+                  maxLength={100}
+                  className="form-in"
+                />
               </Field>
             </div>
           )}

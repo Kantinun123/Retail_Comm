@@ -30,6 +30,7 @@ import { LyText, TargetBar, TargetProgress } from "./target-progress";
 import { pctLabel, tgTone } from "@/lib/commission/targets-store";
 import { yearsOf } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
+import { EmployeeRequestCard } from "./employee-request-card";
 import { AttentionList, MonthOverview, PerformanceCards, buildAttention, perfStatus, useLatestEvalFails } from "./home-performance";
 import { PeriodBar, defaultPick, toView, type PeriodPick } from "./hub-period";
 import {
@@ -541,6 +542,9 @@ export function HomeHubScreen() {
         )}
 
         <ProfileCard />
+
+        {/* Coach / Area: แจ้งพนักงานใหม่ของร้านที่กำลังดู (เลือกร้านไว้ให้) */}
+        {session.isArea && <EmployeeRequestCard dealerCode={session.dealer.code} />}
 
         {/* ช่วงเวลาเดียวคุมทั้งหน้า (ติดด้านบนเวลาเลื่อน) */}
         <PeriodBar pick={pick} onChange={setPick} years={years} completeness={completeness} />

@@ -285,22 +285,43 @@ export function AdminHomeScreen() {
               <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
             </Link>
 
+            <Link href="/app/employee-requests" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 transition">
+              <div className="relative w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
+                <Icon name="person_add" className="text-2xl" />
+                {pending.employees > 0 && (
+                  <span
+                    aria-label={`รออนุมัติ ${pending.employees} รายการ`}
+                    className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-[#d32029] text-white text-[11px] font-bold flex items-center justify-center ring-2 ring-white"
+                  >
+                    {pending.employees > 99 ? "99+" : pending.employees}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14.5px] font-bold text-slate-900">คำขอเพิ่มพนักงาน</p>
+                <p className="text-[11px] text-slate-500">
+                  {pending.employees > 0 ? `รออนุมัติ ${pending.employees} รายการ` : "ตรวจ / แก้ / อนุมัติ ก่อนเข้าฐานข้อมูลพนักงาน"}
+                </p>
+              </div>
+              <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
+            </Link>
+
             <Link href="/app/admin-users" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 transition">
               <div className="relative w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
                 <Icon name="how_to_reg" className="text-2xl" />
-                {pending.total > 0 && (
+                {pending.accounts > 0 && (
                   <span
-                    aria-label={`รอดำเนินการ ${pending.total} รายการ`}
+                    aria-label={`รอดำเนินการ ${pending.accounts} รายการ`}
                     className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-[#d32029] text-white text-[11px] font-bold flex items-center justify-center ring-2 ring-white"
                   >
-                    {pending.total > 99 ? "99+" : pending.total}
+                    {pending.accounts > 99 ? "99+" : pending.accounts}
                   </span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[14.5px] font-bold text-slate-900">อนุมัติผู้ใช้ร้านค้า</p>
                 <p className="text-[11px] text-slate-500">
-                  {pending.total > 0
+                  {pending.accounts > 0
                     ? `รอดำเนินการ: สมัครใหม่ ${pending.signups} · ขอรีเซ็ตรหัส ${pending.resets}`
                     : "คำขอสมัครของร้านค้า · อนุมัติ / ปฏิเสธ / ระงับ"}
                 </p>

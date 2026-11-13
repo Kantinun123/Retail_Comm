@@ -31,6 +31,7 @@ import {
   type OrgStore,
   type Person,
 } from "@/lib/commission/my-profile-store";
+import { fetchEmployeeRequests, type EmployeeRequest } from "@/lib/commission/employee-request-store";
 import { cn } from "@/lib/utils";
 
 const KIND: Record<MeKind, { label: string; hero: string; sub: string; node: string; nodeSub: string; avatar: string }> = {
@@ -54,6 +55,22 @@ export function MyProfileScreen() {
   const [reload, setReload] = useState(0);
   const [editing, setEditing] = useState(false);
   const [sheet, setSheet] = useState<SheetPerson | null>(null);
+  const [pending, setPending] = useState<Map<string, EmployeeRequest[]>>(() => new Map());
+
+  // คำขอเพิ่มพนักงานที่รออนุมัติ (กลุ่ม Area) -> แสดงเป็นเส้นประในร้าน
+  useEffect(() => {
+    if (!ready || !session?.isArea) return;
+    let cancelled = false;
+    fetchEmployeeRequests("pending").then((r) => {
+      if (cancelled || !r.ok) return;
+      const m = new Map<string, EmployeeRequest[]>();
+      r.requests.forEach((x) => m.set(x.dealerCode, [...(m.get(x.dealerCode) ?? []), x]));
+      setPending(m);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, session?.isArea]);
 
   useEffect(() => {
     if (!ready) return;
@@ -126,7 +143,7 @@ export function MyProfileScreen() {
             {data.me.kind === "admin" ? (
               <AdminTeam admins={data.admins} onOpen={(c) => setSheet({ c, sub: c.title ?? "ผู้ดูแลระบบ", tone: KIND.admin.avatar })} />
             ) : (
-              <OrgView data={data} isArea={session.isArea} onOpen={setSheet} onOpenStore={(code) => { setAreaStore(code); router.push("/app/home"); }} />
+              <OrgView data={data} isArea={session.isArea} pending={pending} onOpen={setSheet} onOpenStore={(code) => { setAreaStore(code); router.push("/app/home"); }} />
             )}
           </>
         )}
@@ -235,7 +252,19 @@ function AdminTeam({ admins, onOpen }: { admins: Contact[]; onOpen: (c: Contact)
 
 /* ---------------- ผังทีม (กลุ่ม Area) ---------------- */
 
-function OrgView({ data, isArea, onOpen, onOpenStore }: { data: MyProfileData; isArea: boolean; onOpen: (p: SheetPerson) => void; onOpenStore: (code: string) => void }) {
+function OrgView({
+  data,
+  isArea,
+  onOpen,
+  onOpenStore,
+  pending,
+}: {
+  data: MyProfileData;
+  isArea: boolean;
+  onOpen: (p: SheetPerson) => void;
+  onOpenStore: (code: string) => void;
+  pending: Map<string, EmployeeRequest[]>;
+}) {
   const { me, heads, stores, people } = data;
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [q, setQ] = useState("");
@@ -291,6 +320,7 @@ function OrgView({ data, isArea, onOpen, onOpenStore }: { data: MyProfileData; i
       toggle={toggle}
       onPerson={(p) => onOpen(personSheet(p))}
       onOpenStore={isArea ? onOpenStore : undefined}
+      pending={pending}
     />
   );
 
@@ -550,6 +580,7 @@ function StoreList({
   toggle,
   onPerson,
   onOpenStore,
+  pending,
 }: {
   listKey: string;
   stores: OrgStore[];
@@ -557,6 +588,8 @@ function StoreList({
   toggle: (k: string) => void;
   onPerson: (p: Person) => void;
   onOpenStore?: (code: string) => void;
+  /** คำขอเพิ่มพนักงานที่รออนุมัติ แยกตามร้าน (แสดงเป็นเส้นประ ยังไม่นับเป็นพนักงาน) */
+  pending?: Map<string, EmployeeRequest[]>;
 }) {
   const moreKey = `${listKey}|more`;
   const showAll = open.has(moreKey) || stores.length <= PAGE + 1;
@@ -585,6 +618,23 @@ function StoreList({
                     <PersonRow key={p.repCode} c={p} sub={staffSub(p)} tone={toneOf(p.position)} level={p.level} isNew={isNewEmployee(p.startDate)} onOpen={() => onPerson(p)} />
                   ))}
                 </div>
+                {(pending?.get(s.code) ?? []).map((r) => (
+                  <div key={r.id} className="flex items-center gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50/70 px-3 py-2 text-[11.5px] text-amber-900">
+                    <Icon name="hourglass_top" style={{ fontSize: 15 }} />
+                    <span className="flex-1 truncate">
+                      {r.payload.name}{r.payload.nickname ? ` (${r.payload.nickname})` : ""} · รออนุมัติ
+                    </span>
+                  </div>
+                ))}
+                {onOpenStore && (
+                  <Link
+                    href={`/app/employee-requests?new=1&store=${encodeURIComponent(s.code)}`}
+                    className="w-full py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11.5px] font-bold flex items-center justify-center gap-1"
+                  >
+                    <Icon name="person_add" style={{ fontSize: 15 }} />
+                    แจ้งพนักงานใหม่ของร้านนี้
+                  </Link>
+                )}
                 <div className="grid grid-cols-2 gap-1.5 pt-1">
                   {onOpenStore && (
                     <button type="button" onClick={() => onOpenStore(s.code)} className="py-2 rounded-xl bg-[#d32029] text-white text-[11.5px] font-bold flex items-center justify-center gap-1">

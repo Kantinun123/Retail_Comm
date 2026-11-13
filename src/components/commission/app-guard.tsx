@@ -6,7 +6,7 @@ import { useSession } from "@/lib/commission/session";
 import { useDatasetReady } from "@/lib/commission/dataset";
 
 /** หน้าที่ Area ใช้ได้โดยยังไม่ต้องเลือกร้าน (ที่เหลือเป็นหน้าข้อมูลรายร้าน) */
-const AREA_NO_STORE_OK = ["/app/stores", "/app/store", "/app/change-password", "/app/chat"];
+const AREA_NO_STORE_OK = ["/app/stores", "/app/store", "/app/change-password", "/app/chat", "/app/member", "/app/employee-requests"];
 
 /** Redirects to the login page when there is no active session. */
 export function AppGuard({ children }: { children: React.ReactNode }) {

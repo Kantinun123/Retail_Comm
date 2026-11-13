@@ -15,6 +15,7 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { useSession, useHomeHref, setAreaStore, doLogout } from "@/lib/commission/session";
 import { getStoreTeamCaps } from "@/lib/commission/permissions";
+import { EmployeeRequestCard } from "./employee-request-card";
 import {
   fetchStores,
   setStoreActive,
@@ -163,6 +164,9 @@ export function StoresScreen() {
       <Header homeHref={homeHref} />
 
       <div className="space-y-4 pb-4">
+        {/* Coach / Area / หัวหน้า Area: การ์ดงานแจ้งเพิ่มพนักงานใหม่ */}
+        {session.isArea && <EmployeeRequestCard />}
+
         {/* ตัวนับร้าน */}
         <section className="grid grid-cols-3 gap-2">
           <Stat label="ร้านทั้งหมด" value={stores.length} tone="slate" />
