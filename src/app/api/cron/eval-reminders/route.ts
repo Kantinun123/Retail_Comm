@@ -6,12 +6,20 @@ import { thaiMonth } from "@/lib/server/thai-month";
 
 /**
  * แจ้งเตือนการตรวจประเมินร้านรายวัน — Vercel Cron 09:00 (เวลาไทย) ทุกวัน
- * - ตั้งแต่วันที่ 15: Coach ที่ยังมีร้านค้างตรวจในเดือนนี้
- * - 5 วันสุดท้ายของเดือน: Area ที่มี Coach ในทีมยังตรวจไม่ครบ
+ * - ตั้งแต่วันที่ 15: Coach ที่ยังมีร้านค้างตรวจในเดือนนี้ (ระบุร้านที่ขาดติดกัน)
+ * - Area: ตั้งแต่วันที่ 15 ถ้าทีมมีร้านขาดติดกัน ≥2 เดือน ; ไม่งั้น 5 วันสุดท้ายของเดือน
  * - วันที่ 1: Admin ได้สรุปเดือนก่อน (ขาด / ซ้ำ)
  * ป้องกัน: ต้องมี Authorization: Bearer <CRON_SECRET> (Vercel ส่งให้อัตโนมัติ) ; ส่งซ้ำวันเดียวกันไม่ได้ (reminder_log)
  * ?dry=1 = ดูแผนอย่างเดียว ไม่ส่ง ; ?date=YYYY-MM-DD = จำลองวันที่ (ใช้คู่กับ dry เท่านั้น)
  */
+/** เดือนนี้ยังไม่จบ -> บอกว่า "ไม่ได้ตรวจตั้งแต่เดือนไหน" แทนการนับเดือนนี้เป็นเดือนที่ขาดแล้ว */
+const sinceText = (last: string | null) => {
+  if (!last) return "ยังไม่เคยตรวจ";
+  const [y, m] = last.split("-").map(Number);
+  const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  return `ไม่ได้ตรวจตั้งแต่ ${thaiMonth(next)}`;
+};
+
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -38,39 +46,45 @@ export async function GET(req: NextRequest) {
     for (const c of t.coaches) {
       const missing = c.total - c.done;
       if (!c.repCode || missing <= 0) continue;
+      const chronic = c.stores.filter((s) => s.chronic);
+      const chronicText = chronic.length
+        ? ` · ⚠ ค้างจากเดือนก่อน: ${chronic.slice(0, 2).map((s) => `${s.name} (${sinceText(s.lastEvalPeriod)})`).join(", ")}${chronic.length > 2 ? ` และอีก ${chronic.length - 2} ร้าน` : ""}`
+        : "";
       for (const uid of usersByRep.get(c.repCode) ?? []) {
         plan.push({
           kind: "eval-coach",
           to: uid,
           ref: period,
           title: `ตรวจประเมินร้าน ${thaiMonth(period)}`,
-          body: `ยังเหลือ ${missing} จาก ${c.total} ร้านที่ยังไม่ตรวจ · เหลือเวลา ${left} วัน`,
+          body: `ยังเหลือ ${missing} จาก ${c.total} ร้านที่ยังไม่ตรวจ · เหลือเวลา ${left} วัน${chronicText}`,
           url: "/app/eval-tracking",
         });
       }
     }
-    if (day >= dim - 4) {
-      const byArea = new Map<string, { missing: number; coaches: Set<string> }>();
-      t.coaches.forEach((c) =>
-        c.stores.forEach((s) => {
-          if (s.status !== "missing" || !s.areaRep) return;
-          const x = byArea.get(s.areaRep) ?? { missing: 0, coaches: new Set<string>() };
-          x.missing++;
-          x.coaches.add(c.nickname || c.name);
-          byArea.set(s.areaRep, x);
-        })
-      );
-      for (const [areaRep, x] of byArea) {
-        for (const uid of usersByRep.get(areaRep) ?? []) {
-          plan.push({
-            kind: "eval-area",
-            to: uid,
-            ref: period,
-            title: `ทีมยังตรวจร้านไม่ครบ · ${thaiMonth(period)}`,
-            body: `เหลือ ${x.missing} ร้าน (Coach: ${[...x.coaches].join(", ")}) · อีก ${dim - day} วันสิ้นเดือน`,
-            url: "/app/eval-tracking",
-          });
-        }
+    // Area: ร้านขาดติดกัน -> เตือนตั้งแต่วันที่ 15 ; ร้านค้างทั่วไป -> 5 วันสุดท้ายของเดือน
+    const lastDays = day >= dim - 4;
+    const byArea = new Map<string, { missing: number; chronic: number; coaches: Set<string> }>();
+    t.coaches.forEach((c) =>
+      c.stores.forEach((s) => {
+        if (s.status !== "missing" || !s.areaRep) return;
+        const x = byArea.get(s.areaRep) ?? { missing: 0, chronic: 0, coaches: new Set<string>() };
+        x.missing++;
+        if (s.chronic) x.chronic++;
+        x.coaches.add(c.nickname || c.name);
+        byArea.set(s.areaRep, x);
+      })
+    );
+    for (const [areaRep, x] of byArea) {
+      if (!lastDays && x.chronic === 0) continue;
+      for (const uid of usersByRep.get(areaRep) ?? []) {
+        plan.push({
+          kind: "eval-area",
+          to: uid,
+          ref: period,
+          title: x.chronic ? `⚠ ร้านค้างตรวจจากเดือนก่อน ${x.chronic} ร้าน · ${thaiMonth(period)}` : `ทีมยังตรวจร้านไม่ครบ · ${thaiMonth(period)}`,
+          body: `เหลือ ${x.missing} ร้าน (Coach: ${[...x.coaches].join(", ")}) · อีก ${dim - day} วันสิ้นเดือน`,
+          url: "/app/eval-tracking",
+        });
       }
     }
   }
@@ -88,7 +102,7 @@ export async function GET(req: NextRequest) {
           to: p.id as string,
           ref: prev,
           title: `สรุปตรวจประเมินร้าน ${thaiMonth(prev)}`,
-          body: `ตรวจแล้ว ${t.totals.done}/${t.totals.stores} ร้าน · ขาด ${t.totals.missing} · ซ้ำ ${t.totals.duplicates}`,
+          body: `ตรวจแล้ว ${t.totals.done}/${t.totals.stores} ร้าน · ขาด ${t.totals.missing} · ขาดติดกัน ≥${t.chronicMonths} เดือน ${t.totals.chronic} · ซ้ำ ${t.totals.duplicates}`,
           url: `/app/eval-tracking?p=${prev}`,
         })
       );

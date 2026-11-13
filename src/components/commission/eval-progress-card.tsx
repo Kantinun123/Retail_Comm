@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon } from "./icon";
-import { EVAL_FORM_URL, fetchTracking, monthLabel, pctText, shortDate, type Tracking } from "@/lib/commission/eval-tracking-store";
+import { chronicText, EVAL_FORM_URL, fetchTracking, monthLabel, pctText, shortDate, type Tracking } from "@/lib/commission/eval-tracking-store";
 import { cn } from "@/lib/utils";
 
 const SHOW = 3;
@@ -27,10 +27,15 @@ export function EvalProgressCard() {
   const isCoach = t.me.role === "coach" || t.me.role === "re";
   const { done, stores } = t.totals;
   const pct = Math.round((done / Math.max(1, stores)) * 100);
-  const missingStores = t.coaches.flatMap((c) => c.stores).filter((s) => s.status === "missing");
+  // ร้านที่ขาดติดกันขึ้นก่อน
+  const missingStores = t.coaches
+    .flatMap((c) => c.stores)
+    .filter((s) => s.status === "missing")
+    .sort((a, b) => Number(b.chronic) - Number(a.chronic));
   const doneStores = t.coaches.flatMap((c) => c.stores).filter((s) => s.status === "done");
   const behind = t.coaches.filter((c) => c.repCode && c.done < c.total);
-  const urgent = Number(t.today.slice(8, 10)) >= 15 && missingStores.length > 0;
+  const inProgress = t.period === t.today.slice(0, 7);
+  const urgent = (Number(t.today.slice(8, 10)) >= 15 && missingStores.length > 0) || t.totals.chronic > 0;
 
   return (
     <section className={cn("rounded-2xl bg-white border-2 shadow-sm p-3.5", urgent ? "border-amber-300" : "border-blue-200")} aria-labelledby="eval-card-title">
@@ -55,10 +60,12 @@ export function EvalProgressCard() {
           <div className="mt-3 space-y-1.5">
             <p className="text-[11.5px] font-bold text-slate-700">ยังไม่ได้ตรวจ ({missingStores.length})</p>
             {(all ? missingStores : missingStores.slice(0, SHOW)).map((s) => (
-              <div key={s.code} className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+              <div key={s.code} className={cn("flex items-center gap-2 rounded-xl border px-3 py-2", s.chronic ? "bg-red-50 border-red-300" : "bg-amber-50 border-amber-200")}>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12.5px] font-semibold text-slate-900 truncate">{s.name}</span>
-                  <span className="block text-[10.5px] text-amber-800">{s.code} · ยังไม่ตรวจเดือนนี้</span>
+                  <span className={cn("block text-[10.5px]", s.chronic ? "text-[#a11119] font-bold" : "text-amber-800")}>
+                    {s.code} · {chronicText(s, inProgress) ?? "ยังไม่ตรวจเดือนนี้"}
+                  </span>
                 </span>
                 <a href={EVAL_FORM_URL} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-blue-600 text-white text-[11.5px] font-bold px-3 py-1.5 hover:-translate-y-0.5 transition-all">
                   ทำแบบประเมิน
@@ -81,6 +88,12 @@ export function EvalProgressCard() {
       ) : (
         <p className="mt-2.5 text-[11.5px] text-slate-600">
           {behind.length > 0 ? `Coach ที่ยังไม่ครบ ${behind.length} คน · ขาด ${missingStores.length} ร้าน` : "ทุก Coach ตรวจครบแล้ว"}
+          {t.totals.chronic > 0 && (
+            <span className="font-bold text-[#a11119]">
+              {" "}
+              · {inProgress ? "ค้างจากเดือนก่อน" : `ขาดติดกัน ≥${t.chronicMonths} เดือน`} {t.totals.chronic} ร้าน
+            </span>
+          )}
           {t.totals.duplicates > 0 && <span className="text-[#a11119]"> · ซ้ำ {t.totals.duplicates}</span>}
         </p>
       )}

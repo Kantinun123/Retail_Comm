@@ -783,6 +783,191 @@ export const dynamic = "force-dynamic";
 3. **ชื่อกลุ่ม CRM "เอสซีจี โฮม บุญถาวร เมืองขอนแก่น" = ร้าน 5100967 แม็กซ์โฮม แอนด์ เดคคอร์** (PBI 82/82) → เพิ่ม OVERRIDE
 4. **Timezone bug**: เดิม period = `toISOString().slice(0,7)` (UTC) ทำให้งานที่เปิด 00:00-07:00 เวลาไทยเลื่อนไปวันก่อน (เช่น 1 ก.พ. 05:00 → ม.ค.) → ใช้ local getter (`getFullYear/getMonth/getDate`) เพราะ SheetJS `cellDates` สร้าง Date แบบ local
 
-**ยังต่าง (แอปนับเกิน 209)**: ร้านที่ PBI ไม่แสดงเลย 5102009 (109), 5101839 (68), 5100975 (24) ; sub_solution ใหม่ "มุงหลังคา เอสซีจี (… รอบบน)" ของ 5101027 ต.ค. (7) ; OP202610220066 5100974 (1) — รอผู้ใช้ตัดสิน
+**ยังต่าง (แอปนับเกิน 209)**: ร้านที่ PBI ไม่แสดงเลย 5102009 (109), 5101839 (68), 5100975 (24) ; sub_solution ใหม่ "มุงหลังคา เอสซีจี (… รอบบน)" ของ 5101027 ต.ค. (7) ; OP202610220066 5100974 (1) — ผู้ใช้ยืนยันให้คงไว้ทั้งหมด: 3 ร้านนั้นยกเลิกเป็นตัวแทนแล้ว Power BI ตัดออกเพื่อแสดงเฉพาะร้าน Active แต่แอปเก็บข้อมูลตามปกติ ; "รอบบน" นับเป็น Solution ; 5100974 คงไว้ (นับตามชื่อร้าน) → ส่วนต่าง 209 รายการนี้เป็นความต่างที่ตั้งใจ ไม่ใช่บั๊ก
 
 **บทเรียน**: อย่าสรุปกฎจาก export เดือนเดียว ให้ขอข้อมูลหลายเดือน/ทุกโมเดลร้านแล้วเทียบราย ID และแยกสาเหตุ (ไม่มีใน DB / map ร้านไม่ได้ / ตัวกรอง / เดือนต่าง) ; วันที่จาก Excel ห้ามตัด string จาก ISO UTC
+
+---
+
+## 👤 BA Service Sales — คอลัมน์ใหม่ seller_name (Google Sheet BA, พ.ย. 69)
+
+- ทีมหลังบ้านเพิ่ม `seller_name` ใน Sheet (gid 1270019465 = `BA_GSHEET_CSV_URL`) — ครอบคลุม win 7,273/7,283 และตรงกับชื่อเดิมจาก BA Incentive 6,793/6,793
+- เก็บใน `ba_service_sales_lines.seller_name` (sync-ba-service-sales-gsheet.mjs) ; `refresh_service_sales_reps`: sales_name = seller_name → ชื่อจาก Incentive ; rep_code = Incentive → จับคู่ sale_reps ด้วยร้าน + ชื่อ (ตัดช่องว่าง/คำนำหน้า, ต้องเจอคนเดียว)
+- ผล: มีชื่อ 6,707 → 7,161 งาน ; มี rep_code 2,524 → 3,118 งาน ; ที่เหลือ (~4,000 งาน) ชื่อไม่อยู่ใน sale_reps (ปัญหา master พนักงานเดิม) → หน้าร้านยังเห็นชื่อ แต่หน้าพนักงานรายคนไม่เห็น
+- **ระวัง**: สคริปต์ตรวจที่ select จาก Supabase โดยไม่ paginate ได้แค่ 1,000 แถว (`.limit(10000)` ไม่ช่วย — max rows ของ PostgREST) → ต้อง `.range()` วนเสมอ
+- ระหว่าง apply มี sync รายชั่วโมง (Task Scheduler) รันทับ ทำให้จำนวน "แก้" ตอน apply น้อยกว่า dry-run — ตรวจผลด้วยการนับในตารางแทน
+
+---
+
+## 🎯 เป้าหมาย (TG) — opbyhomedesign.xlsx / opbychannel.xlsx (rawdata_op)
+
+- ตาราง `sales_targets` (kind design_intake | service_sales, period, dealer_code, store_name, shop_model, group3, h5, target) + RPC `replace_sales_targets` (แทนที่ทั้ง kind แบบ atomic) ; สคริปต์ `scripts/import-sales-targets.mjs --kind design|service [--apply]`
+- **opbychannel.xlsx ใหญ่ 166MB** → อ่านเฉพาะ sheet ด้วย `XLSX.read(buf, { sheets: ["Plan"] })` (+ `--max-old-space-size=12288`) ; header มีช่องว่าง `" plan_amount_excl_vat "` → ต้อง trim ชื่อคอลัมน์ ไม่งั้นยอดเป็น 0 ทั้งหมด
+- เป้ายอดขายเป็น **ไม่รวม VAT** (plan_amount_excl_vat) แต่ยอดจริง Rudy = plan_amount_incl_vat / BA = gmv → เทียบต้องปรับฐาน VAT
+- group3 ของ TG: H3 ROOF SYSTEM/METAL ROOF → ROOF SERVICE ; H3 HOME RENOVATION SYSTEM หรือ H2 3.Q-Chang → Qchang ; H2 2.Smart Solution → SMART SOLUTION
+- design TG ปี 2026: "TG Win แบบบ้าน" = "TG แบบบ้าน" และ "TG Win แบบเฉพาะสินค้า" = 0 → เก็บแค่ TG แบบบ้าน ; ร้าน map ด้วย OVERRIDE ชุดเดียวกับ sync-design-intake (66 ร้าน HE/SCG Home ปี 2026 map ครบ)
+
+- **เทียบกับรายงาน Power BI ยอดขายงานบริการ ปี 2026 ม.ค.-ต.ค.** (filter Structure L1 = 2.SOLUTION, โมเดล HE/SCG Home): TG ใน `sales_targets` ตรงกับ PBI 1,059/1,064 ช่อง ; ACT ของ PBI = Rudy (รวม VAT, ไม่หาร 1.07) + BA รวมกัน ยอดรวมรายเดือนใกล้กัน (ต่างกัน ±10%) แต่รายช่องของ BA ไม่ตรง (กลุ่ม/ยอด BA ใน PBI ต่างจาก gmv + service_group ของแอป) ; LY ของ PBI = Rudy ปี 2025 ตรงกับแอป 788 ช่อง แต่บางร้านต่างกันมาก (เช่น 5100817 PBI 3.4 ล้าน / แอป 15.2 ล้าน, 5100968 PBI 8.8 ล้าน / แอป 0) → ต้องตรวจการ map ร้านของข้อมูลปี 2025 ก่อนแสดง LY
+- เจออีกครั้ง: select `sales_targets` ด้วย `.limit(20000)` ได้แค่ 1,000 แถว (max rows) ทำให้ TG เดือนหลังเป็น 0 → ใช้ `.range()` วนเสมอ
+
+---
+
+## 📅 LHS/Rudy ยอดขายงานบริการ — กติกาตาม Power BI (พ.ย. 69)
+
+**อาการ**: LY (Rudy ปี 2025) ของแอปไม่ตรง Power BI (ตรงแค่ 154/431 ร้าน×เดือน ; บางร้านต่างกันหลายเท่า)
+**สาเหตุ**: แอปจัดเดือนตาม `project_close_date` + map ร้านด้วย `rept_gp_shopgroup` + นับทุก building type ; Power BI ใช้ `order_created_date` + `channel_detail_name` + เฉพาะ `report_gp_buildingtype` OB/NONRES (HP/TP/RES ไม่นับ)
+**แก้**: `import-service-sales.mjs` period = order_created_date (fallback close date), ร้าน = channel_detail_name (normalize + override) → fallback shopgroup ; เก็บ building_type/order_date/channel_detail ทุกแถว แล้วกรองที่ view `service_sales_union` (`building_type in ('OB','NONRES')`) — ข้อมูลดิบไม่หาย ย้อนกลับได้
+**ผล**: LY ตรง 347/374 (ยอดรวม ม.ค.-ต.ค. ใกล้กันทุกเดือน) ; ACT (Rudy+BA) 384/510 — ส่วนที่ยังต่างส่วนใหญ่มาจาก BA
+**บทเรียน**: ก่อนทำ KPI เทียบเป้า/ปีก่อน ให้ทดสอบหลาย "กติกา" (คีย์ร้าน × ฐานวันที่ × ตัวกรอง) กับรายงานอ้างอิงแบบราย cell แล้วเลือกตัวที่ตรงที่สุด อย่าเดาจากชื่อคอลัมน์
+
+---
+
+## 🎯 แสดงเป้า (TG/ACT/LY) — RPC sales_targets_compare
+
+- RPC `sales_targets_compare(p_kind, p_dealer, p_year)` คืน months (period × group3: target/actual/ly) + stores (admin) ; API `/api/targets` ; client `targets-store.ts` ; UI `target-progress.tsx` ใช้ในหน้าหลัก (การ์ดแบบรับเข้า + เป้ายอดขายงานบริการ), `/app/service-sales` (hero, เส้นเป้า/จุด LY ในกราฟ, 3 กลุ่ม, อันดับร้านเรียงตาม % ถึงเป้า), `/app/design-intake`
+- **ขอบเขต admin** = ร้าน HE/SCG Home ที่ `dealers.report_active = true` (คอลัมน์ใหม่ ; 5102009/5101839/5100975 = false เพราะยกเลิกตัวแทน — Power BI ตัดออก) **ห้ามใช้ `is_active`** เพราะคุมสิทธิ์เข้าระบบ (`my_dealer_access`)
+- **ช้า 1.3–3 วินาที**: หลัง re-import service_sales_lines (ลบ+เพิ่ม 38k แถว) index scan 6k แถวใช้ 690ms เพราะ heap/visibility map ยังไม่ vacuum → `vacuum analyze public.service_sales_lines` แล้วเหลือ 79ms ; STABLE function ห้ามสร้าง temp table / insert (ใช้ CTE + jsonb แทน)
+- สะสมปี = ถึงเดือนที่ครบล่าสุด (ไม่นับเดือนปัจจุบัน) ; % = ACT ÷ TG ไม่ปรับ VAT (เหมือน Power BI) ; พนักงาน (sales) ไม่มีเป้ารายคน → API คืน has_target=false
+
+---
+
+## 🔗 ส่งช่วงเวลาจากหน้าหลักไปหน้ารายละเอียด (?p= / ?y=)
+
+- `src/lib/commission/linked-period.ts`: `withPeriod(href, view)` ต่อ `?p=YYYY-MM` (เดือน) / `?y=YYYY` (สะสมปี) ; `useLinkedPeriod()` อ่านด้วย `useSearchParams` — ใช้ได้เพราะทุก page.tsx ห่อ screen ด้วย `<Suspense>` อยู่แล้ว (cacheComponents)
+- หน้าปลายทาง: ใช้ค่าจาก URL เป็น **ค่าเริ่มต้นของ useState** เท่านั้น (ผู้ใช้เปลี่ยนต่อได้) ; ไม่มีพารามิเตอร์ = เดือนที่ครบล่าสุด (`lastFullPeriod()`) เหมือนหน้าหลัก ; หน้ารายการรายเดือน (Back Margin/Commission/ตรวจประเมิน ฯลฯ) = เลือกปี + ไฮไลต์แถวเดือนนั้น ; benefit-rollup = เปิด accordion เดือนนั้น
+- "เรื่องที่ควรดู" ไม่แนบช่วงเวลา เพราะอิงข้อมูลล่าสุดเสมอ
+- **Turbopack panic** `end byte index ... is not a char boundary` (ภาษาไทยใน code frame ของ error) ทำให้ dev server ตายเงียบ ๆ ระหว่างแก้ไฟล์ → ตรวจด้วย `pnpm build` แล้วเปิด dev ใหม่ ; ระวังลำดับ: ลบ `.next` ก่อนแล้วค่อย start dev (อย่าลบหลัง start)
+
+---
+
+## 🧩 BA service_group -> 3 กลุ่ม: งานซ่อมหลังคา = Qchang
+
+**อาการ**: ร้าน 5100895 ต.ค. 69 กลุ่ม ROOF SERVICE ของแอป = 1.64M แต่ Power BI = 1.39M (เท่ายอด Rudy พอดี) ; Qchang แอป 68K / PBI 257K
+**สาเหตุ**: `GROUP3_MAP` ของ BA จัด Roof Repair / Re-Roof / Roof Repaint เป็น ROOF SERVICE แต่ Power BI (และกติกาฝั่ง Rudy ของแอปเอง: H5 ROOF REPAIR/REROOF/ROOF REPAINT -> Qchang ; TG H2 "3.Q-Chang" มี ROOF REPAIR) จัดเป็น Qchang
+**แก้**: เปลี่ยน map ใน sync-ba-service-sales-gsheet.mjs + import-ba-service-sales.mjs และ `update ba_service_sales_lines set group3='Qchang' where service_group in (...)` → ตรง PBI ร้าน×กลุ่ม×เดือน 254 -> 680 ช่อง
+**ที่ยังต่าง**: งาน BA กลุ่มเล็กบางกลุ่ม (Electrical Repair, AC Cleaning/Installation, Acoustic Solution) ดูเหมือน PBI ไม่นับ — ยอดน้อย ยังไม่ตัด
+**บทเรียน**: กติกาจัดกลุ่มของ 2 แหล่งข้อมูลที่รวมกันต้องสอดคล้องกัน (Rudy ใช้ H5, BA ใช้ service_group) — ตรวจกับรายงานอ้างอิงรายกลุ่ม ไม่ใช่แค่ยอดรวม
+- **ผู้ใช้ตัดสิน (พ.ย. 69)**: ยอด BA ใช้จากฐานข้อมูล BA ครบทุกงาน (Power BI อาจดึง BA มาไม่ครบ) — ไม่ตัด Electrical Repair/AC/Acoustic ออก ; แต่การจัดกลุ่มใช้ตาม BI (งานซ่อมหลังคา = Qchang) → ACT/% ถึงเป้าในแอปอาจสูงกว่า Power BI เล็กน้อยเป็นเรื่องตั้งใจ (TG/LY ยังตรง PBI)
+
+---
+
+## 🛒 เป้ายอดขายสินค้า DI & Odoo (พ.ย. 69)
+
+- **6 กลุ่มตาม Power BI** (`product_sales_lines.group6`): DI จาก `COMPANY_NAME` (ROOF&FITTING→ROOF, ROOF C&W ACCESSORIES, CEILING&WALL+CEMENT BOARD→CW, LANDSCAPE, SFG, WINDSOR ; HOME IMPROVEMENT = null) ; Odoo จาก MCH2 + MCH3 (`[01BM0106]` อุปกรณ์ติดตั้งหลังคา = ROOF C&W ACCESSORIES)
+- **ขอบเขตเทียบเป้า = DI channel Retail + Odoo** (`product_sales_lines.channel`) — Power BI ไม่มีตัวกรอง Channel บนหน้ารายงาน แต่ยอด DI ใน PBI ≈ Retail (ค่ากลาง 98%) ; ยอด Project (~ครึ่งหนึ่งของ DI) PBI ไม่นับ → หน้ายอดขายยังแสดงทุกช่องทาง (ผู้ใช้เลือกทางเลือก ข) ; ส่วนต่าง ~2% น่าจะเป็น DI_AR/OP ที่เราไม่มีไฟล์ — รอทีมรายงานยืนยัน
+- row_key คงเดิมสำหรับแถว Retail ; ต่อท้าย `|PRJ` (DI Project) / `|ACC` (Odoo อุปกรณ์หลังคา) เพื่อไม่ต้องเขียนใหม่ทั้งตาราง
+- TG: opbychannel.xlsx Plan (Product Material) H2/H3 → 6 กลุ่ม ตรง PBI ทุกเดือน (ม.ค. 127.55 / ก.พ. 142.11 ล้าน) ; WINDSOR ในไฟล์สูงกว่า PBI (30.0 vs 6.3 ล้าน) ใช้ตามไฟล์ + หมายเหตุ
+- **ช้า/ไม่คงที่ (0.2–5 วินาที)** บน instance เล็ก (shared_buffers 224MB): อ่าน product_sales_lines ระดับพนักงาน 139k แถวต่อครั้ง → สร้างตารางสรุป `kpi_actuals_monthly` + `refresh_kpi_actuals(kind)` ให้ sync ทุกสคริปต์เรียกหลัง apply ; `sales_targets_compare` อ่านตารางสรุปนี้ (~50ms) — **ถ้าแก้ข้อมูลด้วย SQL ตรง ต้องเรียก `select refresh_kpi_actuals()` เอง** ไม่งั้น ACT ในการ์ดเป้าจะค้าง
+- **ไฟล์ Odoo ต้นทางว่าง (12 พ.ย. 69 09:09)**: `odoo_hpb_vendor_sales_detail.xlsx` เหลือแค่หัวคอลัมน์ ; มีไฟล์ใหม่ `odoo_scgh_sale.xlsx` (คนละโครงสร้าง: dealer_code เป็นรหัสสาขา 8040/8010, รวมสินค้าทุกยี่ห้อ, ไม่มีชื่อพนักงาน) → guard ยอดลด >30% หยุด sync ไว้ ข้อมูลเดิมไม่หาย ; ระหว่างนี้ group6 ของ Odoo เติมจาก MCH2 (อุปกรณ์หลังคารวมอยู่ใน ROOF)
+- ระวัง: ผลจาก MCP execute_sql ทันทีหลัง refresh/apply บางครั้งอ่านได้ค่าเก่า (ได้ 0) — รันซ้ำก่อนสรุปว่าบั๊ก
+
+- **ยอดขายสินค้าหายจากหน้าจอ (API 500 หลัง 8.5 วินาที)** หลังแยก Retail/Project (ตาราง 184k -> 245k แถว): `product_sales_summary` หา `updated_at`/`latest_date` ด้วย `where p_source is null or source = p_source` → สแกนทั้งตาราง 2 รอบทุกครั้ง + admin รวมทุกแถว → เกิน `statement_timeout` 8s ของ role authenticator ตอน cache เย็น (เรียกซ้ำตอน cache อุ่นแล้วผ่าน เลยดูเหมือนปกติ)
+  แก้: max ต่อแหล่งผ่าน `unnest(['di','odoo'])` ใช้ index (source, synced_at)/(source, last_sale_date) + ตารางสรุป `product_sales_monthly` (ไม่แยกพนักงาน, ~40k แถว) ให้มุมมองร้าน/admin อ่าน — รีเฟรชใน `refresh_kpi_actuals('product_sales')` → admin 2.5s -> 0.04s, ร้าน 0.3s -> 0.12s
+  **บทเรียน**: หลังเปลี่ยนจำนวนแถวของตารางใหญ่ ให้ทดสอบ API ผ่านเบราว์เซอร์/ดู log dev server (ไม่ใช่ curl ซ้ำตอน cache อุ่น) ; ระวัง `or p is null` ใน subquery ที่ทำให้ index ใช้ไม่ได้
+
+---
+
+## 🔑 Provision บัญชีจริง (ร้าน / Area / Coach) — scripts/provision-accounts.mjs
+
+- **Username ร้าน** = `<รหัสร้าน><ชื่อย่อ 4 ตัว>` → email ภายใน `<username>@retail-comm.local` (ฟอร์ม login: ไม่มี `@` = เติม domain ให้ + lowercase) · Area/Coach ใช้อีเมล @scg.com จริง
+- **ขั้นตอน**: dry-run (`node scripts/provision-accounts.mjs`) → backup `profiles` (`bk_20261112_profiles_preprov`) → `--apply` → ไฟล์แจกรหัสอยู่ `commission-app/accounts-YYYYMMDD/` (gitignored, มีรหัสผ่าน ห้าม commit)
+- ทุกบัญชี `must_change_password = true`; role ใหม่ `coach` (ไม่มี check constraint) — ฝั่ง client map coach → session role `"area"`
+- **ข้อผิดพลาดที่เจอ**: สคริปต์ ESM `import * as XLSX from "xlsx"` → `XLSX.readFile is not a function` (ESM build ไม่ผูก fs) → ใช้ `XLSX.read(readFileSync(path))` แทน (หรือ `XLSX.set_fs(fs)`)
+- **ทดสอบ login จาก node ด้วย anon client**: Area/Coach นับ `rep_store_assignments` ได้ 0 เพราะ RLS (policy ไม่รู้จัก rep_code ของ area) — **ไม่ใช่บั๊ก** แอปอ่านผ่าน `/api/me` → `auth-context.ts` ด้วย service client ให้ตรวจที่ DB แทน
+- จำนวนร้านใน assignments ของ Area มากกว่าในไฟล์ได้ (ร้าน inactive ไม่สร้างบัญชี)
+
+### PostgREST `.neq()` ตัดแถว NULL ทิ้ง
+- **อาการ**: แท็บ "ปฏิเสธ/ระงับ" ในหน้า admin users ว่าง ทั้งที่มีบัญชีถูกระงับ (role = null)
+- **สาเหตุ**: `.neq("role","admin")` = SQL `role <> 'admin'` → NULL ไม่ผ่าน
+- **วิธีแก้**: `.or("role.is.null,role.neq.admin")`
+- **ปิดบัญชีทดสอบ**: `auth.users.banned_until` + `profiles.status='rejected'` + ลบ `auth.sessions` (role เดิมเก็บไว้ คืนได้) — sign-in จะได้ "User is banned"
+- **ปุ่ม SCG (Microsoft)**: ซ่อนด้วย `NEXT_PUBLIC_SCG_LOGIN` (ไม่ตั้ง = ซ่อน) เปิดคืนในเฟสถัดไป
+
+---
+
+## 📱 PWA (เพิ่มลงหน้าจอโฮม): sessionStorage หายเมื่อปิดแอป
+
+- **ปัญหา**: session ของแอป (role/ร้าน) อยู่ใน `sessionStorage` → ปิดแอป PWA แล้วเปิดใหม่ต้อง login ใหม่ ทั้งที่ Supabase session (cookie) ยังอยู่
+- **วิธีแก้**: `restoreSession()` ใน `auth-login.ts` — หน้า login (`RealLoginForm`) เช็ค `hasRealAuthSession()` แล้วสร้าง session ใหม่จาก `/api/me` และพาไปหน้าตาม role ; AppGuard ส่ง `/?next=<path>` (ตรวจ `safeNext` กัน open redirect)
+- **Race ตอนออกจากระบบ**: `doLogout()` เรียก `signOut()` แบบ async แล้ว `router.replace("/")` ทันที → หน้า login อาจกู้ session เดิมคืน → ตั้งธง `sessionStorage.loggedOut = "1"` ใน doLogout (ล้างใน doLogin) และข้ามการกู้ถ้าธงอยู่
+- **ไอคอน**: iOS เติมพื้นหลังโปร่งใสเป็นสีดำ → ใช้ไอคอนพื้นขาวทึบ (`apple-touch-icon.png` 180) ; Android ต้องมี 512 + `purpose: maskable` (โลโก้ ~74% ให้อยู่ใน safe zone) ; `start_url` = `/` ไม่ใช่ `/app/home` (Area ต้องไป /app/stores)
+- **ทดสอบ local**: `/` เป็นเดโมเพราะ `.env` ไม่มี `NEXT_PUBLIC_REAL_AUTH` — ทดสอบหน้า login จริงที่ `/auth/email`
+- **LINE in-app browser** ติดตั้ง PWA ไม่ได้ → การ์ด `InstallAppHint` เตือนให้เปิดใน Safari/Chrome
+
+---
+
+## 👥 บัญชีทีม Admin + role `area_head` (scripts/provision-admin-team.mjs)
+
+- แหล่งข้อมูล: `commission-app/Admin team/Admin Team.xlsx` (gitignored) — "ผู้ดูแลระบบ" -> admin ; ข้อความมีคำว่า "Area" -> `area_head`
+- `area_head` (หัวหน้า Area) = มุมมองแบบ Area แต่ทุกร้านใน `rep_store_assignments` (68 ร้าน = union ของทุก Area) — ต้องเพิ่มในทุกจุดที่เช็ค role กลุ่ม Area: `auth-context.ts`, `isAreaRole()`, `/auth/bridge`, `AREA_ROLES` ใน `/api/admin/users`, badge ในหน้า admin
+- `/api/me` ชื่อเดิมมาจาก `sale_reps` ผ่าน rep_code เท่านั้น -> คนที่ไม่มี rep_code ได้ name = null -> fallback `profiles.full_name`
+- บัญชีที่มีอยู่แล้ว (kantinkn) อัปเดตแค่ชื่อ/เบอร์ ไม่แตะรหัสผ่าน
+- ⚠️ ต้อง deploy โค้ดที่รู้จัก `area_head` ก่อนให้หัวหน้า Area login จริง ไม่งั้น production ไม่รู้จัก role -> ไม่เห็นร้าน
+
+---
+
+## 🔒 API ขอบเขตร้าน + เลือกร้านของ admin/Area (resolveScope)
+
+**ช่องโหว่ที่เจอ**: 9 routes (back-margin, ba-profit-share, ba-incentive, commission-product, lhs-commission, lhs-purchase-discount, cust-sat, store-eval, sale-reps) ใช้ service role + เชื่อ `?dealerCode=` ตรง ๆ ไม่ตรวจ session -> ใครก็ดึงข้อมูลทุกร้านได้ ; routes ที่ "ตรวจแล้ว" ก็ยังเป็น `if (ctx) {...}` = ไม่มี session ปล่อยผ่าน (พฤติกรรมเดโม)
+**วิธีแก้**: `src/lib/supabase/api-scope.ts` -> `resolveScope(dealerCode, repCode, { perRep })` ใช้ทุก route ที่รับ dealerCode
+- ไม่มี session + `NEXT_PUBLIC_REAL_AUTH=1` -> 401 ; non-admin ไม่ระบุร้าน -> ใช้ร้านเดียวถ้ามีร้านเดียว ไม่งั้น 403 ; ร้านนอกขอบเขต -> 403
+- store-eval `?submission=` -> หา dealer_code จาก store_eval_lines ก่อนตรวจสิทธิ์
+- route เดิมที่เป็น `if (ctx)` เพิ่ม `if (!ctx && REAL_AUTH) 401`
+**ทดสอบ**: สร้าง cookie `sb-<ref>-auth-token=base64-<base64url(session JSON)>` จาก signInWithPassword แล้วยิง API (ไม่ต้องเปลี่ยนรหัสผ่าน)
+
+**admin "มุมมองร้านค้า" ไม่กรองหน้าย่อย**: launcher ตั้งแค่ `adminViewDealer` แต่หน้าย่อยส่วนใหญ่อ่าน `session.storeFilter` -> แก้ที่ `readSession()` ให้ `storeFilter` = ร้านของมุมมองเมื่ออยู่ในมุมมอง (แก้ที่เดียว ทุกหน้าได้ผล) + `setStoreFilter` อัปเดต adminViewDealer ในมุมมองร้าน
+**Area ดูรายร้าน**: `areaViewDealer` (ต้องอยู่ใน areaStores) -> `session.dealer` ; ยังไม่เลือก -> `EMPTY_DEALER` (ห้าม fallback ร้านแรก) + AppGuard พาไป /app/stores ; เลือกจากปุ่ม "ดูข้อมูลร้าน" ในหน้าร้านที่ดูแล
+
+---
+
+## ⚡ ความหน่วงของแอป: ฟังก์ชัน Vercel อยู่ iad1 แต่ Supabase อยู่สิงคโปร์
+
+- **อาการ**: API แต่ละตัวบน production ใช้ 2.5–3 วินาที ทั้งที่ RPC ในฐานข้อมูลใช้ 10–60 ms ; `/api/me` (ตรวจ session อย่างเดียว) 1.75 วินาที
+- **สาเหตุ**: Vercel ค่าเริ่มต้นรัน function ที่ `iad1` (Washington DC) — ดูจาก header `x-vercel-id: sin1::iad1::...` (edge::function) ; ทุก API ต้องเรียก Supabase สิงคโปร์ 3–4 รอบ (getUser, profiles, scope, RPC) ข้ามมหาสมุทรทุกรอบ
+- **แก้**: `vercel.json` → `{"regions": ["sin1"]}` (Hobby ใช้ได้ 1 region) ; ยืนยันด้วย header เป็น `sin1::sin1::`
+- **ผล (หน้าหลักร้าน 17 API พร้อมกัน)**: cache เย็น 8.3 → 3.9 วินาที ; รอบถัดไป 3.1–3.3 → 1.0–1.6 วินาที ; `/api/me` 1,751 → 206 ms
+- **บทเรียน**: ก่อนลดข้อมูล/ปรับ query ให้วัดก่อนว่าเวลาเสียที่ไหน (DB vs network) — การจำกัดเหลือ 2 ปีแทบไม่ช่วยเรื่องเวลา เพราะ DB เร็วอยู่แล้ว
+
+### แสดงข้อมูลแค่ปีปัจจุบัน + ปีก่อน (ซ่อนที่หน้าจอ ไม่ลบข้อมูล)
+- จุดเดียว: `yearsOf()` ใน `year-filter.tsx` กรอง `y >= minVisibleYear()` (`VISIBLE_YEARS = 2`) → ปุ่มเลือกปีทุกหน้า + PeriodBar หน้าหลัก ; `computeYearFilter` ตัดรายการปีเก่าทิ้งเสมอ
+- เอาปุ่ม "ทุกปี" ใน `YearChips` ออก (ไม่งั้นรวมยอดปีเก่าที่ซ่อนไว้) ; service-sales / design-intake / product-sales: ปีที่เลือก (หรือ `?y=` เก่า) ไม่อยู่ในช่วง → กลับเป็นปีปัจจุบัน
+- ข้อมูลเก่ายังอยู่ใน DB (Rudy 2021–2024 ~26k แถว) — LY ใช้ปีก่อนหน้าซึ่งยังอยู่ในช่วง
+---
+
+## 👤 หน้า "ฉัน" ของ Admin / หัวหน้า Area / Area / Coach (my-profile-screen)
+
+- `/app/member` แยกด้วย `member-router.tsx`: admin + กลุ่ม area -> `MyProfileScreen` ; ร้านค้า/พนักงาน -> `MemberScreen` เดิม
+- API `/api/me/profile` (GET ข้อมูลของฉัน + ผังทีมในขอบเขต `allowedDealerCodes` ; PATCH แก้ได้แค่ nickname/phone/phone2/lineId ของตัวเอง) + `/api/me/photo` (path มาจาก session เท่านั้น)
+  - area/coach/re -> แก้แถว `sale_reps` ของ rep_code ตัวเอง ; admin/area_head (ไม่มี rep_code) -> คอลัมน์ใหม่ใน `profiles` (nickname, job_title, photo_url, line_id) — migration `profiles_self_contact_fields` แยกชื่อเล่นออกจาก full_name เดิม
+- session role "area" ใช้ร่วม 4 บทบาท -> เพิ่ม `areaKind` (area | coach | re | area_head) ใน doLogin ทุกทาง (loginWithEmail, restoreSession, /auth/bridge) ; หน้า "ฉัน" ใช้ `me.kind` จาก API (ไม่พึ่ง session ที่อาจเก่า)
+- ผังจัดฝั่ง client จาก stores + assignments(manager/coach) + people: Area -> กลุ่มตาม Coach ; Coach -> กลุ่มตาม Area (ถ้าดูแลหลาย Area) ; หัวหน้า Area -> Area -> Coach -> ร้าน
+- ทดสอบ: Coach SR0236 (หลาย Area) login ด้วยรหัสชั่วคราวไม่ได้ = เปลี่ยนรหัสเองแล้ว **ห้ามรีเซ็ตเพื่อทดสอบ** ใช้บัญชีอื่นแทน
+---
+
+## 🧾 คำขอเพิ่มพนักงานใหม่ (Coach / Area / หัวหน้า Area -> Admin อนุมัติ)
+
+- ตาราง `employee_requests` (RLS เปิด ไม่มี policy = service role เท่านั้น ; kind เผื่อ resign/move ภายหลัง) + `sale_reps.education/major` ; `store_roster` คืน education/major (drop + create + revoke public/anon/authenticated)
+- API: `/api/employee-requests` (GET ตามขอบเขตร้าน / `mode=dupes` ; POST ส่ง ; PATCH แก้/ยกเลิกของตัวเองที่ยัง pending) · `/api/employee-requests/photo` (ชื่อไฟล์สุ่มฝั่ง server `requests/<uuid>.jpg`) · `/api/admin/employee-requests` (approve/reject)
+- **อนุมัติ = จองก่อน**: update `status pending -> approved` แบบมีเงื่อนไข `.eq("status","pending")` แล้วค่อย insert sale_reps ; insert พัง -> คืน pending ; รหัส SR ชน (23505) ลองใหม่ 3 ครั้ง -> กันกดซ้ำ/admin 2 คนพร้อมกัน
+- validate ที่ `employee-request-shared.ts` ใช้ทั้ง client และ server ; อีเมลบังคับ ; photoUrl รับเฉพาะ URL ใน bucket ของเรา
+- เช็คซ้ำ: โหลด sale_reps ทั้งหมด (~250) เทียบชื่อ (ตัดคำนำหน้า/ช่องว่าง) + เบอร์ 9 ตัวท้าย + อีเมล ; ร้านนอกขอบเขตแสดง "ร้านอื่น" ไม่บอกชื่อ
+- **บั๊กที่เจอระหว่างทำ**: AppGuard `AREA_NO_STORE_OK` ไม่มี `/app/member` -> Area ที่ยังไม่เลือกร้านกด "ฉัน" แล้วเด้งกลับ /app/stores (หน้า "ฉัน" ที่ปล่อยไปก่อนหน้าเข้าไม่ได้) — เพิ่มหน้าใหม่ที่ Area ใช้ได้โดยไม่ต้องเลือกร้าน ต้องเพิ่มใน list นี้เสมอ
+- ทดสอบ end-to-end ด้วย session จริง 19 กรณี แล้วลบข้อมูลทดสอบ (คำขอ + sale_reps) ใน finally
+---
+
+## 📋 ติดตามการตรวจประเมินร้าน + แจ้งเตือน Coach รายวัน (Web Push + Vercel Cron)
+
+- ร้านที่ต้องตรวจ = `dealers.is_active` ทั้งหมด (64) ; ผู้รับผิดชอบ = coach ใน `rep_store_assignments` ; ตรวจแทน = ชื่อต้นของ inspector ≠ ชื่อต้นของ Coach
+- ตรวจซ้ำ: view `store_eval_effective` (1 แถว/ร้าน/เดือน: `is_primary` ก่อน แล้วครั้งล่าสุด) ; `store_eval_summary/month_lines/fail_summary` อ่านจาก view แล้ว ; sync ไม่แตะ `is_primary` (ไม่อยู่ใน FIELDS)
+- **ระวังนับร้าน**: ต.ค. 69 มีร้านที่ตรวจ 45 ร้าน แต่เป็นร้าน active 44 (อีก 1 ร้านปิดแล้ว) — เวลาสรุปตัวเลขให้ผู้ใช้ ให้บอกว่านับเฉพาะร้านเปิดใช้งาน
+- Web Push: `web-push@3.6.7` + `public/sw.js` + ตาราง `push_subscriptions` (404/410 ลบทิ้ง) ; สวิตช์ในหน้า "ฉัน" ; iPhone ต้องติดตั้งเป็นแอปก่อน (iOS 16.4+)
+- Cron: `vercel.json` crons `0 2 * * *` (= 09:00 ไทย) -> `/api/cron/eval-reminders` ตรวจ `Authorization: Bearer CRON_SECRET` (Vercel ส่งให้เองเมื่อมี env) ; `reminder_log` unique ต่อวัน กันส่งซ้ำ ; `?dry=1&date=` จำลองวันโดยไม่ส่ง
+- env ใหม่ (ต้องตั้งบน Vercel ด้วย): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` — ค่าอยู่ใน `.env` (gitignored) ; NEXT_PUBLIC_ ฝังตอน build -> ตั้งก่อน deploy
+- dev server ต้อง restart หลังเพิ่ม env ใหม่ใน .env
+- ESLint `react-hooks/purity`: ห้าม `Date.now()` ระหว่าง render -> ใช้วันที่จาก server (`t.today`)
+### ร้านที่ขาดตรวจติดกัน (missedStreak / chronic)
+- `buildTracking` คำนวณ `missedStreak` = จำนวนเดือนจากเดือนที่ตรวจล่าสุดถึงเดือนที่ดู (null = ไม่เคยถูกตรวจ) ; `chronic` = ยังไม่ตรวจเดือนนี้ และ streak ≥ `CHRONIC_MONTHS` (2) หรือไม่เคยตรวจ ; ร้าน chronic ขึ้นก่อนในรายการ Coach
+- ❌ เดือนปัจจุบันยังไม่จบ แต่ streak นับเดือนนี้เป็นเดือนที่ "ขาด" แล้ว → กลางเดือน พ.ย. ร้านที่ตรวจล่าสุด ก.ย. ขึ้น "ขาดติดกัน 2 เดือน" (20 ร้าน) ทั้งที่ พ.ย. ยังเหลือ 15 วัน → ✅ เดือนที่ยังไม่จบใช้คำว่า "ค้างจากเดือนก่อน" / "ไม่ได้ตรวจตั้งแต่ <เดือนถัดจากเดือนที่ตรวจล่าสุด>" ; "ขาดติดกัน N เดือน" ใช้กับเดือนที่จบแล้วเท่านั้น
+- ตัวเลขจริง: ต.ค. 69 chronic 3 ร้าน (2 ร้านไม่เคยตรวจ, 5100289 ตรวจล่าสุด เม.ย.) ; พ.ย. 69 (กลางเดือน) ค้างจากเดือนก่อน 20 ร้าน
+- cron: Area ได้เตือนตั้งแต่วันที่ 15 ถ้ามีร้านค้างจากเดือนก่อน (ไม่งั้น 5 วันสุดท้าย) ; profile role `area_head` ไม่อยู่ในรายชื่อรับเตือน (ไม่มี rep_code ของ Area)
+- PowerShell: คำสั่งหลายบรรทัดที่มี `*>` redirect บางครั้งบรรทัดถัดไปไม่ถูกรัน/ไม่มี output → แยกเป็นคำสั่งเดียวต่อ tool call เมื่อต้องอ่านผล

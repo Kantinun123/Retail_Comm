@@ -24,6 +24,12 @@ export interface TrackStore {
   status: "done" | "missing";
   duplicate: boolean;
   proxy: boolean;
+  /** เดือนที่ขาดติดกันจนถึงเดือนนี้ (0 = ตรวจแล้ว, null = ไม่เคยถูกตรวจ) */
+  missedStreak: number | null;
+  /** ขาดติดกัน ≥ chronicMonths เดือน หรือไม่เคยถูกตรวจ */
+  chronic: boolean;
+  /** เดือนล่าสุดที่ร้านนี้ถูกตรวจ */
+  lastEvalPeriod: string | null;
   submissions: EvalSubmission[];
 }
 export interface TrackCoach {
@@ -36,6 +42,7 @@ export interface TrackCoach {
   done: number;
   duplicates: number;
   proxies: number;
+  chronic: number;
   lastEvalPeriod: string | null;
   stores: TrackStore[];
 }
@@ -43,7 +50,8 @@ export interface Tracking {
   period: string;
   today: string;
   daysLeft: number;
-  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number };
+  chronicMonths: number;
+  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number; chronic: number };
   coaches: TrackCoach[];
   me: { role: string; repCode: string | null };
 }
@@ -84,4 +92,12 @@ export function shortDate(iso: string | null): string {
   const [, m, d] = iso.split("-").map(Number);
   return `${d} ${MONTHS[(m || 1) - 1]}`;
 }
+/** ข้อความป้ายร้านที่ขาดติดกัน — null ถ้าไม่ใช่ร้านที่ขาดติดกัน
+ *  inProgress = เดือนที่ดูยังไม่จบ -> ยังไม่นับเดือนนี้ว่า "ขาด" บอกเป็น "ไม่ได้ตรวจตั้งแต่ ..." แทน */
+export function chronicText(s: Pick<TrackStore, "chronic" | "missedStreak" | "lastEvalPeriod">, inProgress = false): string | null {
+  if (!s.chronic) return null;
+  if (s.missedStreak === null || !s.lastEvalPeriod) return "ยังไม่เคยตรวจ";
+  return inProgress ? `ไม่ได้ตรวจตั้งแต่ ${monthLabel(shiftPeriod(s.lastEvalPeriod, 1))}` : `ขาดติดกัน ${s.missedStreak} เดือน`;
+}
+
 export const pctText = (p: number | null) => (p === null ? "-" : `${Math.round(p * 100)}%`);

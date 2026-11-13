@@ -14,6 +14,7 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { useHomeHref, useSession } from "@/lib/commission/session";
 import {
+  chronicText,
   EVAL_FORM_URL,
   fetchTracking,
   monthLabel,
@@ -38,6 +39,7 @@ export function EvalTrackingScreen() {
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [chronicOnly, setChronicOnly] = useState(false);
   const key = `${period ?? ""}|${reload}`;
 
   useEffect(() => {
@@ -65,7 +67,12 @@ export function EvalTrackingScreen() {
   // เดือนปัจจุบันตามเซิร์ฟเวอร์ (เวลาไทย) — ห้ามเลื่อนไปเดือนอนาคต
   const thisMonth = t?.today.slice(0, 7) ?? period ?? "";
   const current = period ?? t?.period ?? thisMonth;
-  const coachOpen = (c: TrackCoach) => isCoach || open === (c.repCode ?? "none");
+  // กรองเฉพาะร้านที่ขาดติดกัน (มีผลเมื่อเดือนนั้นมีร้านแบบนี้)
+  const filterOn = chronicOnly && (t?.totals.chronic ?? 0) > 0;
+  // เดือนที่ดูยังไม่จบ -> ยังไม่นับเดือนนี้เป็นเดือนที่ "ขาด"
+  const inProgress = !!t && t.period === thisMonth;
+  const coachOpen = (c: TrackCoach) => isCoach || filterOn || open === (c.repCode ?? "none");
+  const coaches = !t ? [] : filterOn ? t.coaches.filter((c) => c.chronic > 0).map((c) => ({ ...c, stores: c.stores.filter((s) => s.chronic) })) : t.coaches;
 
   async function pickCounted(s: TrackStore, submissionId: string) {
     setBusy(submissionId);
@@ -147,9 +154,33 @@ export function EvalTrackingScreen() {
                 <span className="rounded-full bg-amber-100 text-amber-900 px-2.5 py-1">ขาด {t.totals.missing} ร้าน</span>
                 {t.totals.duplicates > 0 && <span className="rounded-full bg-red-100 text-[#a11119] px-2.5 py-1">ซ้ำ {t.totals.duplicates} ร้าน</span>}
                 {t.totals.proxies > 0 && <span className="rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1">ตรวจแทน {t.totals.proxies}</span>}
+                {t.totals.chronic > 0 && (
+                  <button
+                    type="button"
+                    aria-pressed={filterOn}
+                    onClick={() => setChronicOnly((v) => !v)}
+                    className={cn("rounded-full px-2.5 py-1 inline-flex items-center gap-0.5 border", filterOn ? "bg-white text-[#a11119] border-white" : "bg-red-600 text-white border-red-400")}
+                  >
+                    <Icon name="error" style={{ fontSize: 12 }} />
+                    {inProgress ? "ค้างจากเดือนก่อน" : `ขาดติดกัน ≥${t.chronicMonths} เดือน`} {t.totals.chronic} ร้าน
+                  </button>
+                )}
                 {t.daysLeft > 0 && <span className="rounded-full bg-white/15 px-2.5 py-1">เหลือ {t.daysLeft} วัน</span>}
               </div>
             </section>
+
+            {filterOn && (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[11.5px] text-[#a11119]" role="status">
+                <span>
+                  {inProgress
+                    ? "แสดงเฉพาะร้านที่เดือนก่อนก็ไม่ได้ตรวจ และเดือนนี้ยังไม่ตรวจ (รวมร้านที่ยังไม่เคยตรวจ)"
+                    : `แสดงเฉพาะร้านที่ไม่ได้ตรวจติดกันตั้งแต่ ${t.chronicMonths} เดือน หรือยังไม่เคยตรวจ`}
+                </span>
+                <button type="button" onClick={() => setChronicOnly(false)} className="shrink-0 rounded-full bg-white border border-red-200 px-2 py-0.5 font-bold">
+                  ดูทั้งหมด
+                </button>
+              </div>
+            )}
 
             {!isCoach && (
               <div className="flex items-baseline justify-between px-1">
@@ -158,7 +189,7 @@ export function EvalTrackingScreen() {
               </div>
             )}
 
-            {t.coaches.map((c) => {
+            {coaches.map((c) => {
               const k = c.repCode ?? "none";
               const pct = Math.round((c.done / Math.max(1, c.total)) * 100);
               const isOpen = coachOpen(c);
@@ -179,6 +210,7 @@ export function EvalTrackingScreen() {
                       <span className="block text-[11px] text-slate-500">
                         {c.done} / {c.total} ร้าน
                         {c.done === 0 && c.lastEvalPeriod ? ` · ส่งล่าสุด ${monthLabel(c.lastEvalPeriod)}` : ""}
+                        {c.chronic > 0 && <span className="font-bold text-[#a11119]"> · {inProgress ? "ค้างจากเดือนก่อน" : "ขาดติดกัน"} {c.chronic} ร้าน</span>}
                         {c.duplicates > 0 ? ` · ซ้ำ ${c.duplicates}` : ""}
                         {c.proxies > 0 ? ` · ตรวจแทน ${c.proxies}` : ""}
                       </span>
@@ -211,7 +243,7 @@ export function EvalTrackingScreen() {
                         </div>
                       )}
                       {c.stores.map((s) => (
-                        <StoreRow key={s.code} s={s} isAdmin={isAdmin} isCoach={isCoach} busy={busy} onPick={(sid) => pickCounted(s, sid)} />
+                        <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} onPick={(sid) => pickCounted(s, sid)} />
                       ))}
                     </div>
                   )}
@@ -230,10 +262,12 @@ export function EvalTrackingScreen() {
   );
 }
 
-function StoreRow({ s, isAdmin, isCoach, busy, onPick }: { s: TrackStore; isAdmin: boolean; isCoach: boolean; busy: string | null; onPick: (sid: string) => void }) {
+function StoreRow({ s, inProgress, isAdmin, isCoach, busy, onPick }: { s: TrackStore; inProgress: boolean; isAdmin: boolean; isCoach: boolean; busy: string | null; onPick: (sid: string) => void }) {
   const counted = s.submissions[0];
-  const badge =
-    s.status === "missing"
+  const chronic = chronicText(s, inProgress);
+  const badge = chronic
+    ? { t: chronic, c: "bg-red-600 text-white border-red-600", i: "error" }
+    : s.status === "missing"
       ? { t: "ยังไม่ตรวจ", c: "bg-amber-50 text-amber-800 border-amber-200", i: "hourglass_top" }
       : s.duplicate
         ? { t: `ตรวจซ้ำ ${s.submissions.length} ครั้ง`, c: "bg-red-50 text-[#a11119] border-red-200", i: "warning" }
@@ -241,7 +275,7 @@ function StoreRow({ s, isAdmin, isCoach, busy, onPick }: { s: TrackStore; isAdmi
           ? { t: "ตรวจแทน", c: "bg-indigo-50 text-indigo-700 border-indigo-200", i: "warning" }
           : { t: "ตรวจแล้ว", c: "bg-emerald-50 text-emerald-700 border-emerald-200", i: "check_circle" };
   return (
-    <div className={cn("rounded-xl border px-3 py-2.5", s.status === "missing" ? "bg-amber-50/50 border-amber-200" : s.duplicate ? "border-red-200" : "border-slate-100 bg-slate-50/50")}>
+    <div className={cn("rounded-xl border px-3 py-2.5", s.chronic ? "bg-red-50/60 border-red-300" : s.status === "missing" ? "bg-amber-50/50 border-amber-200" : s.duplicate ? "border-red-200" : "border-slate-100 bg-slate-50/50")}>
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1">
           <span className="block text-[12.5px] font-semibold text-slate-900 truncate">{s.name}</span>
@@ -249,6 +283,7 @@ function StoreRow({ s, isAdmin, isCoach, busy, onPick }: { s: TrackStore; isAdmi
             {s.code}
             {counted ? ` · ${shortDate(counted.evalDate)} · ${pctText(counted.pct)}` : ""}
             {s.proxy && counted?.inspector ? ` · ผู้ตรวจ: ${counted.inspector}` : ""}
+            {s.status === "missing" && s.lastEvalPeriod ? ` · ตรวจล่าสุด ${monthLabel(s.lastEvalPeriod)}` : ""}
           </span>
         </span>
         <span className={cn("shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold border rounded-full px-2 py-0.5", badge.c)}>

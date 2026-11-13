@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
-import { bangkokToday, buildTracking } from "@/lib/server/eval-tracking";
+import { bangkokToday, buildTracking, totalsOf } from "@/lib/server/eval-tracking";
 
 /**
  * ติดตามการตรวจประเมินร้านรายเดือน
@@ -23,14 +23,7 @@ export async function GET(req: NextRequest) {
     // Coach: เห็นเฉพาะกลุ่มของตัวเอง (ร้านที่ผูกกับ Coach คนอื่นในร้านร่วม ไม่แสดง)
     if ((ctx.role === "coach" || ctx.role === "re") && ctx.repCode) {
       t.coaches = t.coaches.filter((c) => c.repCode === ctx.repCode);
-      const mine = t.coaches.flatMap((c) => c.stores);
-      t.totals = {
-        stores: mine.length,
-        done: mine.filter((s) => s.status === "done").length,
-        missing: mine.filter((s) => s.status === "missing").length,
-        duplicates: mine.filter((s) => s.duplicate).length,
-        proxies: mine.filter((s) => s.proxy).length,
-      };
+      t.totals = totalsOf(t.coaches.flatMap((c) => c.stores));
     }
     return NextResponse.json({ ok: true, ...t, me: { role: ctx.role, repCode: ctx.repCode } });
   } catch (e) {

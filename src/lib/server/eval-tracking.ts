@@ -28,6 +28,21 @@ export interface TrackStore {
   duplicate: boolean;
   proxy: boolean;
   submissions: EvalSubmission[];
+  /** จำนวนเดือนติดกันที่ไม่ได้ตรวจ นับถึงเดือนที่เลือก (ตรวจแล้ว = 0) ; null = ไม่เคยถูกตรวจเลย */
+  missedStreak: number | null;
+  /** ขาดติดกันตั้งแต่ CHRONIC_MONTHS เดือน หรือไม่เคยถูกตรวจ */
+  chronic: boolean;
+  /** เดือนล่าสุดที่เคยตรวจ (ก่อนหรือเท่ากับเดือนที่เลือก) */
+  lastEvalPeriod: string | null;
+}
+
+/** ขาดติดกันกี่เดือนถึงนับเป็น "ขาดติดกัน" (เตือนเข้มขึ้น) */
+export const CHRONIC_MONTHS = 2;
+
+export function monthsBetween(from: string, to: string): number {
+  const [ya, ma] = from.split("-").map(Number);
+  const [yb, mb] = to.split("-").map(Number);
+  return (yb - ya) * 12 + (mb - ma);
 }
 
 export interface TrackCoach {
@@ -40,6 +55,8 @@ export interface TrackCoach {
   done: number;
   duplicates: number;
   proxies: number;
+  /** ร้านที่ขาดติดกัน ≥ CHRONIC_MONTHS เดือน (รวมร้านที่ไม่เคยถูกตรวจ) */
+  chronic: number;
   lastEvalPeriod: string | null;
   stores: TrackStore[];
 }
@@ -48,7 +65,8 @@ export interface Tracking {
   period: string;
   today: string;
   daysLeft: number;
-  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number };
+  chronicMonths: number;
+  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number; chronic: number };
   coaches: TrackCoach[];
 }
 
@@ -123,6 +141,8 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
       isPrimary: s.is_primary === true,
     }));
     const counted = submissions[0];
+    const lastP = lastPeriodOf.get(code) ?? null;
+    const missedStreak = submissions.length ? 0 : lastP ? monthsBetween(lastP, period) : null;
     return {
       code,
       name: d.name as string,
@@ -134,6 +154,9 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
       duplicate: submissions.length > 1,
       proxy: !!counted && !!coachName && firstWord(counted.inspector) !== firstWord(coachName),
       submissions,
+      missedStreak,
+      chronic: !submissions.length && (missedStreak === null || missedStreak >= CHRONIC_MONTHS),
+      lastEvalPeriod: lastP,
     };
   });
 
@@ -141,7 +164,13 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
   stores.forEach((s) => groups.set(s.coachRep, [...(groups.get(s.coachRep) ?? []), s]));
   const coaches: TrackCoach[] = [...groups.entries()].map(([repCode, list]) => {
     const r = repCode ? repMap.get(repCode) : null;
-    const sorted = list.sort((a, b) => Number(a.status === "done") - Number(b.status === "done") || a.name.localeCompare(b.name, "th"));
+    // ขาดติดกันก่อน -> ยังไม่ตรวจ -> ตรวจแล้ว
+    const sorted = list.sort(
+      (a, b) =>
+        Number(b.chronic) - Number(a.chronic) ||
+        Number(a.status === "done") - Number(b.status === "done") ||
+        a.name.localeCompare(b.name, "th")
+    );
     const lastEval = sorted.map((s) => lastPeriodOf.get(s.code)).filter(Boolean).sort().pop() ?? null;
     return {
       repCode,
@@ -153,6 +182,7 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
       done: list.filter((s) => s.status === "done").length,
       duplicates: list.filter((s) => s.duplicate).length,
       proxies: list.filter((s) => s.proxy).length,
+      chronic: list.filter((s) => s.chronic).length,
       lastEvalPeriod: lastEval,
       stores: sorted,
     };
@@ -167,13 +197,19 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
     period,
     today,
     daysLeft,
-    totals: {
-      stores: stores.length,
-      done: stores.filter((s) => s.status === "done").length,
-      missing: stores.filter((s) => s.status === "missing").length,
-      duplicates: stores.filter((s) => s.duplicate).length,
-      proxies: stores.filter((s) => s.proxy).length,
-    },
+    chronicMonths: CHRONIC_MONTHS,
+    totals: totalsOf(stores),
     coaches,
+  };
+}
+
+export function totalsOf(stores: TrackStore[]): Tracking["totals"] {
+  return {
+    stores: stores.length,
+    done: stores.filter((s) => s.status === "done").length,
+    missing: stores.filter((s) => s.status === "missing").length,
+    duplicates: stores.filter((s) => s.duplicate).length,
+    proxies: stores.filter((s) => s.proxy).length,
+    chronic: stores.filter((s) => s.chronic).length,
   };
 }
