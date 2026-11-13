@@ -114,7 +114,8 @@ export function DesignIntakeScreen() {
   const byPeriod = useMemo(() => new Map(months.map((m) => [m.period, m])), [months]);
   const years = yearsOf(months.map((m) => m.period));
   const curYear = String(new Date().getFullYear());
-  const activeYear = year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
+  // ปีที่เลือกต้องอยู่ในช่วงที่แสดง (ปีปัจจุบัน + ปีก่อน) — ลิงก์ปีเก่า / ค่าเดิม "ทุกปี" ให้กลับเป็นปีปัจจุบัน
+  const activeYear = year && years.includes(year) ? year : years.includes(curYear) ? curYear : years[0] ?? null;
   const shown = months.filter((m) => !activeYear || m.period.startsWith(activeYear));
   const maxTotal = Math.max(1, ...shown.map(total));
 

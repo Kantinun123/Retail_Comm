@@ -521,7 +521,8 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
   const allMonths = useMemo(() => summary?.months ?? [], [summary]);
   const years = useMemo(() => yearsOf(allMonths.map((m) => m.period)), [allMonths]);
   const curYear = String(new Date().getFullYear());
-  const activeYear = year === undefined ? (years.includes(curYear) ? curYear : years[0] ?? null) : year;
+  // ปีที่เลือกต้องอยู่ในช่วงที่แสดง (ปีปัจจุบัน + ปีก่อน) — ลิงก์ปีเก่า / ค่าเดิม "ทุกปี" ให้กลับเป็นปีปัจจุบัน
+  const activeYear = year && years.includes(year) ? year : years.includes(curYear) ? curYear : years[0] ?? null;
   const detailKey = `${sumKey}|${activeYear ?? ""}`;
 
   // 3 กลุ่ม (ปี) + รายเดือน+กลุ่ม + แยกพนักงาน/ร้าน + แยกแหล่ง ตามปีที่เลือก
