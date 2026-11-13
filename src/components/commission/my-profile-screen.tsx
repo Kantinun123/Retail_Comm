@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { InstallAppHint } from "./install-app-hint";
+import { PushToggle } from "./push-toggle";
 import { doLogout, setAreaStore, useHomeHref, useSession } from "@/lib/commission/session";
 import { LEVEL_META, POSITION_LABEL, isNewEmployee, tenureFromStartDate } from "@/lib/commission/employee-store";
 import {
@@ -137,6 +138,7 @@ export function MyProfileScreen() {
                 <span className="flex-1 text-[13px] font-semibold text-slate-800">เปลี่ยนรหัสผ่าน</span>
                 <Icon name="chevron_right" className="text-slate-300" />
               </Link>
+              <PushToggle />
               <InstallAppHint />
             </section>
 

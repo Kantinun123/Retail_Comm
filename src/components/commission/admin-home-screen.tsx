@@ -285,6 +285,17 @@ export function AdminHomeScreen() {
               <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
             </Link>
 
+            <Link href="/app/eval-tracking" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 transition">
+              <div className="w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
+                <Icon name="fact_check" className="text-2xl" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14.5px] font-bold text-slate-900">ติดตามการตรวจร้าน</p>
+                <p className="text-[11px] text-slate-500">Coach ตรวจครบ / ขาด / ซ้ำ รายเดือน · ส่งเตือนได้</p>
+              </div>
+              <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
+            </Link>
+
             <Link href="/app/employee-requests" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 transition">
               <div className="relative w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
                 <Icon name="person_add" className="text-2xl" />

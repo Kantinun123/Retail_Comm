@@ -16,6 +16,7 @@ import { BottomNav } from "./bottom-nav";
 import { useSession, useHomeHref, setAreaStore, doLogout } from "@/lib/commission/session";
 import { getStoreTeamCaps } from "@/lib/commission/permissions";
 import { EmployeeRequestCard } from "./employee-request-card";
+import { EvalProgressCard } from "./eval-progress-card";
 import {
   fetchStores,
   setStoreActive,
@@ -165,6 +166,7 @@ export function StoresScreen() {
 
       <div className="space-y-4 pb-4">
         {/* Coach / Area / หัวหน้า Area: การ์ดงานแจ้งเพิ่มพนักงานใหม่ */}
+        {session.isArea && <EvalProgressCard />}
         {session.isArea && <EmployeeRequestCard />}
 
         {/* ตัวนับร้าน */}

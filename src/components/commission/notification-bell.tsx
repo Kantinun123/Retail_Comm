@@ -15,6 +15,7 @@ import {
 } from "@/lib/commission/notifications";
 import { useSession } from "@/lib/commission/session";
 import { useAdminPending } from "@/lib/commission/admin-pending";
+import { useEvalReminder } from "@/lib/commission/eval-reminder";
 import { cn } from "@/lib/utils";
 
 /** เวลาแบบย่อ "x นาทีที่แล้ว" / วันเวลา */
@@ -49,7 +50,9 @@ export function NotificationBell({
   const [unread, setUnread] = useState(0);
   // งานที่รอ admin (คำขอสมัคร/รีเซ็ตรหัสผ่าน) — เป็นตัวเลขสดจากฐานข้อมูล ไม่หายจนกว่าจะดำเนินการ
   const pending = useAdminPending(!!session?.isAdmin);
-  const badge = unread + pending.total;
+  // Coach / Area: เตือนร้านที่ยังไม่ตรวจประเมินเดือนนี้ (Coach ตั้งแต่วันที่ 15 · Area 5 วันสุดท้าย)
+  const evalReminder = useEvalReminder(!!session?.isArea);
+  const badge = unread + pending.total + (evalReminder ? 1 : 0);
   const [toast, setToast] = useState<NotifItem | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const lastSeenId = useRef<string | null>(null);
@@ -199,6 +202,25 @@ export function NotificationBell({
             </div>
 
             <div className="overflow-y-auto">
+              {evalReminder && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    router.push("/app/eval-tracking");
+                  }}
+                  className="w-full text-left px-3.5 py-2.5 flex items-start space-x-2.5 border-b border-slate-100 bg-blue-50/60 hover:bg-blue-50 transition"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                    <Icon name="fact_check" className="text-lg" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-semibold text-slate-700">{evalReminder.title}</p>
+                    <p className="text-[11px] text-slate-500">{evalReminder.detail}</p>
+                  </div>
+                  <Icon name="chevron_right" className="text-slate-300 text-lg shrink-0 self-center" />
+                </button>
+              )}
               {pending.total > 0 && (
                 <ul className="divide-y divide-amber-100 border-b border-slate-100 bg-amber-50/60">
                   {(
@@ -234,7 +256,7 @@ export function NotificationBell({
                     ))}
                 </ul>
               )}
-              {items.length === 0 && pending.total === 0 ? (
+              {items.length === 0 && pending.total === 0 && !evalReminder ? (
                 <div className="px-3.5 py-8 text-center">
                   <Icon
                     name="notifications_off"
