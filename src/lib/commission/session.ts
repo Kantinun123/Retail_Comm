@@ -49,6 +49,8 @@ const KEYS = {
   areaName: "areaName",
   // Area/Coach/หัวหน้า Area: ร้านที่เลือกดูข้อมูล (ต้องอยู่ใน areaStores)
   areaViewDealer: "areaViewDealer",
+  // บทบาทจริงของกลุ่ม area: area | coach | re | area_head
+  areaKind: "areaKind",
 } as const;
 
 export type AdminViewMode = "admin" | "store" | "staff";
@@ -82,6 +84,8 @@ export interface SessionData {
   areaName: string | null;
   /** ร้านที่ Area/Coach/หัวหน้า Area เลือกดูข้อมูล (null = ยังไม่เลือก -> ต้องเลือกจากหน้าร้านที่ดูแล) */
   areaViewDealer: string | null;
+  /** บทบาทจริงของกลุ่ม area (area | coach | re | area_head) ; null = ไม่ใช่กลุ่ม area */
+  areaKind: string | null;
   /**
    * ขอบเขตร้านที่ admin กำลังดู (รหัสร้าน) หรือ null = ดูทุกร้านรวมกัน
    * - อยู่ใน "มุมมองร้านค้า/พนักงาน" = ร้านของมุมมองนั้น (ทุกหน้าจอที่อ่าน storeFilter จึงกรองตามร้านที่เลือกเสมอ)
@@ -134,6 +138,7 @@ function readSession(): SessionData {
   const areaName = isArea ? sessionStorage.getItem(KEYS.areaName) || null : null;
   const areaPick = isArea ? sessionStorage.getItem(KEYS.areaViewDealer) || null : null;
   const areaViewDealer = areaPick && areaStores.includes(areaPick) ? areaPick : null;
+  const areaKind = isArea ? sessionStorage.getItem(KEYS.areaKind) || "area" : null;
   // admin "ดูในมุมมอง" (store/staff) — role อื่นไม่ใช้
   const adminViewMode = (isAdmin
     ? (sessionStorage.getItem(KEYS.adminViewMode) as AdminViewMode) || "admin"
@@ -182,6 +187,7 @@ function readSession(): SessionData {
     areaStores,
     areaName,
     areaViewDealer,
+    areaKind,
     storeFilter,
     adminViewMode,
     adminViewDealer,
@@ -205,18 +211,22 @@ export interface LoginInput {
   /** area: ร้านที่ดูแล + ชื่อ */
   areaStores?: string[];
   areaName?: string;
+  /** area: บทบาทจริงใน profiles (area | coach | re | area_head) — session ใช้ role "area" ร่วมกัน */
+  areaKind?: string;
 }
 
-export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repDealerName, repModel, areaStores, areaName }: LoginInput) {
+export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repDealerName, repModel, areaStores, areaName, areaKind }: LoginInput) {
   sessionStorage.setItem(KEYS.loggedIn, "true");
   sessionStorage.removeItem("loggedOut");
   if (role === "area") {
     sessionStorage.setItem(KEYS.areaStores, JSON.stringify(areaStores ?? []));
     if (areaName) sessionStorage.setItem(KEYS.areaName, areaName);
     else sessionStorage.removeItem(KEYS.areaName);
+    sessionStorage.setItem(KEYS.areaKind, areaKind || "area");
   } else {
     sessionStorage.removeItem(KEYS.areaStores);
     sessionStorage.removeItem(KEYS.areaName);
+    sessionStorage.removeItem(KEYS.areaKind);
   }
   // login ใหม่ -> ยังไม่เลือกร้าน (Area เลือกจากหน้าร้านที่ดูแล)
   sessionStorage.removeItem(KEYS.areaViewDealer);
@@ -319,6 +329,7 @@ export function doLogout() {
   sessionStorage.removeItem(KEYS.areaStores);
   sessionStorage.removeItem(KEYS.areaName);
   sessionStorage.removeItem(KEYS.areaViewDealer);
+  sessionStorage.removeItem(KEYS.areaKind);
   sessionStorage.removeItem(KEYS.adminViewMode);
   sessionStorage.removeItem(KEYS.adminViewDealer);
   sessionStorage.removeItem(KEYS.adminViewRep);

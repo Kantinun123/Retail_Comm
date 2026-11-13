@@ -68,7 +68,8 @@ for (const p of plan) {
       if (error) throw error;
       id = data.user.id;
     }
-    const patch = { role: p.role, full_name: full, phone: p.phone || null, status: "approved", approved_at: now };
+    // ชื่อเล่น / ตำแหน่ง เก็บแยกคอลัมน์ (หน้า "ฉัน") ; full_name = ชื่อ-นามสกุลล้วน
+    const patch = { role: p.role, full_name: p.fullName, nickname: p.nick || null, job_title: p.title || null, phone: p.phone || null, status: "approved", approved_at: now };
     if (pwd) patch.must_change_password = true;
     const { error: e2 } = await sb.from("profiles").update(patch).eq("id", id);
     if (e2) {

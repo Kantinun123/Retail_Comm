@@ -105,7 +105,7 @@ export async function loginWithEmail(
       await sb.auth.signOut();
       return { ok: false, error: "อ่านข้อมูลร้านที่ดูแลไม่สำเร็จ ลองใหม่อีกครั้ง" };
     }
-    doLogin({ role: "area", areaStores: json.me.storeCodes ?? [], areaName: json.me.name ?? undefined });
+    doLogin({ role: "area", areaStores: json.me.storeCodes ?? [], areaName: json.me.name ?? undefined, areaKind: profile.role ?? undefined });
     setMustChangePassword(!!profile.must_change_password);
     return { ok: true, role: "area", mustChangePassword: !!profile.must_change_password };
   }
@@ -161,7 +161,7 @@ export async function restoreSession(next?: string | null): Promise<string | nul
     doLogin({ role });
   } else if (isAreaRole(me.role)) {
     role = "area";
-    doLogin({ role, areaStores: me.storeCodes ?? [], areaName: me.name ?? undefined });
+    doLogin({ role, areaStores: me.storeCodes ?? [], areaName: me.name ?? undefined, areaKind: me.role });
   } else if (me.role === "dealer" && me.dealerCode) {
     role = "dealer";
     doLogin({ role, dealerCode: me.dealerCode });

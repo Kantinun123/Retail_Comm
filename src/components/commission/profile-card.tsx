@@ -97,7 +97,9 @@ export function ProfileCard() {
               </>
             ) : session.isArea ? (
               <>
-                <Icon name="supervisor_account" style={{ fontSize: 13 }} /> {session.areaName ?? "Area / Coach"} · ดูร้าน {session.dealer.code}
+                <Icon name="supervisor_account" style={{ fontSize: 13 }} />{" "}
+                {session.areaKind === "area_head" ? "หัวหน้า Area" : session.areaKind === "coach" || session.areaKind === "re" ? "Coach" : "Area"}
+                {session.areaName ? ` ${session.areaName}` : ""} · ดูร้าน {session.dealer.code}
               </>
             ) : (
               <>
