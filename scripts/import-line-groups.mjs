@@ -10,7 +10,8 @@
 //     (*group_not_register*.xlsx ไม่มีเลขงาน/ร้าน จึงจับคู่ไม่ได้ — ไม่ใช้)
 //
 // กติกา
-//   - ลูกค้าคนเดียวกัน = home_id เดียวกันใน CRM หรือ ร้านเดียวกัน + ชื่อลูกค้าเดียวกัน (ตัดคำนำหน้า/วงเล็บ) -> 1 กลุ่ม Line
+//   - เฉพาะงานช่องทาง B2C (คอลัมน์ H7 ของไฟล์ Rudy)
+//   - ลูกค้าคนเดียวกัน = home_id เดียวกันใน CRM หรือ ร้านเดียวกัน + ชื่อลูกค้าเดียวกัน (ดู norm()) -> 1 กลุ่ม Line
 //   - สถานะของลูกค้า = สถานะที่ดีที่สุดของงานทั้งหมด: register > not_register > no_bot ; ไม่มี = null ("ไม่มีข้อมูล")
 //   - เลขใบเสนอราคา (Q...) จับคู่ไม่ได้ จึงไม่นับ
 //
@@ -50,9 +51,26 @@ const wbW = XLSX.read(readFileSync(WIN));
 const raw = XLSX.utils.sheet_to_json(wbW.Sheets[wbW.SheetNames[0]], { defval: "", raw: false });
 const projOpps = new Map(), custOf = new Map();
 const addOpp = (p, o) => { if (!p || !o) return; p = String(p).trim().slice(0, 14); o = String(o).trim(); if (!/^OP\d{12}$/.test(o)) return; projOpps.set(p, (projOpps.get(p) ?? new Set()).add(o)); };
-const norm = (s) => String(s ?? "").replace(/(นางสาว|นาย|นาง|คุณ|บ้าน|บจก\.?|บริษัท|จำกัด|หจก\.?|ห้างหุ้นส่วน|\(.*?\))/g, "").replace(/[\s._\-()/:,]+/g, "").toLowerCase();
+// ชื่อลูกค้าใน Rudy = "<ลูกค้า/บริษัท> (<บ้านคุณ…/แปลง…/ประเภทงาน>) <ต่อท้าย>"
+// กติกา (ผู้ใช้ยืนยัน พ.ย. 69):
+//   - ต่างกันแค่ประเภทงาน (รอบบน/รอบล่าง/หลังที่ N/Truss/ค่าแรงมุง/โรงรถ ฯลฯ) = ลูกค้าเดียวกัน
+//   - บริษัทเดียวกันหลายแปลง (แปลง A1/A2, แปลง 120…) = ลูกค้าเดียวกัน
+//   - บริษัทเดียวกันแต่ "บ้านคุณ…" ในวงเล็บเป็นคนละคน = คนละลูกค้า
+const WORK_WORDS = /(รอบ\s*(บน|ล่าง|แรก|สอง|\d+)|หลัง\s*ที่\s*\d+|หลังที่สอง|แปลง\s*[A-Za-z0-9ก-๙\-]+|เฟส\s*\d+|phase\s*\d+|งวด\s*\d+|truss|ค่าแรง\s*มุง|เฉพาะ\s*แรง|มุง|งาน\s*เพิ่มเติม|ต่อเติม|โรง\s*(จอด)?\s*รถ|ตัวบ้าน|กันสาด|อะเส|value|type\s*[a-z0-9]+|ดาร์กเกรย์)/gi;
+const TITLE = /(นางสาว|นาย|นาง|คุณ|บ้าน|บจก\.?|บริษัท|จำกัด|หจก\.?|ห้างหุ้นส่วน|บ\.(?=\s*[ก-๙A-Za-z]))/g;
+const squash = (s) => s.replace(/[\s._\-()/:,+]+/g, "").toLowerCase();
+const norm = (s) => {
+  const full = String(s ?? "");
+  // เจ้าของบ้านในวงเล็บ: "บ้านคุณกัญชพร อินธรรม" -> "กัญชพร" (ชื่อต้น)
+  const owner = (full.match(/\(([^)]*)\)/g) ?? []).map((x) => x.match(/คุณ\s*([ก-๙A-Za-z]{2,})/)?.[1]).find(Boolean) ?? "";
+  const base = squash(full.replace(/\(.*?\)/g, " ").replace(WORK_WORDS, " ").replace(TITLE, ""));
+  return owner ? `${base}#${owner.toLowerCase()}` : base;
+};
+let nonB2c = 0;
 for (const r of raw) {
   const p = String(r.project_number).trim();
+  // ทีมที่เกี่ยวข้องให้นับเฉพาะช่องทาง B2C (H7)
+  if (jobs.has(p) && String(r.H7).trim() !== "B2C") { jobs.delete(p); nonB2c++; }
   addOpp(p, r.ref_opp);
   if (!custOf.has(p)) custOf.set(p, {
     name: `${String(r.customer_first_name).trim()} ${String(r.customer_last_name).trim()}`.replace(/\s+/g, " ").trim(),
@@ -61,6 +79,7 @@ for (const r of raw) {
     province: String(r.province_name || "").trim() || null,
   });
 }
+console.log(`ตัดงานที่ไม่ใช่ B2C (H7) ${nonB2c} งาน -> เหลือ ${jobs.size} งาน`);
 const crm = await all(() => sb.from("design_intake_lines").select("opp_id, rudy_id, home_id").not("rudy_id", "is", null));
 const homeOfOpp = new Map();
 for (const c of crm) { String(c.rudy_id).split(/[,\s]+/).forEach((rd) => addOpp(rd, c.opp_id)); if (c.home_id) homeOfOpp.set(c.opp_id, c.home_id); }
@@ -131,6 +150,13 @@ const rows = [...jobs.values()].map((j) => {
 const C = [...cust.values()];
 const count = (k) => C.filter((c) => (c.best?.status ?? null) === k).length;
 console.log(`ลูกค้า ${C.length} ราย (หลายงาน ${C.filter((c) => [...jobs.keys()].filter((p) => find(p) === c.id).length > 1).length}) : ลงทะเบียน ${count("register")} · ไม่ลงทะเบียน ${count("not_register")} · ไม่ Add Bot ${count("no_bot")} · ไม่มีข้อมูล ${count(null)} ; ข้อมูลกลุ่มล่าสุด ${latestGroup}`);
+
+// --debug: แสดงลูกค้าที่รวมหลายชื่อเข้าด้วยกัน ไว้ตรวจกติกา
+if (process.argv.includes("--debug")) {
+  const names = new Map();
+  for (const p of jobs.keys()) { const r = find(p); names.set(r, (names.get(r) ?? new Set()).add(custOf.get(p)?.name ?? p)); }
+  [...names.values()].filter((s) => s.size > 1).forEach((s) => console.log(`  รวม: ${[...s].join(" | ")}`));
+}
 
 if (!APPLY) { console.log("dry-run — เพิ่ม --apply เพื่อบันทึก"); process.exit(0); }
 for (let i = 0; i < rows.length; i += 500) {
