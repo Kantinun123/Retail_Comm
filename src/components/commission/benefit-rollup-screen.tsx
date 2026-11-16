@@ -9,6 +9,7 @@
    server-authoritative: เรียก fetch...Summary ของแต่ละระบบแล้ว merge ฝั่ง client
    ============================================================= */
 import Link from "next/link";
+import { modelFeatures } from "@/lib/commission/store-models";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLinkedPeriod } from "@/lib/commission/linked-period";
@@ -78,27 +79,27 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
 
     async function load() {
       const out: SourceRow[] = [];
+      const feat = modelFeatures(session?.dealer?.model);
       if (kind === "store") {
         const [bm, ps, pd] = await Promise.all([
           fetchBackMarginSummary(dealerCode),
           fetchProfitShareSummary(dealerCode),
           fetchPdSummary(dealerCode),
         ]);
-        // Back Margin เฉพาะร้าน Housing Expert (admin เห็นทุกร้าน) — SCG Home ซ่อน
-        if (session?.isAdmin || session?.dealer?.model === "Housing Expert") {
+        // ผลประโยชน์ตามโมเดลร้าน (store-models.ts) ; admin เห็นทุกอย่าง
+        if (session?.isAdmin || feat.backMargin) {
           out.push({
             key: "back-margin", label: "Back Margin", icon: "savings", href: "/app/back-margin",
             byPeriod: new Map(bm.months.map((m) => [m.period, m.payoutTotal ?? m.lineTotal])),
             total: bm.totalPayout,
           });
         }
-        out.push({
+        if (session?.isAdmin || feat.profitShareBa) out.push({
           key: "profit-ba", label: "Profit Share BA", icon: "storefront", href: "/app/ba-profit-share",
           byPeriod: new Map(ps.months.map((m) => [m.period, m.profitShare])),
           total: ps.totalProfitShare,
         });
-        // LHS Channel Discount เฉพาะร้าน Housing Expert (admin เห็นทุกร้าน)
-        if (session?.isAdmin || session?.dealer?.model === "Housing Expert") {
+        if (session?.isAdmin || feat.lhsDiscount) {
           out.push({
             key: "lhs-pd", label: "LHS Channel Discount", icon: "sell", href: "/app/lhs-purchase-discount",
             byPeriod: new Map(pd.months.map((m) => [m.period, m.discount])),
@@ -111,17 +112,17 @@ export function BenefitRollupScreen({ kind }: { kind: RollupKind }) {
           fetchBaSummary(dealerCode),
           fetchLhsSummary(dealerCode),
         ]);
-        out.push({
+        if (session?.isAdmin || feat.productCommission) out.push({
           key: "comm-product", label: "Product Commission", icon: "payments", href: "/app/commission-product",
           byPeriod: new Map(cp.months.map((m) => [m.period, m.net])),
           total: cp.totalNet,
         });
-        out.push({
+        if (session?.isAdmin || feat.baCommission) out.push({
           key: "ba-inc", label: "BA Commission", icon: "home_repair_service", href: "/app/ba-incentive",
           byPeriod: new Map(ba.months.map((m) => [m.period, m.incentive])),
           total: ba.totalIncentive,
         });
-        out.push({
+        if (session?.isAdmin || feat.lhsCommission) out.push({
           key: "lhs", label: "LHS Commission", icon: "roofing", href: "/app/lhs-commission",
           byPeriod: new Map(lhs.months.map((m) => [m.period, m.payment])),
           total: lhs.totalPayment,

@@ -18,11 +18,14 @@ const EXT: Record<string, string> = {
 };
 const ALL_EXT = ["jpg", "png", "webp"];
 
+// มี session จริง -> ต้องเป็น admin เสมอ (เดิมข้ามการตรวจเมื่อไม่ได้ตั้ง REAL_AUTH ทำให้ Coach ที่ล็อกอินจริงเขียนได้บนเครื่อง dev)
+// ไม่มี session: โหมด real auth = ปฏิเสธ ; โหมดเดโม = อนุญาต (พฤติกรรมเดิม)
 async function verifyAdmin(): Promise<{ ok: boolean; error?: string }> {
-  if (process.env.NEXT_PUBLIC_REAL_AUTH !== "1") return { ok: true };
   const sb = await createServerAuthClient();
   const { data: auth } = await sb.auth.getUser();
-  if (!auth.user) return { ok: false, error: "unauthenticated" };
+  if (!auth.user || auth.user.is_anonymous) {
+    return process.env.NEXT_PUBLIC_REAL_AUTH === "1" ? { ok: false, error: "unauthenticated" } : { ok: true };
+  }
   const { data: profile } = await sb
     .from("profiles")
     .select("role, status")

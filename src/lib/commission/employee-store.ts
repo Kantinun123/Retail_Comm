@@ -342,6 +342,33 @@ export async function setStoreActive(
   return (await res.json()) as { ok: boolean; error?: string };
 }
 
+export interface NewStoreInput {
+  code: string;
+  name: string;
+  model: string;
+  region?: string | null;
+  province?: string | null;
+  branch?: string | null;
+  taxId?: string | null;
+  areaRep?: string | null;
+  coachRep?: string | null;
+}
+
+/** Admin: เพิ่มร้านค้าใหม่ */
+export async function createStore(input: NewStoreInput): Promise<{ ok: boolean; code?: string; error?: string }> {
+  try {
+    const res = await fetch("/api/stores/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const j = (await res.json().catch(() => null)) as { ok: boolean; code?: string; error?: string } | null;
+    return j ?? { ok: false, error: "บันทึกไม่สำเร็จ" };
+  } catch {
+    return { ok: false, error: "เชื่อมต่อไม่สำเร็จ" };
+  }
+}
+
 /** อัปโหลดรูปพนักงาน -> คืน public URL (เขียนผ่าน server/service-role) */
 export async function uploadEmployeePhoto(
   repCode: string,

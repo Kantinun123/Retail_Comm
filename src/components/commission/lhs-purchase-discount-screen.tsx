@@ -6,6 +6,7 @@
    - server-authoritative ผ่าน /api/lhs-purchase-discount (แสดงเฉพาะร้านที่ map เจอ)
    ============================================================= */
 import Link from "next/link";
+import { modelFeatures } from "@/lib/commission/store-models";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLinkedPeriod } from "@/lib/commission/linked-period";
@@ -138,7 +139,7 @@ export function LhsPurchaseDiscountScreen() {
   useEffect(() => {
     if (ready && session && session.isSales) router.replace("/app/member");
     // LHS Channel Discount เฉพาะร้าน Housing Expert (admin ดูได้ทุกร้าน)
-    else if (ready && session && !session.isAdmin && session.dealer?.model !== "Housing Expert") {
+    else if (ready && session && !session.isAdmin && !modelFeatures(session.dealer?.model).lhsDiscount) {
       router.replace("/app/home");
     }
   }, [ready, session, router]);

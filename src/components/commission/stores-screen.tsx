@@ -22,15 +22,12 @@ import {
   type StoreInfo,
 } from "@/lib/commission/employee-store";
 import { cn } from "@/lib/utils";
+import { modelBadgeClass } from "@/lib/commission/store-models";
+import { StoreCreateModal } from "./store-create-modal";
 
 const ALL = "__all__";
 
-function modelAccent(model: string | null): string {
-  if (!model) return "bg-slate-100 text-slate-600";
-  if (model.includes("Housing")) return "bg-red-50 text-[#d32029]";
-  if (model.includes("SCG")) return "bg-amber-50 text-amber-700";
-  return "bg-sky-50 text-sky-700";
-}
+const modelAccent = (model: string | null) => modelBadgeClass(model);
 
 export function StoresScreen() {
   const { session, ready } = useSession();
@@ -48,6 +45,7 @@ export function StoresScreen() {
   const [showInactive, setShowInactive] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [creating, setCreating] = useState(false);
   // Area/Coach: สถานะตรวจประเมินเดือนนี้รายร้าน (ป้ายบนการ์ดร้าน)
   const [evalMap, setEvalMap] = useState<{ map: Map<string, TrackStore>; inProgress: boolean } | null>(null);
   const isAreaUser = !!session?.isArea;
@@ -217,6 +215,17 @@ export function StoresScreen() {
             รวม {totals.total.toLocaleString("th-TH")} คนในร้าน · ไม่รวม Area/Coach (ดูแลหลายร้าน)
           </p>
         </section>
+
+        {caps.canToggleStore && (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="w-full py-2.5 rounded-2xl bg-[#d32029] text-white text-[13px] font-bold flex items-center justify-center gap-1.5 shadow-sm hover:-translate-y-0.5 transition-all"
+          >
+            <Icon name="add_business" style={{ fontSize: 18 }} />
+            เพิ่มร้านค้าใหม่
+          </button>
+        )}
 
         {/* ตัวกรอง */}
         <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
@@ -395,6 +404,15 @@ export function StoresScreen() {
           </p>
         )}
       </div>
+
+      {creating && (
+        <StoreCreateModal
+          regions={[...new Set(stores.map((s) => s.region).filter((r): r is string => !!r))].sort()}
+          existingCodes={stores.map((s) => s.code)}
+          onClose={() => setCreating(false)}
+          onCreated={(code) => router.push(`/app/store/${code}`)}
+        />
+      )}
 
       <BottomNav active="database" />
     </>

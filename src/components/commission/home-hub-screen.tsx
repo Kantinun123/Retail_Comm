@@ -7,6 +7,7 @@
    - admin/sales ยังใช้ /app/dashboard เดิม (หน้านี้เผื่อ dealer เป็นหลัก)
    ============================================================= */
 import Link from "next/link";
+import { modelFeatures } from "@/lib/commission/store-models";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "./icon";
@@ -355,12 +356,12 @@ export function HomeHubScreen() {
 
   if (!ready || !session) return null;
 
-  // Back Margin + LHS Channel Discount = เฉพาะร้าน Housing Expert (SCG Home ซ่อน)
-  // admin ที่ดู "ทุกร้าน" (ไม่เจาะร้าน) ให้แสดงทั้งคู่ (เพราะรวมทุกประเภท)
+  // ผลประโยชน์ที่ร้านได้ ขึ้นกับโมเดลร้าน (store-models.ts) ; admin ที่ดู "ทุกร้าน" แสดงทุกอย่าง (รวมทุกโมเดล)
   const adminAllStores = session.isAdmin && !dealerCode;
-  const isHousingExpert = session.dealer?.model === "Housing Expert";
-  const showLhsDiscount = adminAllStores || isHousingExpert;
-  const showBackMargin = adminAllStores || isHousingExpert;
+  const feat = modelFeatures(session.dealer?.model);
+  const showLhsDiscount = adminAllStores || feat.lhsDiscount;
+  const showBackMargin = adminAllStores || feat.backMargin;
+  const showProfitShare = adminAllStores || feat.profitShareBa;
 
   // ---- ช่วงเวลาที่เลือก (เดือน / สะสมปี) คุมทุกการ์ด ----
   const view = toView(pick);
@@ -376,11 +377,11 @@ export function HomeHubScreen() {
   // แหล่งรายเดือน (ผลประโยชน์) -> ค่าในช่วงที่เลือก / รอข้อมูล / ฿0
   type Src = { key: MonthlySource; months: { period: string; amount: number }[] } | null;
   const srcBm: Src = showBackMargin ? { key: "back-margin", months: (bm?.months ?? []).map((m) => ({ period: m.period, amount: m.payoutTotal ?? m.lineTotal })) } : null;
-  const srcPs: Src = { key: "profit-share-ba", months: (ps?.months ?? []).map((m) => ({ period: m.period, amount: m.profitShare })) };
+  const srcPs: Src = !showProfitShare ? null : { key: "profit-share-ba", months: (ps?.months ?? []).map((m) => ({ period: m.period, amount: m.profitShare })) };
   const srcPd: Src = showLhsDiscount ? { key: "lhs-discount", months: (pd?.months ?? []).map((m) => ({ period: m.period, amount: m.discount })) } : null;
-  const srcCp: Src = { key: "product-commission", months: (cp?.months ?? []).map((m) => ({ period: m.period, amount: m.net })) };
-  const srcBa: Src = { key: "ba-commission", months: (ba?.months ?? []).map((m) => ({ period: m.period, amount: m.incentive })) };
-  const srcLhs: Src = { key: "lhs-commission", months: (lhsSum?.months ?? []).map((m) => ({ period: m.period, amount: m.payment })) };
+  const srcCp: Src = !(adminAllStores || feat.productCommission) ? null : { key: "product-commission", months: (cp?.months ?? []).map((m) => ({ period: m.period, amount: m.net })) };
+  const srcBa: Src = !(adminAllStores || feat.baCommission) ? null : { key: "ba-commission", months: (ba?.months ?? []).map((m) => ({ period: m.period, amount: m.incentive })) };
+  const srcLhs: Src = !(adminAllStores || feat.lhsCommission) ? null : { key: "lhs-commission", months: (lhsSum?.months ?? []).map((m) => ({ period: m.period, amount: m.payment })) };
   const valueOf = (s: Src, v: HubView = view): SourceValue | null => (s ? monthlyValue(s.months, v, fm[s.key]) : null);
   const agg = (vals: (SourceValue | null)[]) => {
     const live = vals.filter((v): v is SourceValue => !!v);

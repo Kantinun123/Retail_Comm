@@ -7,6 +7,7 @@
    - server-authoritative ผ่าน /api/back-margin (back-margin-store)
    ============================================================= */
 import Link from "next/link";
+import { modelFeatures } from "@/lib/commission/store-models";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLinkedPeriod } from "@/lib/commission/linked-period";
@@ -187,7 +188,7 @@ export function BackMarginScreen() {
   useEffect(() => {
     if (ready && session && session.isSales) {
       router.replace("/app/member");
-    } else if (ready && session && !session.isAdmin && session.dealer?.model !== "Housing Expert") {
+    } else if (ready && session && !session.isAdmin && !modelFeatures(session.dealer?.model).backMargin) {
       router.replace("/app/home");
     }
   }, [ready, session, router]);
@@ -210,7 +211,7 @@ export function BackMarginScreen() {
   if (!ready || !session) return null;
   if (session.isSales) return null;
   // SCG Home ไม่มี Back Margin (กำลัง redirect) — กัน content แฟลช
-  if (!session.isAdmin && session.dealer?.model !== "Housing Expert") return null;
+  if (!session.isAdmin && !modelFeatures(session.dealer?.model).backMargin) return null;
 
   const allMonths = summary?.months ?? [];
   // กรองปี (auto-show เมื่อ >1 ปี) — รายการเดือนแสดงเฉพาะปีที่เลือก
