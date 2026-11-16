@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
         .select("dealer_code, email")
         .in("dealer_code", codes)
         .eq("role", "dealer")
+        .eq("is_test", false)
         .eq("status", "approved"),
     ]);
     (ds ?? []).forEach((d) => names.set(d.code as string, d.name as string));
@@ -112,6 +113,7 @@ export async function POST(req: NextRequest) {
       .select("email")
       .eq("dealer_code", dealerCode)
       .eq("role", "dealer")
+        .eq("is_test", false)
       .eq("status", "approved")
       .maybeSingle();
     if (taken) {
@@ -191,6 +193,7 @@ export async function POST(req: NextRequest) {
       .select("email")
       .eq("dealer_code", dealerCode)
       .eq("role", "dealer")
+        .eq("is_test", false)
       .eq("status", "approved")
       .neq("id", userId)
       .maybeSingle();

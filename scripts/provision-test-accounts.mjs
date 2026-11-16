@@ -2,6 +2,8 @@
 //   test.area     -> Area แดง (SR0229)
 //   test.coach    -> Coach เนม (SR0239)
 //   test.areahead -> หัวหน้า Area (เห็นทุกร้านที่มี Area ดูแล ไม่ต้องผูก rep)
+//   test.he       -> ร้าน HE 5100895 (บ.สมาร์ท โฮมโปรดักส์) ; test.scg -> ร้าน SCG Home 5102653 (บุญถาวร จันทบุรี)
+//   บัญชีร้านแบบทดสอบไม่นับใน "1 บัญชีต่อร้าน" (unique index ยกเว้น is_test) -> ร้านยังมีบัญชีจริงได้ตามปกติ
 // ใช้: node scripts/provision-test-accounts.mjs          (dry-run)
 //      node scripts/provision-test-accounts.mjs --apply  (สร้าง/รีเซ็ตรหัส + เขียนไฟล์รหัสผ่านใน commission-app/, gitignored)
 // รันซ้ำได้: บัญชีที่มีอยู่แล้ว -> อัปเดตโปรไฟล์ + ตั้งรหัสชั่วคราวใหม่
@@ -22,6 +24,8 @@ const ACCOUNTS = [
   { username: "test.area", role: "area", rep: "SR0229", label: "Area แดง" },
   { username: "test.coach", role: "coach", rep: "SR0239", label: "Coach เนม" },
   { username: "test.areahead", role: "area_head", rep: null, label: "หัวหน้า Area" },
+  { username: "test.he", role: "dealer", rep: null, dealer: "5100895", label: "ร้าน Housing Expert" },
+  { username: "test.scg", role: "dealer", rep: null, dealer: "5102653", label: "ร้าน SCG Home" },
 ];
 
 function tempPassword() {
@@ -40,6 +44,11 @@ const out = [];
 for (const acc of ACCOUNTS.filter((a) => !ONLY || a.username === ONLY)) {
   const email = `${acc.username}@retail-comm.local`;
   let repName = null;
+  if (acc.dealer) {
+    const { data: d } = await sb.from("dealers").select("name, is_active").eq("code", acc.dealer).single();
+    if (!d?.is_active) throw new Error(`ร้าน ${acc.dealer} ไม่พบหรือปิดใช้งาน`);
+    repName = `${d.name} (${acc.dealer})`;
+  }
   if (acc.rep) {
     const { data: rep } = await sb.from("sale_reps").select("name, nickname, position").eq("rep_code", acc.rep).single();
     const ok = (acc.role === "area" && rep?.position === "area_mng") || (acc.role === "coach" && rep?.position === "coach");
@@ -63,7 +72,7 @@ for (const acc of ACCOUNTS.filter((a) => !ONLY || a.username === ONLY)) {
   }
   const { error: pErr } = await sb
     .from("profiles")
-    .update({ full_name: fullName, role: acc.role, rep_code: acc.rep, status: "approved", is_test: true, must_change_password: true, approved_at: new Date().toISOString() })
+    .update({ full_name: fullName, role: acc.role, rep_code: acc.rep, dealer_code: acc.dealer ?? null, status: "approved", is_test: true, must_change_password: true, approved_at: new Date().toISOString() })
     .eq("id", userId);
   if (pErr) {
     if (!existing) await sb.auth.admin.deleteUser(userId); // ไม่ให้เหลือ auth user ค้าง

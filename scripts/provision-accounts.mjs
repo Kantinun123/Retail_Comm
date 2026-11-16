@@ -56,7 +56,8 @@ const { data: reps, error: rErr } = await sb.from("sale_reps").select("rep_code,
 if (rErr) die(rErr.message);
 const { data: assigns, error: aErr } = await sb.from("rep_store_assignments").select("rep_code,dealer_code");
 if (aErr) die(aErr.message);
-const { data: profiles, error: pErr } = await sb.from("profiles").select("id,email,role,status,dealer_code,rep_code");
+// บัญชีทดสอบ (is_test) ไม่ใช่บัญชีจริงของร้าน/คน -> ไม่แตะ ไม่นับ
+const { data: profiles, error: pErr } = await sb.from("profiles").select("id,email,role,status,dealer_code,rep_code").eq("is_test", false);
 if (pErr) die(pErr.message);
 const users = [];
 for (let page = 1; ; page++) {

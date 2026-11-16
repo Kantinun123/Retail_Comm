@@ -42,6 +42,7 @@ export async function GET() {
         .select("dealer_code, email")
         .in("dealer_code", codes)
         .eq("role", "dealer")
+        .eq("is_test", false)
         .eq("status", "approved"),
     ]);
     (ds ?? []).forEach((d) => names.set(d.code as string, d.name as string));
@@ -119,7 +120,8 @@ export async function POST(req: NextRequest) {
     const { data: prof } =
       reqRow.kind === "staff"
         ? await sb.from("profiles").select("id, email").eq("id", reqRow.profile_id).in("role", ["area", "coach", "re", "area_head"]).eq("status", "approved").maybeSingle()
-        : await sb.from("profiles").select("id, email").eq("dealer_code", reqRow.dealer_code).eq("role", "dealer").eq("status", "approved").maybeSingle();
+        : await sb.from("profiles").select("id, email").eq("dealer_code", reqRow.dealer_code).eq("role", "dealer")
+        .eq("is_test", false).eq("status", "approved").maybeSingle();
     if (!prof) {
       return NextResponse.json({ ok: false, error: reqRow.kind === "staff" ? "ไม่พบบัญชีที่ใช้งานอยู่" : "ร้านนี้ยังไม่มีบัญชีที่อนุมัติแล้ว" }, { status: 400 });
     }
