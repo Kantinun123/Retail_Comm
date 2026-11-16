@@ -294,6 +294,8 @@ export function AreaHomeScreen() {
           )}
         </div>
 
+        <LinkCard href="/app/line-groups" icon="forum" tone="emerald" title="ติดตามกลุ่ม Line ลูกค้า" sub="งาน Roof Service · ลูกค้าที่ยังไม่ลงทะเบียนกลุ่ม" />
+
         <LinkCard
           href="/app/employee-requests"
           icon="person_add"
