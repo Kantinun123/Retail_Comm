@@ -22,8 +22,14 @@ export function pushConfigured(): boolean {
   }
   try {
     // subject ต้องเป็น mailto: หรือ https: — ถ้าใส่มาแค่อีเมล เติม mailto: ให้
-    const subjRaw = envClean(process.env.VAPID_SUBJECT) || "mailto:admin@example.com";
-    const subject = /^(mailto:|https:)/i.test(subjRaw) ? subjRaw : subjRaw.includes("@") ? `mailto:${subjRaw}` : subjRaw;
+    // ค่าไม่ใช่อีเมล/URL (เช่นวางข้อความอธิบายมาผิด) -> ใช้ URL ของแอปแทน (subject เป็นแค่ช่องทางติดต่อ ไม่กระทบการส่ง)
+    const subjRaw = envClean(process.env.VAPID_SUBJECT);
+    const email = subjRaw.replace(/^mailto:/i, "").trim();
+    const subject = /^https:\/\/\S+$/i.test(subjRaw)
+      ? subjRaw
+      : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        ? `mailto:${email}`
+        : "https://retail-comm.vercel.app";
     webpush.setVapidDetails(subject, pub, priv);
   } catch (e) {
     // คีย์/subject ผิดรูปแบบ: ไม่ให้ทั้ง route พัง (500) แค่ถือว่ายังส่งไม่ได้
