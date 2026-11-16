@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AREA_HOME, useSession } from "@/lib/commission/session";
 import { useDatasetReady } from "@/lib/commission/dataset";
+import { TestAccountBanner } from "./test-account-banner";
 
 /** หน้าที่ Area ใช้ได้โดยยังไม่ต้องเลือกร้าน (ที่เหลือเป็นหน้าข้อมูลรายร้าน) */
 const AREA_NO_STORE_OK = [AREA_HOME, "/app/stores", "/app/store", "/app/change-password", "/app/chat", "/app/member", "/app/employee-requests", "/app/eval-tracking"];
@@ -53,5 +54,10 @@ export function AppGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <TestAccountBanner />
+      {children}
+    </>
+  );
 }

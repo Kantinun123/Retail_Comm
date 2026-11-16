@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
   const ctx = await getAuthContext();
   if (!ctx) return NextResponse.json({ ok: false, error: "unauthenticated" }, { status: 401 });
   if (!ALLOWED_ROLES.has(ctx.role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  // บัญชีทดสอบผูกกับคนจริง -> แก้แล้วจะไปทับข้อมูลของคนนั้น
+  if (ctx.isTest) return NextResponse.json({ ok: false, error: "บัญชีทดสอบแก้ข้อมูลส่วนตัวไม่ได้ (จะไปแก้ข้อมูลของคนจริงที่ผูกไว้)" }, { status: 403 });
 
   let form: FormData;
   try {

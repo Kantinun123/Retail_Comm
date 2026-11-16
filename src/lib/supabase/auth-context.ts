@@ -17,6 +17,8 @@ export interface AuthContext {
   dealerCode: string | null;
   mustChangePassword: boolean;
   allowedDealerCodes: "all" | string[];
+  /** บัญชีทดสอบ (ผูกกับคนจริงเพื่อเช็คหน้าจอ) — แก้ข้อมูลส่วนตัวไม่ได้ */
+  isTest: boolean;
 }
 
 export async function getAuthContext(): Promise<AuthContext | null> {
@@ -27,7 +29,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
 
   const { data: profile } = await sb
     .from("profiles")
-    .select("role, status, rep_code, dealer_code, must_change_password")
+    .select("role, status, rep_code, dealer_code, must_change_password, is_test")
     .eq("id", user.id)
     .single();
   if (!profile || profile.status !== "approved" || !profile.role) return null;
@@ -61,6 +63,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     dealerCode: profile.dealer_code ?? null,
     mustChangePassword: !!profile.must_change_password,
     allowedDealerCodes: allowed,
+    isTest: profile.is_test === true,
   };
 }
 

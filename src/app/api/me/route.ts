@@ -36,9 +36,13 @@ export async function GET() {
     name = (data?.full_name as string | undefined) ?? null;
   }
 
+  // บัญชีทดสอบ: ติดป้ายชื่อ กันสับสนกับคนจริงที่ผูกไว้
+  if (ctx.isTest && name && !name.startsWith("[ทดสอบ]")) name = `[ทดสอบ] ${name}`;
+
   return NextResponse.json({
     ok: true,
     me: {
+      isTest: ctx.isTest,
       role: ctx.role,
       email: ctx.email,
       name,

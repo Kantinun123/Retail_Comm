@@ -238,6 +238,7 @@ export interface LoginInput {
 export function doLogin({ dealerCode, role, empId, repCode, repName, repCr, repDealerName, repModel, areaStores, areaName, areaKind }: LoginInput) {
   sessionStorage.setItem(KEYS.loggedIn, "true");
   sessionStorage.removeItem("loggedOut");
+  sessionStorage.removeItem("isTestAccount");
   if (role === "area") {
     sessionStorage.setItem(KEYS.areaStores, JSON.stringify(areaStores ?? []));
     if (areaName) sessionStorage.setItem(KEYS.areaName, areaName);
@@ -339,8 +340,12 @@ export function exitAdminView() {
 /** ธง "เพิ่งกดออกจากระบบ" — กันหน้า login กู้ session คืนก่อน signOut ของ Supabase จะเสร็จ */
 export const LOGGED_OUT_KEY = "loggedOut";
 
+/** แคชว่าเป็นบัญชีทดสอบหรือไม่ ("1"/"0") — ล้างทุกครั้งที่ login/logout */
+export const TEST_ACCOUNT_KEY = "isTestAccount";
+
 export function doLogout() {
   sessionStorage.removeItem("mustChangePw");
+  sessionStorage.removeItem(TEST_ACCOUNT_KEY);
   sessionStorage.setItem(LOGGED_OUT_KEY, "1");
   // ออกจาก Supabase session จริงด้วย (ไม่แตะ anonymous ของเดโม) กัน API ฝั่ง server ยัง scope ตามผู้ใช้เดิม
   const sb = createClient();

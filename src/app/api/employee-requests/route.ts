@@ -127,7 +127,8 @@ export async function POST(req: NextRequest) {
       payload: v.payload,
       photo_url: safePhoto(body.photoUrl),
       requested_by: ctx.userId,
-      requester_name: await requesterName(sb, ctx),
+      // บัญชีทดสอบ: ติดป้ายให้ Admin รู้ว่าไม่ใช่คำขอจริง
+      requester_name: `${ctx.isTest ? "[ทดสอบ] " : ""}${await requesterName(sb, ctx)}`,
       requester_role: ROLE_LABEL[ctx.role] ?? ctx.role,
       requester_rep: ctx.repCode,
     })
