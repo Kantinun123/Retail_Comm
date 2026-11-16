@@ -51,6 +51,9 @@ const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   sales: { label: "พนักงาน", cls: "bg-amber-50 text-amber-700 border-amber-200" },
 };
 
+/** ป้ายบทบาทในคำขอรีเซ็ตรหัสของกลุ่ม Area */
+const RESET_ROLE_LABEL: Record<string, string> = { area: "Area", coach: "Coach", re: "Coach", area_head: "หัวหน้า Area" };
+
 export function AdminUsersScreen() {
   const { session, ready } = useSession();
   const [tab, setTab] = useState<Tab>("pending");
@@ -70,11 +73,15 @@ export function AdminUsersScreen() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [query, setQuery] = useState("");
 
-  // คำขอรีเซ็ตรหัสผ่านจากร้านค้า
+  // คำขอรีเซ็ตรหัสผ่าน — ร้านค้า (dealer) + Area / Coach / หัวหน้า Area (staff)
   interface ResetReq {
     id: number;
-    dealer_code: string;
+    kind: "dealer" | "staff";
+    dealer_code: string | null;
     dealer_name: string | null;
+    requested_login: string | null;
+    account_name: string | null;
+    account_role: string | null;
     account_email: string | null;
     contact_name: string;
     phone: string;
@@ -96,7 +103,7 @@ export function AdminUsersScreen() {
   }, [resetReload]);
 
   async function handleReset(r: ResetReq, action: "reset" | "dismiss") {
-    if (action === "reset" && !window.confirm(`ยืนยันตัวตนผู้ติดต่อแล้ว และรีเซ็ตรหัสผ่านร้าน ${r.dealer_name ?? r.dealer_code}?`)) return;
+    if (action === "reset" && !window.confirm(`ยืนยันตัวตนผู้ติดต่อแล้ว และรีเซ็ตรหัสผ่าน${r.kind === "staff" ? ` ของ ${r.account_name ?? r.account_email}` : `ร้าน ${r.dealer_name ?? r.dealer_code}`}?`)) return;
     setBusy(`req-${r.id}`);
     setMsg(null);
     try {
@@ -266,13 +273,24 @@ export function AdminUsersScreen() {
             {resetReqs.map((r) => (
               <div key={r.id} className="bg-white rounded-xl border border-amber-100 p-3">
                 <p className="text-[13px] font-bold text-slate-900">
-                  {r.dealer_name ?? r.dealer_code} ({r.dealer_code})
+                  {r.kind === "staff" ? (
+                    <>
+                      <span className="mr-1 rounded-md bg-sky-100 text-sky-800 px-1.5 py-0.5 text-[10px] font-bold align-middle">
+                        {RESET_ROLE_LABEL[r.account_role ?? ""] ?? "Area / Coach"}
+                      </span>
+                      {r.account_name ?? r.requested_login}
+                    </>
+                  ) : (
+                    <>
+                      {r.dealer_name ?? r.dealer_code} ({r.dealer_code})
+                    </>
+                  )}
                 </p>
                 <p className="text-[12px] text-slate-600 mt-0.5">
                   {r.contact_name} · โทร {r.phone}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {r.account_email ? `บัญชี: ${r.account_email}` : "ร้านนี้ยังไม่มีบัญชีที่อนุมัติแล้ว"}
+                  {r.account_email ? `บัญชี: ${r.account_email}` : r.kind === "staff" ? "บัญชีนี้ถูกระงับแล้ว" : "ร้านนี้ยังไม่มีบัญชีที่อนุมัติแล้ว"}
                   {" · "}
                   {new Date(r.created_at).toLocaleString("th-TH")}
                 </p>

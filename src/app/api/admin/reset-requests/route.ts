@@ -5,7 +5,7 @@ import { generateTempPassword } from "@/lib/supabase/temp-password";
 import { emailToUsername } from "@/lib/commission/username";
 
 /**
- * คำขอรีเซ็ตรหัสผ่านของร้านค้า (admin เท่านั้น ต้องมี session จริง)
+ * คำขอรีเซ็ตรหัสผ่าน — ร้านค้า (kind=dealer) + Area / Coach / หัวหน้า Area (kind=staff) (admin เท่านั้น ต้องมี session จริง)
  * - GET  -> รายการคำขอที่ค้างอยู่
  * - POST { requestId, action: 'reset' | 'dismiss' }
  *     reset  : ออกรหัสชั่วคราวใหม่ให้บัญชีร้านนั้น (must_change_password) แล้วปิดคำขอ
@@ -26,7 +26,7 @@ export async function GET() {
   const sb = createServiceClient();
   const { data, error } = await sb
     .from("password_reset_requests")
-    .select("id, dealer_code, contact_name, phone, note, created_at")
+    .select("id, kind, dealer_code, profile_id, requested_login, contact_name, phone, note, created_at")
     .eq("status", "pending")
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -48,11 +48,34 @@ export async function GET() {
     (ps ?? []).forEach((p) => accounts.set(p.dealer_code as string, p.email as string));
   }
 
-  const requests = (data ?? []).map((r) => ({
-    ...r,
-    dealer_name: names.get(r.dealer_code as string) ?? null,
-    account_email: accounts.has(r.dealer_code as string) ? emailToUsername(accounts.get(r.dealer_code as string)) : null,
-  }));
+  // คำขอของ Area / Coach: ชื่อ + บทบาทจากโปรไฟล์
+  const pids = (data ?? []).filter((r) => r.kind === "staff" && r.profile_id).map((r) => r.profile_id as string);
+  const staff = new Map<string, { email: string; full_name: string | null; role: string | null; status: string }>();
+  if (pids.length) {
+    const { data: ps } = await sb.from("profiles").select("id, email, full_name, role, status").in("id", pids);
+    (ps ?? []).forEach((p) => staff.set(p.id as string, p as { email: string; full_name: string | null; role: string | null; status: string }));
+  }
+
+  const requests = (data ?? []).map((r) => {
+    if (r.kind === "staff") {
+      const p = staff.get(r.profile_id as string);
+      const active = !!p && p.status === "approved";
+      return {
+        ...r,
+        dealer_name: null,
+        account_name: p?.full_name ?? null,
+        account_role: p?.role ?? null,
+        account_email: active ? emailToUsername(p!.email) : null,
+      };
+    }
+    return {
+      ...r,
+      dealer_name: names.get(r.dealer_code as string) ?? null,
+      account_name: null,
+      account_role: "dealer",
+      account_email: accounts.has(r.dealer_code as string) ? emailToUsername(accounts.get(r.dealer_code as string)) : null,
+    };
+  });
   return NextResponse.json({ ok: true, requests });
 }
 
@@ -73,7 +96,7 @@ export async function POST(req: NextRequest) {
   const sb = createServiceClient();
   const { data: reqRow } = await sb
     .from("password_reset_requests")
-    .select("id, dealer_code, status")
+    .select("id, kind, dealer_code, profile_id, status")
     .eq("id", requestId)
     .single();
   if (!reqRow || reqRow.status !== "pending") {
@@ -92,15 +115,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "reset") {
-    const { data: prof } = await sb
-      .from("profiles")
-      .select("id, email")
-      .eq("dealer_code", reqRow.dealer_code)
-      .eq("role", "dealer")
-      .eq("status", "approved")
-      .maybeSingle();
+    // ร้านค้า: บัญชีของร้าน ; Area/Coach: บัญชีตาม profile_id (ต้องยังเป็นกลุ่ม Area และใช้งานอยู่ — ไม่รีเซ็ต admin ผ่านทางนี้)
+    const { data: prof } =
+      reqRow.kind === "staff"
+        ? await sb.from("profiles").select("id, email").eq("id", reqRow.profile_id).in("role", ["area", "coach", "re", "area_head"]).eq("status", "approved").maybeSingle()
+        : await sb.from("profiles").select("id, email").eq("dealer_code", reqRow.dealer_code).eq("role", "dealer").eq("status", "approved").maybeSingle();
     if (!prof) {
-      return NextResponse.json({ ok: false, error: "ร้านนี้ยังไม่มีบัญชีที่อนุมัติแล้ว" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: reqRow.kind === "staff" ? "ไม่พบบัญชีที่ใช้งานอยู่" : "ร้านนี้ยังไม่มีบัญชีที่อนุมัติแล้ว" }, { status: 400 });
     }
     const tempPassword = generateTempPassword();
     const { error: uErr } = await sb.auth.admin.updateUserById(prof.id as string, { password: tempPassword });

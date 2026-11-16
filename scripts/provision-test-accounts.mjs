@@ -5,6 +5,7 @@
 // ใช้: node scripts/provision-test-accounts.mjs          (dry-run)
 //      node scripts/provision-test-accounts.mjs --apply  (สร้าง/รีเซ็ตรหัส + เขียนไฟล์รหัสผ่านใน commission-app/, gitignored)
 // รันซ้ำได้: บัญชีที่มีอยู่แล้ว -> อัปเดตโปรไฟล์ + ตั้งรหัสชั่วคราวใหม่
+//      --only test.coach  = ทำเฉพาะบัญชีนั้น (ไฟล์รหัสผ่านจะมีเฉพาะบัญชีที่รีเซ็ต)
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { randomInt } from "node:crypto";
 import * as XLSX from "xlsx";
@@ -32,9 +33,11 @@ function tempPassword() {
   return chars.join("");
 }
 
+const onlyIdx = process.argv.indexOf("--only");
+const ONLY = onlyIdx > 0 ? process.argv[onlyIdx + 1] : null;
 const { data: list } = await sb.auth.admin.listUsers({ perPage: 1000 });
 const out = [];
-for (const acc of ACCOUNTS) {
+for (const acc of ACCOUNTS.filter((a) => !ONLY || a.username === ONLY)) {
   const email = `${acc.username}@retail-comm.local`;
   let repName = null;
   if (acc.rep) {
@@ -83,7 +86,7 @@ if (APPLY && out.length) {
   ws["!cols"] = [{ wch: 16 }, { wch: 34 }, { wch: 16 }, { wch: 18 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Test accounts");
-  writeFileSync(`${dir}/Test_Accounts.xlsx`, XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
-  console.log(`เขียนไฟล์รหัสผ่าน: ${dir}/Test_Accounts.xlsx (${out.length} บัญชี)`);
+  writeFileSync(`${dir}/Test_Accounts${ONLY ? `_${ONLY}` : ""}.xlsx`, XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+  console.log(`เขียนไฟล์รหัสผ่าน: ${dir}/Test_Accounts${ONLY ? `_${ONLY}` : ""}.xlsx (${out.length} บัญชี)`);
 }
 if (!APPLY) console.log("dry-run — เพิ่ม --apply เพื่อสร้างจริง");
