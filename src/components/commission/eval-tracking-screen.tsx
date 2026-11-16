@@ -21,6 +21,7 @@ import {
   pctText,
   remindCoachNow,
   setCountedSubmission,
+  setStoreEvalRequired,
   shiftPeriod,
   shortDate,
   type TrackCoach,
@@ -80,6 +81,16 @@ export function EvalTrackingScreen() {
     setBusy(null);
     if (r.ok) {
       setMsg({ type: "ok", text: `ใช้ผลตรวจครั้งที่เลือกเป็นคะแนนของ ${s.name} แล้ว` });
+      setReload((n) => n + 1);
+    } else setMsg({ type: "err", text: r.error });
+  }
+
+  async function toggleRequired(s: TrackStore, required: boolean, reason?: string) {
+    setBusy(`req:${s.code}`);
+    const r = await setStoreEvalRequired(s.code, required, reason);
+    setBusy(null);
+    if (r.ok) {
+      setMsg({ type: "ok", text: required ? `เปิดการตรวจ ${s.name} แล้ว (มีผลตั้งแต่ ${monthLabel(r.period)})` : `ปิดการตรวจ ${s.name} แล้ว (มีผลตั้งแต่ ${monthLabel(r.period)} · เดือนก่อนหน้ายังนับตามเดิม)` });
       setReload((n) => n + 1);
     } else setMsg({ type: "err", text: r.error });
   }
@@ -165,6 +176,7 @@ export function EvalTrackingScreen() {
                     {inProgress ? "ค้างจากเดือนก่อน" : `ขาดติดกัน ≥${t.chronicMonths} เดือน`} {t.totals.chronic} ร้าน
                   </button>
                 )}
+                {t.totals.exempt > 0 && <span className="rounded-full bg-white/15 px-2.5 py-1">ไม่ต้องตรวจ {t.totals.exempt} ร้าน</span>}
                 {t.daysLeft > 0 && <span className="rounded-full bg-white/15 px-2.5 py-1">เหลือ {t.daysLeft} วัน</span>}
               </div>
             </section>
@@ -191,7 +203,10 @@ export function EvalTrackingScreen() {
 
             {coaches.map((c) => {
               const k = c.repCode ?? "none";
-              const pct = Math.round((c.done / Math.max(1, c.total)) * 100);
+              // ทุกร้านปิดการตรวจ (total 0) = ไม่มีงานค้าง
+              const pct = c.total ? Math.round((c.done / c.total) * 100) : 100;
+              const reqStores = c.stores.filter((s) => s.required);
+              const exemptStores = c.stores.filter((s) => !s.required);
               const isOpen = coachOpen(c);
               const tone = pct === 100 ? "bg-emerald-500" : pct === 0 ? "bg-red-400" : "bg-amber-500";
               return (
@@ -209,6 +224,7 @@ export function EvalTrackingScreen() {
                       <span className="block text-[13px] font-bold text-slate-900 truncate">{c.nickname ? `${c.name} (${c.nickname})` : c.name}</span>
                       <span className="block text-[11px] text-slate-500">
                         {c.done} / {c.total} ร้าน
+                        {c.exempt > 0 ? ` · ไม่ต้องตรวจ ${c.exempt}` : ""}
                         {c.done === 0 && c.lastEvalPeriod ? ` · ส่งล่าสุด ${monthLabel(c.lastEvalPeriod)}` : ""}
                         {c.chronic > 0 && <span className="font-bold text-[#a11119]"> · {inProgress ? "ค้างจากเดือนก่อน" : "ขาดติดกัน"} {c.chronic} ร้าน</span>}
                         {c.duplicates > 0 ? ` · ซ้ำ ${c.duplicates}` : ""}
@@ -242,9 +258,17 @@ export function EvalTrackingScreen() {
                           )}
                         </div>
                       )}
-                      {c.stores.map((s) => (
-                        <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} onPick={(sid) => pickCounted(s, sid)} />
+                      {reqStores.map((s) => (
+                        <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} canToggle={isAdmin && inProgress} onToggle={(v, why) => toggleRequired(s, v, why)} onPick={(sid) => pickCounted(s, sid)} />
                       ))}
+                      {exemptStores.length > 0 && (
+                        <>
+                          <p className="pt-1.5 px-0.5 text-[11px] font-bold text-slate-500">ไม่ต้องตรวจ ({exemptStores.length}) · ไม่นับในตัวเลข</p>
+                          {exemptStores.map((s) => (
+                            <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} canToggle={isAdmin && inProgress} onToggle={(v, why) => toggleRequired(s, v, why)} onPick={(sid) => pickCounted(s, sid)} />
+                          ))}
+                        </>
+                      )}
                     </div>
                   )}
                 </article>
@@ -262,10 +286,33 @@ export function EvalTrackingScreen() {
   );
 }
 
-function StoreRow({ s, inProgress, isAdmin, isCoach, busy, onPick }: { s: TrackStore; inProgress: boolean; isAdmin: boolean; isCoach: boolean; busy: string | null; onPick: (sid: string) => void }) {
+function StoreRow({
+  s,
+  inProgress,
+  isAdmin,
+  isCoach,
+  busy,
+  canToggle,
+  onToggle,
+  onPick,
+}: {
+  s: TrackStore;
+  inProgress: boolean;
+  isAdmin: boolean;
+  isCoach: boolean;
+  busy: string | null;
+  /** Admin + เดือนปัจจุบัน: เปิด/ปิดการตรวจของร้าน */
+  canToggle: boolean;
+  onToggle: (required: boolean, reason?: string) => void;
+  onPick: (sid: string) => void;
+}) {
+  const [askReason, setAskReason] = useState(false);
+  const [reason, setReason] = useState("");
   const counted = s.submissions[0];
   const chronic = chronicText(s, inProgress);
-  const badge = chronic
+  const badge = !s.required
+    ? { t: "ไม่ต้องตรวจ", c: "bg-slate-100 text-slate-500 border-slate-200", i: "do_not_disturb_on" }
+    : chronic
     ? { t: chronic, c: "bg-red-600 text-white border-red-600", i: "error" }
     : s.status === "missing"
       ? { t: "ยังไม่ตรวจ", c: "bg-amber-50 text-amber-800 border-amber-200", i: "hourglass_top" }
@@ -275,7 +322,7 @@ function StoreRow({ s, inProgress, isAdmin, isCoach, busy, onPick }: { s: TrackS
           ? { t: "ตรวจแทน", c: "bg-indigo-50 text-indigo-700 border-indigo-200", i: "warning" }
           : { t: "ตรวจแล้ว", c: "bg-emerald-50 text-emerald-700 border-emerald-200", i: "check_circle" };
   return (
-    <div className={cn("rounded-xl border px-3 py-2.5", s.chronic ? "bg-red-50/60 border-red-300" : s.status === "missing" ? "bg-amber-50/50 border-amber-200" : s.duplicate ? "border-red-200" : "border-slate-100 bg-slate-50/50")}>
+    <div className={cn("rounded-xl border px-3 py-2.5", !s.required ? "bg-slate-50 border-slate-200 opacity-80" : s.chronic ? "bg-red-50/60 border-red-300" : s.status === "missing" ? "bg-amber-50/50 border-amber-200" : s.duplicate ? "border-red-200" : "border-slate-100 bg-slate-50/50")}>
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1">
           <span className="block text-[12.5px] font-semibold text-slate-900 truncate">{s.name}</span>
@@ -283,19 +330,59 @@ function StoreRow({ s, inProgress, isAdmin, isCoach, busy, onPick }: { s: TrackS
             {s.code}
             {counted ? ` · ${shortDate(counted.evalDate)} · ${pctText(counted.pct)}` : ""}
             {s.proxy && counted?.inspector ? ` · ผู้ตรวจ: ${counted.inspector}` : ""}
-            {s.status === "missing" && s.lastEvalPeriod ? ` · ตรวจล่าสุด ${monthLabel(s.lastEvalPeriod)}` : ""}
+            {s.required && s.status === "missing" && s.lastEvalPeriod ? ` · ตรวจล่าสุด ${monthLabel(s.lastEvalPeriod)}` : ""}
+            {!s.required && s.exemptSince ? ` · ปิดตั้งแต่ ${monthLabel(s.exemptSince)}` : ""}
+            {!s.required && s.exemptReason ? ` · ${s.exemptReason}` : ""}
           </span>
         </span>
         <span className={cn("shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold border rounded-full px-2 py-0.5", badge.c)}>
           <Icon name={badge.i} style={{ fontSize: 12 }} />
           {badge.t}
         </span>
-        {s.status === "missing" && isCoach && (
+        {s.required && s.status === "missing" && isCoach && (
           <a href={EVAL_FORM_URL} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-blue-600 text-white text-[11px] font-bold px-2.5 py-1">
             ทำแบบประเมิน
           </a>
         )}
       </div>
+      {canToggle && !askReason && (
+        <div className="mt-1.5 flex justify-end">
+          <button
+            type="button"
+            disabled={busy === `req:${s.code}`}
+            onClick={() => (s.required ? setAskReason(true) : onToggle(true))}
+            className="text-[10.5px] font-bold text-slate-500 hover:text-[#a11119] inline-flex items-center gap-0.5 disabled:opacity-50"
+          >
+            <Icon name={s.required ? "toggle_off" : "toggle_on"} style={{ fontSize: 15 }} />
+            {s.required ? "ปิดการตรวจร้านนี้" : "เปิดการตรวจอีกครั้ง"}
+          </button>
+        </div>
+      )}
+      {canToggle && askReason && (
+        <div className="mt-2 rounded-lg bg-white border border-slate-200 p-2 space-y-1.5">
+          <p className="text-[11px] text-slate-600">ปิดการตรวจตั้งแต่เดือนนี้ · เดือนก่อนหน้ายังนับตามเดิม</p>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={200}
+            placeholder="เหตุผล (ไม่บังคับ) เช่น ร้านปรับปรุง"
+            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[#d32029]"
+          />
+          <div className="flex justify-end gap-1.5">
+            <button type="button" onClick={() => { setAskReason(false); setReason(""); }} className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              disabled={busy === `req:${s.code}`}
+              onClick={() => { onToggle(false, reason); setAskReason(false); setReason(""); }}
+              className="rounded-full bg-[#d32029] text-white px-2.5 py-1 text-[11px] font-bold disabled:opacity-50"
+            >
+              ยืนยันปิดการตรวจ
+            </button>
+          </div>
+        </div>
+      )}
       {s.duplicate && (
         <ul className="mt-2 space-y-1">
           {s.submissions.map((x) => (

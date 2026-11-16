@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
     const byArea = new Map<string, { missing: number; chronic: number; coaches: Set<string> }>();
     t.coaches.forEach((c) =>
       c.stores.forEach((s) => {
-        if (s.status !== "missing" || !s.areaRep) return;
+        if (!s.required || s.status !== "missing" || !s.areaRep) return;
         const x = byArea.get(s.areaRep) ?? { missing: 0, chronic: 0, coaches: new Set<string>() };
         x.missing++;
         if (s.chronic) x.chronic++;

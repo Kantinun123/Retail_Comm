@@ -113,7 +113,7 @@ export function AreaHomeScreen() {
         .filter((s) => (!model || s.model === model) && (!region || s.region === region))
         .map((s) => {
           const e = evalByStore.get(s.code);
-          const ev = !e ? "" : e.status === "done" ? ` · ✓ ตรวจแล้ว ${shortDate(e.submissions[0]?.evalDate ?? null)}` : ` · ${chronicText(e, true) ?? "ยังไม่ตรวจเดือนนี้"}`;
+          const ev = !e ? "" : !e.required ? " · ไม่ต้องตรวจ" : e.status === "done" ? ` · ✓ ตรวจแล้ว ${shortDate(e.submissions[0]?.evalDate ?? null)}` : ` · ${chronicText(e, true) ?? "ยังไม่ตรวจเดือนนี้"}`;
           return { value: s.code, label: s.name, sub: `รหัส ${s.code}${s.region ? " · " + s.region : ""}${ev}`, tag: s.model ?? undefined };
         }),
     [list, model, region, evalByStore]
@@ -254,7 +254,7 @@ export function AreaHomeScreen() {
   );
 
   const missing = track ? track.totals.missing : null;
-  const urgent = track?.coaches.flatMap((c) => c.stores).filter((s) => s.status === "missing").sort((a, b) => Number(b.chronic) - Number(a.chronic))[0];
+  const urgent = track?.coaches.flatMap((c) => c.stores).filter((s) => s.required && s.status === "missing").sort((a, b) => Number(b.chronic) - Number(a.chronic))[0];
   const workSection = (
     <section key="work">
       <h3 className="text-[12px] font-bold text-[#1d4ed8] mb-2 px-1">งานของฉัน</h3>

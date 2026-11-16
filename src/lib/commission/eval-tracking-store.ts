@@ -30,6 +30,11 @@ export interface TrackStore {
   chronic: boolean;
   /** เดือนล่าสุดที่ร้านนี้ถูกตรวจ */
   lastEvalPeriod: string | null;
+  /** เดือนที่ดูร้านนี้ต้องตรวจหรือไม่ (false = Admin ปิดการตรวจไว้) */
+  required: boolean;
+  exemptReason: string | null;
+  /** เดือนที่เริ่มปิดการตรวจ */
+  exemptSince: string | null;
   submissions: EvalSubmission[];
 }
 export interface TrackCoach {
@@ -43,6 +48,8 @@ export interface TrackCoach {
   duplicates: number;
   proxies: number;
   chronic: number;
+  /** ร้านที่ปิดการตรวจ (ไม่นับใน total) */
+  exempt: number;
   lastEvalPeriod: string | null;
   stores: TrackStore[];
 }
@@ -51,7 +58,7 @@ export interface Tracking {
   today: string;
   daysLeft: number;
   chronicMonths: number;
-  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number; chronic: number };
+  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number; chronic: number; exempt: number };
   coaches: TrackCoach[];
   me: { role: string; repCode: string | null };
 }
@@ -73,6 +80,17 @@ export const fetchTracking = (period?: string) => call<Tracking>(`/api/store-eva
 
 export const setCountedSubmission = (submissionId: string) =>
   call<object>("/api/store-eval/tracking", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionId }) });
+
+/** Admin: เปิด/ปิดการตรวจประเมินของร้าน (มีผลตั้งแต่เดือนนี้) */
+export const setStoreEvalRequired = (dealerCode: string, required: boolean, reason?: string) =>
+  call<{ period: string; required: boolean }>("/api/store-eval/requirement", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dealerCode, required, reason }),
+  });
+
+export const fetchStoreEvalRequired = (dealerCode: string) =>
+  call<{ period: string; required: boolean; reason: string | null; since: string | null }>(`/api/store-eval/requirement?dealerCode=${encodeURIComponent(dealerCode)}`);
 
 export const remindCoachNow = (repCode: string) =>
   call<{ sent: number }>("/api/push/remind", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repCode }) });

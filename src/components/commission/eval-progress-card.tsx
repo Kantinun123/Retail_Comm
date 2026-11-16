@@ -30,7 +30,7 @@ export function EvalProgressCard() {
   // ร้านที่ขาดติดกันขึ้นก่อน
   const missingStores = t.coaches
     .flatMap((c) => c.stores)
-    .filter((s) => s.status === "missing")
+    .filter((s) => s.required && s.status === "missing")
     .sort((a, b) => Number(b.chronic) - Number(a.chronic));
   const doneStores = t.coaches.flatMap((c) => c.stores).filter((s) => s.status === "done");
   const behind = t.coaches.filter((c) => c.repCode && c.done < c.total);

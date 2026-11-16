@@ -186,7 +186,7 @@ export function StoresScreen() {
           <Stat label="ร้านทั้งหมด" value={stores.length} tone="slate" />
           <Stat label="เปิดใช้งาน" value={activeCount} tone="emerald" />
           {session.isArea ? (
-            <Stat label="ตรวจแล้วเดือนนี้" value={stores.filter((s) => evalMap?.map.get(s.code)?.status === "done").length} tone="slate" />
+            <Stat label="ตรวจแล้วเดือนนี้" value={stores.filter((s) => { const e = evalMap?.map.get(s.code); return !!e?.required && e.status === "done"; }).length} tone="slate" />
           ) : (
             <Stat label="ปิด/ยกเลิก" value={inactiveCount} tone="red" />
           )}
@@ -405,8 +405,9 @@ export function StoresScreen() {
 /** ป้ายสถานะตรวจประเมินเดือนนี้ของร้าน (Area/Coach) */
 function EvalChip({ s, inProgress }: { s: TrackStore; inProgress: boolean }) {
   const chronic = chronicText(s, inProgress);
-  const [text, cls] =
-    s.status === "done"
+  const [text, cls] = !s.required
+    ? ["ไม่ต้องตรวจ", "bg-slate-100 text-slate-500 border-slate-200"]
+    : s.status === "done"
       ? [`✓ ตรวจแล้ว ${shortDate(s.submissions[0]?.evalDate ?? null)}`, "bg-emerald-50 text-emerald-700 border-emerald-200"]
       : chronic
         ? [chronic, "bg-red-600 text-white border-red-600"]

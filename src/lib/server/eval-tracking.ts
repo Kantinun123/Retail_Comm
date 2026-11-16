@@ -3,7 +3,9 @@ import type { createServiceClient } from "@/lib/supabase/service";
 /* ติดตามการตรวจประเมินร้านรายเดือน (ใช้ทั้ง API หน้าติดตาม และงานแจ้งเตือนรายวัน)
    - ร้านที่ต้องตรวจ = ร้านที่เปิดใช้งาน (dealers.is_active) ทุกร้าน ; ผู้รับผิดชอบ = Coach ตาม rep_store_assignments
    - ร้านเดียวกันส่งหลายครั้งในเดือน = ตรวจซ้ำ ; ครั้งที่นับ = is_primary หรือครั้งล่าสุด (ตรงกับ view store_eval_effective)
-   - ผู้ตรวจไม่ใช่ Coach ที่ดูแล = "ตรวจแทน" (เทียบชื่อต้น) */
+   - ผู้ตรวจไม่ใช่ Coach ที่ดูแล = "ตรวจแทน" (เทียบชื่อต้น)
+   - Admin ปิดการตรวจรายร้านได้ (store_eval_requirements) มีผลตั้งแต่เดือนที่ตั้ง ; เดือนก่อนหน้ายังนับตามเดิม
+     ร้านที่ไม่ต้องตรวจ: ไม่นับในตัวเลข/ขาดติดกัน/แจ้งเตือน แต่ยังแสดง (ส่วน "ไม่ต้องตรวจ") */
 
 type Sb = ReturnType<typeof createServiceClient>;
 
@@ -34,6 +36,12 @@ export interface TrackStore {
   chronic: boolean;
   /** เดือนล่าสุดที่เคยตรวจ (ก่อนหรือเท่ากับเดือนที่เลือก) */
   lastEvalPeriod: string | null;
+  /** เดือนที่เลือกร้านนี้ต้องตรวจหรือไม่ (false = Admin ปิดการตรวจไว้) */
+  required: boolean;
+  /** เหตุผลที่ปิดการตรวจ (เมื่อ required = false) */
+  exemptReason: string | null;
+  /** เดือนที่เริ่มปิดการตรวจ (เมื่อ required = false) */
+  exemptSince: string | null;
 }
 
 /** ขาดติดกันกี่เดือนถึงนับเป็น "ขาดติดกัน" (เตือนเข้มขึ้น) */
@@ -57,6 +65,8 @@ export interface TrackCoach {
   proxies: number;
   /** ร้านที่ขาดติดกัน ≥ CHRONIC_MONTHS เดือน (รวมร้านที่ไม่เคยถูกตรวจ) */
   chronic: number;
+  /** ร้านที่ปิดการตรวจในเดือนนี้ (ไม่นับใน total) */
+  exempt: number;
   lastEvalPeriod: string | null;
   stores: TrackStore[];
 }
@@ -66,7 +76,8 @@ export interface Tracking {
   today: string;
   daysLeft: number;
   chronicMonths: number;
-  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number; chronic: number };
+  /** stores/done/missing/... นับเฉพาะร้านที่ต้องตรวจ ; exempt = ร้านที่ปิดการตรวจในเดือนนี้ */
+  totals: { stores: number; done: number; missing: number; duplicates: number; proxies: number; chronic: number; exempt: number };
   coaches: TrackCoach[];
 }
 
@@ -91,12 +102,39 @@ const firstWord = (s: string | null | undefined) =>
 export async function buildTracking(sb: Sb, period: string, scope: string[] | null): Promise<Tracking> {
   let dq = sb.from("dealers").select("code, name, model, region").eq("is_active", true);
   if (scope) dq = dq.in("code", scope.length ? scope : ["__none__"]);
-  const [{ data: dealers }, { data: asg }, { data: lines }, { data: lastByStore }] = await Promise.all([
+  const [{ data: dealers }, { data: asg }, { data: lines }, { data: lastByStore }, { data: reqRows }] = await Promise.all([
     dq,
     sb.from("rep_store_assignments").select("rep_code, dealer_code, role_in_store").in("role_in_store", ["coach", "manager"]),
     sb.from("store_eval_lines").select("submission_id, dealer_code, eval_date, inspector, pct, result, is_primary").eq("period", period).not("dealer_code", "is", null),
     sb.from("store_eval_lines").select("dealer_code, period").not("dealer_code", "is", null).order("period", { ascending: false }).limit(5000),
+    sb.from("store_eval_requirements").select("dealer_code, effective_period, required, reason").lte("effective_period", period).order("effective_period", { ascending: true }),
   ]);
+  // สถานะต้องตรวจรายเดือน: แถวล่าสุดที่ effective_period <= เดือนนั้น ; ไม่มีแถว = ต้องตรวจ
+  const reqHist = new Map<string, { p: string; required: boolean; reason: string | null }[]>();
+  (reqRows ?? []).forEach((r) =>
+    reqHist.set(r.dealer_code as string, [
+      ...(reqHist.get(r.dealer_code as string) ?? []),
+      { p: r.effective_period as string, required: r.required === true, reason: (r.reason as string | null) ?? null },
+    ])
+  );
+  const reqAt = (code: string, p: string) => {
+    let cur: { p: string; required: boolean; reason: string | null } | null = null;
+    for (const h of reqHist.get(code) ?? []) if (h.p <= p) cur = h;
+    return cur ?? { p: "", required: true, reason: null };
+  };
+  /** จำนวนเดือนที่ต้องตรวจ ในช่วง (from, to] — ข้ามเดือนที่ปิดการตรวจ */
+  const requiredMonthsBetween = (code: string, from: string, to: string) => {
+    let n = 0;
+    let [y, m] = from.split("-").map(Number);
+    for (let i = 0; i < 600; i++) {
+      m++;
+      if (m > 12) { m = 1; y++; }
+      const p = `${y}-${String(m).padStart(2, "0")}`;
+      if (p > to) break;
+      if (reqAt(code, p).required) n++;
+    }
+    return n;
+  };
   const codes = new Set((dealers ?? []).map((d) => d.code as string));
   const coachOf = new Map<string, string>();
   const areaOf = new Map<string, string>();
@@ -142,7 +180,9 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
     }));
     const counted = submissions[0];
     const lastP = lastPeriodOf.get(code) ?? null;
-    const missedStreak = submissions.length ? 0 : lastP ? monthsBetween(lastP, period) : null;
+    const req = reqAt(code, period);
+    // นับเฉพาะเดือนที่ต้องตรวจ (ช่วงที่ปิดการตรวจไม่นับเป็นเดือนที่ขาด)
+    const missedStreak = submissions.length ? 0 : lastP ? requiredMonthsBetween(code, lastP, period) : null;
     return {
       code,
       name: d.name as string,
@@ -155,8 +195,11 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
       proxy: !!counted && !!coachName && firstWord(counted.inspector) !== firstWord(coachName),
       submissions,
       missedStreak,
-      chronic: !submissions.length && (missedStreak === null || missedStreak >= CHRONIC_MONTHS),
+      chronic: req.required && !submissions.length && (missedStreak === null || missedStreak >= CHRONIC_MONTHS),
       lastEvalPeriod: lastP,
+      required: req.required,
+      exemptReason: req.required ? null : req.reason,
+      exemptSince: req.required ? null : req.p,
     };
   });
 
@@ -164,9 +207,10 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
   stores.forEach((s) => groups.set(s.coachRep, [...(groups.get(s.coachRep) ?? []), s]));
   const coaches: TrackCoach[] = [...groups.entries()].map(([repCode, list]) => {
     const r = repCode ? repMap.get(repCode) : null;
-    // ขาดติดกันก่อน -> ยังไม่ตรวจ -> ตรวจแล้ว
+    // ขาดติดกันก่อน -> ยังไม่ตรวจ -> ตรวจแล้ว -> ไม่ต้องตรวจ (ท้ายสุด)
     const sorted = list.sort(
       (a, b) =>
+        Number(b.required) - Number(a.required) ||
         Number(b.chronic) - Number(a.chronic) ||
         Number(a.status === "done") - Number(b.status === "done") ||
         a.name.localeCompare(b.name, "th")
@@ -178,17 +222,15 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
       nickname: (r?.nickname as string | null | undefined) ?? null,
       phone: (r?.phone as string | null | undefined) ?? null,
       photoUrl: (r?.photo_url as string | null | undefined) ?? null,
-      total: list.length,
-      done: list.filter((s) => s.status === "done").length,
-      duplicates: list.filter((s) => s.duplicate).length,
-      proxies: list.filter((s) => s.proxy).length,
-      chronic: list.filter((s) => s.chronic).length,
+      ...countsOf(list),
       lastEvalPeriod: lastEval,
       stores: sorted,
     };
   });
   // ค้างมากสุดก่อน (สัดส่วนที่ตรวจแล้วน้อยสุด)
-  coaches.sort((a, b) => a.done / Math.max(1, a.total) - b.done / Math.max(1, b.total) || b.total - a.total);
+  // Coach ที่ทุกร้านปิดการตรวจ (total 0) ถือว่าครบ -> ไปท้าย
+  const ratio = (x: TrackCoach) => (x.total ? x.done / x.total : 1);
+  coaches.sort((a, b) => ratio(a) - ratio(b) || b.total - a.total);
 
   const today = bangkokToday();
   const dim = daysInMonth(period);
@@ -203,13 +245,28 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
   };
 }
 
-export function totalsOf(stores: TrackStore[]): Tracking["totals"] {
+/** ตัวเลขของ Coach — นับเฉพาะร้านที่ต้องตรวจ */
+function countsOf(list: TrackStore[]) {
+  const req = list.filter((s) => s.required);
   return {
-    stores: stores.length,
-    done: stores.filter((s) => s.status === "done").length,
-    missing: stores.filter((s) => s.status === "missing").length,
-    duplicates: stores.filter((s) => s.duplicate).length,
-    proxies: stores.filter((s) => s.proxy).length,
-    chronic: stores.filter((s) => s.chronic).length,
+    total: req.length,
+    done: req.filter((s) => s.status === "done").length,
+    duplicates: req.filter((s) => s.duplicate).length,
+    proxies: req.filter((s) => s.proxy).length,
+    chronic: req.filter((s) => s.chronic).length,
+    exempt: list.length - req.length,
+  };
+}
+
+export function totalsOf(stores: TrackStore[]): Tracking["totals"] {
+  const req = stores.filter((s) => s.required);
+  return {
+    stores: req.length,
+    done: req.filter((s) => s.status === "done").length,
+    missing: req.filter((s) => s.status === "missing").length,
+    duplicates: req.filter((s) => s.duplicate).length,
+    proxies: req.filter((s) => s.proxy).length,
+    chronic: req.filter((s) => s.chronic).length,
+    exempt: stores.length - req.length,
   };
 }

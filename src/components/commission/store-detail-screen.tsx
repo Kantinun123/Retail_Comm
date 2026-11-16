@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icon";
+import { EvalRequiredCard } from "./eval-required-card";
 import { BottomNav } from "./bottom-nav";
 import { EmployeeEditModal } from "./employee-edit-modal";
 import { SupervisorPickerModal } from "./supervisor-picker-modal";
@@ -261,6 +262,9 @@ export function StoreDetailScreen({ code }: { code: string }) {
               {msg}
             </p>
           )}
+
+          {/* Admin: เปิด/ปิดการตรวจประเมินรายเดือนของร้าน (มีผลตั้งแต่เดือนนี้) */}
+          {caps.canToggleStore && store.isActive && <EvalRequiredCard dealerCode={store.code} />}
 
           {/* รูปร้าน — แสดงทั้งใบไม่ตัด (รูปมีทั้งแนวตั้ง/แนวนอน) กดขยายเต็มจอได้ */}
           {(store.photoUrl || caps.canEditStore) && (
