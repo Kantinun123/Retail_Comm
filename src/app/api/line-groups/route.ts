@@ -5,6 +5,7 @@ import { bangkokToday } from "@/lib/server/eval-tracking";
 
 /**
  * ติดตามกลุ่ม Line ลูกค้า (งาน ROOF SERVICE ของ LHS/Rudy · ร้าน HE + SCG Home) — นับต่อลูกค้า
+ * งานมาจาก 2 แหล่ง: Rudy (เลข RD) + BA งานติดตั้ง (เลขใบเสนอราคา Q…)
  * GET ?period=YYYY-MM (ว่าง = เดือนปัจจุบัน)
  *   admin / หัวหน้า Area: ทุกร้าน ; Area / Coach: ร้านที่ดูแล
  * ข้อมูลคำนวณล่วงหน้าโดย scripts/import-line-groups.mjs (ตาราง line_tracking_jobs, batch ล่าสุด)
@@ -12,7 +13,7 @@ import { bangkokToday } from "@/lib/server/eval-tracking";
 const ROLES = new Set(["admin", "area_head", "area", "coach", "re"]);
 
 type Row = {
-  project_number: string; dealer_code: string; period: string; order_date: string | null; h5: string | null; sales_name: string | null; rep_code: string | null;
+  source: "rudy" | "ba"; project_number: string; dealer_code: string; period: string; order_date: string | null; h5: string | null; sales_name: string | null; rep_code: string | null;
   amount: number | null; opp_ids: string | null; customer_id: string; customer_name: string | null; customer_type: string | null; province: string | null;
   customer_period: string; customer_dealer: string; job_status: string | null; customer_status: string | null; group_name: string | null;
   group_created: string | null; status_source: string | null; source_date: string | null;
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest) {
       salesName: first.sales_name,
       salesRep: first.rep_code,
       salesPhone: first.rep_code ? phoneOf.get(first.rep_code) ?? null : null,
-      jobs: js.map((j) => ({ project: j.project_number, opps: j.opp_ids, h5: j.h5, orderDate: j.order_date, amount: j.amount === null ? null : Number(j.amount), status: (j.job_status ?? "none") as string, sales: j.sales_name })),
+      jobs: js.map((j) => ({ source: j.source, project: j.project_number, opps: j.opp_ids, h5: j.h5, orderDate: j.order_date, amount: j.amount === null ? null : Number(j.amount), status: (j.job_status ?? "none") as string, sales: j.sales_name })),
     };
   });
   customers.sort((a, b) => RANK[a.status] - RANK[b.status] || a.dealerName.localeCompare(b.dealerName, "th") || a.name.localeCompare(b.name, "th"));

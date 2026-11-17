@@ -3,12 +3,14 @@
    ห้าม import ผ่าน alias "@/..." (สคริปต์ node เรียกไฟล์นี้ตรง ๆ)
 
    กติกา (ผู้ใช้ยืนยัน พ.ย. 69)
-   - งาน = service_sales_lines กลุ่ม ROOF SERVICE (building_type OB/NONRES) ร้าน Housing Expert + SCG Home ตั้งแต่ FROM
+   - งาน = (1) Rudy: service_sales_lines กลุ่ม ROOF SERVICE (building_type OB/NONRES)
+           (2) BA : ba_service_sales_lines กลุ่ม ROOF SERVICE เฉพาะงานติดตั้ง (type_of_job I) — เลขงาน = เลขใบเสนอราคา Q…
+     ร้าน Housing Expert + SCG Home ตั้งแต่ FROM
    - เฉพาะช่องทาง B2C (คอลัมน์ H7 ของไฟล์ Rudy -> rudy_job_customers.h7)
    - ลูกค้าคนเดียวกัน = home_id เดียวกันใน CRM หรือ ร้านเดียวกัน + ชื่อเดียวกันตาม normName()
        ต่างกันแค่ประเภทงาน / หลายแปลงของบริษัทเดียวกัน = รวม ; "บ้านคุณ…" คนละคน = แยก
    - สถานะลูกค้า = ดีที่สุดของทุกงาน: register > not_register > no_bot ; ไม่มี = null (ไม่มีข้อมูล)
-   - เลขใบเสนอราคา (Q…) จับคู่ไม่ได้ จึงไม่นับ */
+   - เลขใบเสนอราคา (Q…) ในไฟล์กลุ่ม Line = งาน BA (job_code) */
 import * as XLSX from "xlsx";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -104,7 +106,10 @@ const WORK_WORDS = /(รอบ\s*(บน|ล่าง|แรก|สอง|\d+)|�
 const TITLE = /(นางสาว|นาย|นาง|คุณ|บ้าน|บจก\.?|บริษัท|จำกัด|หจก\.?|ห้างหุ้นส่วน|บ\.(?=\s*[ก-๙A-Za-z]))/g;
 const squash = (s: string) => s.replace(/[\s._\-()/:,+]+/g, "").toLowerCase();
 export function normName(s: string | null | undefined): string {
-  const full = String(s ?? "");
+  let full = String(s ?? "");
+  // ร้านใส่ชื่อร้านตัวเองแล้วใส่ลูกค้าจริงในวงเล็บ เช่น "พัฒนาดีโฮมมาร์ท (บจก.ทูพีเฮ้า)" -> ใช้บริษัทในวงเล็บเป็นลูกค้า
+  const company = (full.match(/\(([^)]*)\)/g) ?? []).map((x) => x.slice(1, -1)).find((x) => /(บจก|บริษัท|หจก|ห้างหุ้นส่วน)/.test(x));
+  if (company) full = company;
   // เจ้าของบ้านในวงเล็บ "บ้านคุณกัญชพร อินธรรม" -> "กัญชพร"
   const owner = (full.match(/\(([^)]*)\)/g) ?? []).map((x) => x.match(/คุณ\s*([ก-๙A-Za-z]{2,})/)?.[1]).find(Boolean) ?? "";
   const base = squash(full.replace(/\(.*?\)/g, " ").replace(WORK_WORDS, " ").replace(TITLE, ""));
@@ -129,13 +134,13 @@ async function keyset<T>(label: string, key: keyof T & string, build: (last: unk
 }
 
 export interface LineTrackingRow {
-  batch: string; project_number: string; dealer_code: string; period: string; order_date: string | null; h5: string | null; sales_name: string | null; rep_code: string | null;
+  batch: string; source: "rudy" | "ba"; project_number: string; dealer_code: string; period: string; order_date: string | null; h5: string | null; sales_name: string | null; rep_code: string | null;
   amount: number; opp_ids: string | null; customer_id: string; customer_name: string | null; customer_type: string | null; province: string | null;
   customer_period: string; customer_dealer: string; job_status: LineStatusKey | null; customer_status: LineStatusKey | null;
   group_name: string | null; group_created: string | null; status_source: string | null; source_date: string | null;
 }
 export interface LineTrackingSummary {
-  jobs: number; nonB2c: number; missingCustomer: number; customers: number; multiJob: number;
+  jobs: number; baJobs: number; nonB2c: number; missingCustomer: number; customers: number; multiJob: number;
   register: number; not_register: number; no_bot: number; none: number; sourceDate: string | null;
 }
 
@@ -152,18 +157,18 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
     if (last !== null) q = q.gt("id", last);
     return q;
   });
-  const jobs = new Map<string, L & { amount: number }>();
+  const jobs = new Map<string, L & { amount: number; source: "rudy" | "ba"; ba_customer?: string | null }>();
   for (const l of lines) {
     if (!l.dealer_code || !storeOk.has(l.dealer_code)) continue;
     const j = jobs.get(l.project_number);
-    if (!j) jobs.set(l.project_number, { ...l, amount: Number(l.amount_incl_vat) || 0 });
+    if (!j) jobs.set(l.project_number, { ...l, amount: Number(l.amount_incl_vat) || 0, source: "rudy" });
     else {
       j.amount += Number(l.amount_incl_vat) || 0;
       if (l.period < j.period) Object.assign(j, { period: l.period, order_date: l.order_date, dealer_code: l.dealer_code });
     }
   }
 
-  // ลูกค้า + H7 + ref_opp ของงาน
+  // ลูกค้า + H7 + ref_opp ของงาน Rudy
   const codes = [...jobs.keys()];
   type C = { project_number: string; customer_first: string | null; customer_last: string | null; customer_type: string | null; province: string | null; ref_opp: string | null; h7: string | null };
   const custRows: C[] = [];
@@ -178,6 +183,30 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
     const c = custOf.get(p);
     if (!c) missingCustomer++;
     else if ((c.h7 ?? "").trim() && c.h7!.trim() !== "B2C") { jobs.delete(p); nonB2c++; }
+  }
+
+  // งาน BA กลุ่ม ROOF SERVICE — เฉพาะงานติดตั้ง (I) ; งานสำรวจ (S) ไม่นับ (ผู้ใช้ยืนยัน พ.ย. 69)
+  type B = { id: number; job_code: string; period: string; win_date: string | null; dealer_code: string | null; customer_name: string | null; type_of_job: string | null; service_group: string | null; amount: number | null; rep_code: string | null; sales_name: string | null; seller_name: string | null };
+  const baLines = await keyset<B>("ba_service_sales_lines", "id", (last) => {
+    let q = sb.from("ba_service_sales_lines").select("id, job_code, period, win_date, dealer_code, customer_name, type_of_job, service_group, amount, rep_code, sales_name, seller_name").eq("group3", "ROOF SERVICE").eq("type_of_job", "I").gte("period", from).order("id").limit(1000);
+    if (last !== null) q = q.gt("id", last);
+    return q;
+  });
+  let baJobs = 0;
+  for (const b of baLines) {
+    const code = String(b.job_code ?? "").trim().toUpperCase();
+    if (!code || !b.dealer_code || !storeOk.has(b.dealer_code)) continue;
+    const j = jobs.get(code);
+    if (!j) {
+      baJobs++;
+      jobs.set(code, {
+        id: b.id, project_number: code, dealer_code: b.dealer_code, period: b.period, order_date: b.win_date, h5: b.service_group,
+        sales_name: b.seller_name || b.sales_name, rep_code: b.rep_code, amount_incl_vat: null, amount: Number(b.amount) || 0, source: "ba", ba_customer: b.customer_name,
+      });
+    } else {
+      j.amount += Number(b.amount) || 0;
+      if (b.period < j.period) Object.assign(j, { period: b.period, order_date: b.win_date, dealer_code: b.dealer_code });
+    }
   }
 
   // เลข OP <-> เลขงาน (Rudy ref_opp + CRM rudy_id) และ home_id
@@ -217,6 +246,8 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
     if (a !== b) parent.set(b, a);
   };
   const nameOf = (p: string) => {
+    const bj = jobs.get(p);
+    if (bj?.source === "ba") return String(bj.ba_customer ?? "").replace(/[\s.\-]+$/g, "").replace(/\s+/g, " ").trim();
     const c = custOf.get(p);
     return c ? `${(c.customer_first ?? "").trim()} ${(c.customer_last ?? "").trim()}`.replace(/\s+/g, " ").trim() : "";
   };
@@ -226,7 +257,7 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
       if (h) link(`H:${h}`, p);
     }
     const c = custOf.get(p);
-    const key = c ? normName(`${c.customer_first ?? ""} ${c.customer_last ?? ""}`) : "";
+    const key = jobs.get(p)!.source === "ba" ? normName(jobs.get(p)!.ba_customer) : c ? normName(`${c.customer_first ?? ""} ${c.customer_last ?? ""}`) : "";
     // ชื่อสั้นมาก (< 4 ตัวรวมชื่อเจ้าของบ้าน) ไม่ใช้รวม กันรวมผิดคน
     if (key.length >= 4) link(`N:${jobs.get(p)!.dealer_code}:${key}`, p);
   }
@@ -245,6 +276,8 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
     t = t.trim().replace(/\/\d+$/, "");
     if (/^RD\d{12}/.test(t)) return t.slice(0, 14);
     if (/^OP\d{12}/.test(t)) return oppProj.get(t.slice(0, 14)) ?? null;
+    const q = t.match(/^Q\d{4}-\d{6}/i)?.[0];
+    if (q) return q.toUpperCase();
     return null;
   };
   let sourceDate: string | null = null;
@@ -277,7 +310,7 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
     const info = custOf.get(j.project_number);
     const shown = s ?? c.best;
     return {
-      batch, project_number: j.project_number, dealer_code: j.dealer_code!, period: j.period, order_date: j.order_date, h5: j.h5, sales_name: j.sales_name, rep_code: j.rep_code,
+      batch, source: j.source, project_number: j.project_number, dealer_code: j.dealer_code!, period: j.period, order_date: j.order_date, h5: j.h5, sales_name: j.sales_name, rep_code: j.rep_code,
       amount: Math.round(j.amount * 100) / 100, opp_ids: [...(projOpps.get(j.project_number) ?? [])].join(", ") || null,
       customer_id: c.id, customer_name: nameOf(j.project_number) || null, customer_type: info?.customer_type ?? null, province: info?.province ?? null,
       customer_period: c.period, customer_dealer: c.dealer,
@@ -292,7 +325,7 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
   return {
     rows,
     merged,
-    summary: { jobs: jobs.size, nonB2c, missingCustomer, customers: C.length, multiJob: C.filter((c) => c.jobs.length > 1).length, register: n("register"), not_register: n("not_register"), no_bot: n("no_bot"), none: n(null), sourceDate },
+    summary: { jobs: jobs.size, baJobs, nonB2c, missingCustomer, customers: C.length, multiJob: C.filter((c) => c.jobs.length > 1).length, register: n("register"), not_register: n("not_register"), no_bot: n("no_bot"), none: n(null), sourceDate },
   };
 }
 

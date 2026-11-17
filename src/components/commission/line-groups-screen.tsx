@@ -118,7 +118,7 @@ export function LineGroupsScreen() {
             <span className="font-bold text-[15px] text-[#231313] leading-tight truncate">
               {coachObj ? `Coach ${coachObj.nickname ?? coachObj.name}` : coach === "__all__" ? "ลูกค้าทั้งหมด" : "ติดตามกลุ่ม Line ลูกค้า"}
             </span>
-            <span className="text-[11px] font-semibold text-[#b21e1e] truncate">งาน Roof Service · HE + SCG Home</span>
+            <span className="text-[11px] font-semibold text-[#b21e1e] truncate">งาน Roof Service (Rudy + BA) · HE + SCG Home</span>
           </div>
         </div>
         <button type="button" onClick={download} disabled={!t || loading} className="inline-flex items-center gap-1 rounded-full bg-white border border-slate-200 text-[11.5px] font-bold text-blue-700 px-3 py-1.5 disabled:opacity-40 shrink-0">
@@ -185,7 +185,7 @@ export function LineGroupsScreen() {
             )}
 
             <p className="text-[10.5px] text-slate-400 text-center px-4">
-              ลูกค้า 1 คน = 1 กลุ่ม Line (รวมงานด้วยรหัสบ้านใน CRM หรือ ร้าน + ชื่อลูกค้า) · เดือน = เดือนเปิดงานแรกของลูกค้า · เลขใบเสนอราคา (Q…) ยังจับคู่ไม่ได้
+              งาน Rudy + BA (เฉพาะงานติดตั้ง) · ลูกค้า 1 คน = 1 กลุ่ม Line (รวมงานด้วยรหัสบ้านใน CRM หรือ ร้าน + ชื่อลูกค้า) · เดือน = เดือนของงานแรกของลูกค้า
             </p>
           </>
         )}
@@ -308,6 +308,8 @@ function CustomerRow({ c, onClick }: { c: LineCustomer; onClick: () => void }) {
       </span>
       <span className="block text-[10.5px] text-slate-500 mt-0.5 truncate">
         {c.salesName ? `พนักงานขาย: ${c.salesName}` : "ไม่ระบุพนักงานขาย"} · {c.jobs[0]?.h5 ?? "-"}
+        {" · "}
+        {[...new Set(c.jobs.map((j) => (j.source === "ba" ? "BA" : "Rudy")))].join("+")}
       </span>
       <span className="flex items-center gap-2 mt-0.5">
         <span className="min-w-0 flex-1 block text-[10.5px] text-slate-600 truncate">{sub}</span>
@@ -391,14 +393,15 @@ function CustomerSheet({ c, onClose }: { c: LineCustomer; onClose: () => void })
             {c.jobs.map((j) => (
               <button key={j.project} type="button" onClick={() => copy(j.project)} className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                 <span className="flex items-center gap-2">
+                  <span className={cn("shrink-0 text-[9.5px] font-bold rounded px-1.5 py-0.5", j.source === "ba" ? "bg-orange-100 text-orange-800" : "bg-sky-100 text-sky-800")}>{j.source === "ba" ? "BA" : "Rudy"}</span>
                   <span className="min-w-0 flex-1 text-[12.5px] font-bold text-blue-700">{j.project}</span>
                   <StatusChip s={j.status} />
                 </span>
                 <span className="block text-[10.5px] text-slate-600 mt-0.5">
-                  CRM: {j.opps ?? "—"} · {j.h5 ?? "-"}
+                  {j.source === "ba" ? "BA งานติดตั้ง" : `CRM: ${j.opps ?? "—"}`} · {j.h5 ?? "-"}
                 </span>
                 <span className="block text-[10.5px] text-slate-600">
-                  เปิดงาน {shortDate(j.orderDate)} · ยอด {baht(j.amount)}
+                  {j.source === "ba" ? "ปิดการขาย" : "เปิดงาน"} {shortDate(j.orderDate)} · ยอด {baht(j.amount)}
                   {j.sales && j.sales !== c.salesName ? ` · ${j.sales}` : ""}
                 </span>
                 <span className="block text-[9.5px] text-slate-400 mt-0.5">{copied === j.project ? "คัดลอกแล้ว ✓" : "แตะเพื่อคัดลอกเลขงาน"}</span>

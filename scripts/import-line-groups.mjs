@@ -93,7 +93,7 @@ if (DIR) {
 /* ---------- 3) คำนวณ ---------- */
 const { rows, summary: s, merged } = await computeLineTracking(sb, { entries: pendingEntries });
 if (s.missingCustomer) console.log(`! ${s.missingCustomer} งานยังไม่มีข้อมูลลูกค้า (รัน --win ก่อน) — นับเป็น B2C ไว้ก่อน`);
-console.log(`งาน ${s.jobs} (ตัดที่ไม่ใช่ B2C ${s.nonB2c}) -> ลูกค้า ${s.customers} ราย (หลายงาน ${s.multiJob}) : ลงทะเบียน ${s.register} · ไม่ลงทะเบียน ${s.not_register} · ไม่ Add Bot ${s.no_bot} · ไม่มีข้อมูล ${s.none} ; ข้อมูลกลุ่มล่าสุด ${s.sourceDate}`);
+console.log(`งาน ${s.jobs} (Rudy ${s.jobs - s.baJobs} + BA ติดตั้ง ${s.baJobs} ; ตัด Rudy ที่ไม่ใช่ B2C ${s.nonB2c}) -> ลูกค้า ${s.customers} ราย (หลายงาน ${s.multiJob}) : ลงทะเบียน ${s.register} · ไม่ลงทะเบียน ${s.not_register} · ไม่ Add Bot ${s.no_bot} · ไม่มีข้อมูล ${s.none} ; ข้อมูลกลุ่มล่าสุด ${s.sourceDate}`);
 if (has("--debug")) merged.forEach((m) => console.log(`  รวม: ${m.join(" | ")}`));
 const { count: before } = await sb.from("line_tracking_jobs").select("id", { count: "exact", head: true });
 if (before && rows.length < before * (1 - GUARD)) {

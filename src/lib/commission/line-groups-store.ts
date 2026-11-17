@@ -14,6 +14,8 @@ export const LINE_STATUS: Record<LineStatus, { label: string; short: string; chi
 export const LINE_STATUS_ORDER: LineStatus[] = ["no_bot", "not_register", "none", "register"];
 
 export interface LineJob {
+  /** rudy = LHS/Rudy (เลข RD) ; ba = BA งานติดตั้ง (เลขใบเสนอราคา Q…) */
+  source: "rudy" | "ba";
   project: string;
   opps: string | null;
   h5: string | null;
@@ -81,12 +83,12 @@ export async function fetchLineTracking(period?: string): Promise<({ ok: true } 
 /** CSV (เปิดด้วย Excel ได้ ภาษาไทยไม่เพี้ยน) — 1 แถวต่องาน */
 export function lineTrackingCsv(t: LineTracking, customers: LineCustomer[]): string {
   const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const head = ["เดือน", "Coach", "Area", "รหัสร้าน", "ร้าน", "โมเดล", "ลูกค้า", "ประเภทลูกค้า", "จังหวัด", "สถานะกลุ่ม Line (ลูกค้า)", "ชื่อกลุ่ม Line", "พนักงานขาย", "เลขงาน Rudy", "เลข OP", "ประเภทงาน", "วันที่เปิดงาน", "ยอด (รวม VAT)", "สถานะของงานนี้"];
+  const head = ["เดือน", "Coach", "Area", "รหัสร้าน", "ร้าน", "โมเดล", "ลูกค้า", "ประเภทลูกค้า", "จังหวัด", "สถานะกลุ่ม Line (ลูกค้า)", "ชื่อกลุ่ม Line", "พนักงานขาย", "แหล่ง", "เลขงาน", "เลข OP", "ประเภทงาน", "วันที่เปิดงาน", "ยอด (รวม VAT)", "สถานะของงานนี้"];
   const lines = [head.map(q).join(",")];
   for (const c of customers)
     for (const j of c.jobs)
       lines.push(
-        [t.period, c.coachName, c.areaName, c.dealerCode, c.dealerName, c.model, c.name, c.type, c.province, LINE_STATUS[c.status].label, c.groupName, j.sales ?? c.salesName, j.project, j.opps, j.h5, j.orderDate, j.amount, LINE_STATUS[j.status].label]
+        [t.period, c.coachName, c.areaName, c.dealerCode, c.dealerName, c.model, c.name, c.type, c.province, LINE_STATUS[c.status].label, c.groupName, j.sales ?? c.salesName, j.source === "ba" ? "BA" : "Rudy", j.project, j.opps, j.h5, j.orderDate, j.amount, LINE_STATUS[j.status].label]
           .map(q)
           .join(",")
       );
