@@ -46,6 +46,8 @@ const JOBS = [
   { id: "lhs", group: "sharepoint", label: "ยอดขาย LHS/Rudy", file: F.lhs, args: ["scripts/import-service-sales.mjs", "--apply", "--file", F.lhs] },
   // ไฟล์เดียวกับ LHS/Rudy (PO ที่ปิดแล้ว) -> ส่วนลดช่องทาง 7% ของร้าน HE
   { id: "lhs-discount", group: "sharepoint", label: "LHS Channel Discount", file: F.lhs, args: ["scripts/import-lhs-purchase-discount.mjs", "--apply", "--file", F.lhs] },
+  // ไฟล์เดียวกับ LHS/Rudy: อัปเดตลูกค้าของงาน + คำนวณสถานะกลุ่ม Line ใหม่ (ต้องอยู่หลังงาน "lhs")
+  { id: "line-groups", group: "sharepoint", label: "กลุ่ม Line ลูกค้า", file: F.lhs, args: ["scripts/import-line-groups.mjs", "--apply", "--win", F.lhs] },
   { id: "design-intake", group: "sharepoint", label: "แบบรับเข้า (CRM)", file: F.crm, args: ["scripts/sync-design-intake.mjs", "--apply", "--file", F.crm] },
 ];
 

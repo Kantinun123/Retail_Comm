@@ -22,6 +22,7 @@ import {
   type DcSummary,
 } from "@/lib/commission/data-center-store";
 import { BaUploadModal } from "./data-center-upload";
+import { LineGroupsTab } from "./data-center-line-groups";
 import { cn } from "@/lib/utils";
 
 const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -370,7 +371,7 @@ function MonthlyTab({ data, onUpload }: { data: DcSummary; onUpload: (source: st
 export function DataCenterScreen() {
   const { session, ready } = useSession();
   const homeHref = useHomeHref();
-  const [tab, setTab] = useState<"daily" | "monthly">("daily");
+  const [tab, setTab] = useState<"daily" | "monthly" | "line">("daily");
   const [state, setState] = useState<{ v: number; data: DcSummary | null; error: string | null; status: number } | null>(null);
   const [version, setVersion] = useState(0);
   const [upload, setUpload] = useState<{ source: string; period: string } | null>(null);
@@ -435,8 +436,8 @@ export function DataCenterScreen() {
     <>
       {header}
       <div className="space-y-4 pb-4">
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-200/70 p-1" role="tablist" aria-label="ประเภทข้อมูล">
-          {(["daily", "monthly"] as const).map((t) => (
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-200/70 p-1" role="tablist" aria-label="ประเภทข้อมูล">
+          {(["daily", "monthly", "line"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -445,12 +446,14 @@ export function DataCenterScreen() {
               onClick={() => setTab(t)}
               className={cn("rounded-lg py-2 text-[12.5px] font-bold transition", tab === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
             >
-              {t === "daily" ? "รายวัน (อัตโนมัติ)" : "รายเดือน (อัปโหลด)"}
+              {t === "daily" ? "รายวัน (อัตโนมัติ)" : t === "monthly" ? "รายเดือน (อัปโหลด)" : "กลุ่ม Line"}
             </button>
           ))}
         </div>
 
-        {loading && !data ? (
+        {tab === "line" ? (
+          <LineGroupsTab />
+        ) : loading && !data ? (
           <div className="py-12 text-center text-slate-300"><Icon name="progress_activity" className="animate-spin text-3xl" /></div>
         ) : !data ? (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center text-[13px] text-slate-600">

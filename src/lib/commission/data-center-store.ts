@@ -114,6 +114,7 @@ export const DAILY_JOBS: { job: string; label: string; group: "gsheet" | "sharep
   { job: "lhs", label: "ยอดขาย LHS/Rudy", group: "sharepoint", unit: "งาน", href: "/app/service-sales/lhs" },
   { job: "lhs-discount", label: "LHS Channel Discount", group: "sharepoint", unit: "PO", href: "/app/lhs-purchase-discount" },
   { job: "design-intake", label: "แบบรับเข้า (CRM)", group: "sharepoint", unit: "แบบ", href: "/app/design-intake" },
+  { job: "line-groups", label: "กลุ่ม Line ลูกค้า", group: "sharepoint", unit: "ลูกค้า", href: "/app/line-groups" },
 ];
 
 /** แหล่งข้อมูลรายเดือน (อัปโหลดเอง) */
