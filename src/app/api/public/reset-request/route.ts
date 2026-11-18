@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { usernameToEmail } from "@/lib/commission/username";
 
-/** บัญชีกลุ่ม Area ที่ขอรีเซ็ตผ่านฟอร์มนี้ได้ (ร้านค้าใช้ dealerCode) */
-const STAFF_ROLES = ["area", "coach", "re", "area_head"];
+/** บัญชีรายคนที่ขอรีเซ็ตผ่านฟอร์มนี้ได้ (พนักงานขาย + กลุ่ม Area ; ร้านค้าใช้ dealerCode) */
+const STAFF_ROLES = ["area", "coach", "re", "area_head", "sales"];
 
 /**
  * ร้านค้าส่งคำขอรีเซ็ตรหัสผ่าน (ไม่ต้อง login)

@@ -10,6 +10,7 @@ interface Me {
   name: string | null;
   storeCodes: string[] | null;
   dealerCode: string | null;
+  repCode?: string | null;
   mustChangePassword?: boolean;
 }
 
@@ -46,6 +47,10 @@ export default function AuthBridgePage() {
           doLogin({ role: "dealer", dealerCode: json.me.dealerCode });
           setMustChangePassword(!!json.me.mustChangePassword);
           router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/home");
+        } else if (role === "sales" && json.me.repCode && json.me.dealerCode) {
+          doLogin({ role: "sales", dealerCode: json.me.dealerCode, repCode: json.me.repCode, repName: name ?? undefined });
+          setMustChangePassword(!!json.me.mustChangePassword);
+          router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/home-staff");
         } else {
           // sales ยังใช้ล็อกอินเดโมในรอบนี้
           setMessage("บัญชีประเภทนี้ยังไม่เปิดให้ใช้ Microsoft login");

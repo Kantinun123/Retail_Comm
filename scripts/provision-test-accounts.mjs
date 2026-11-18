@@ -2,6 +2,7 @@
 //   test.area     -> Area แดง (SR0229)
 //   test.coach    -> Coach เนม (SR0239)
 //   test.areahead -> หัวหน้า Area (เห็นทุกร้านที่มี Area ดูแล ไม่ต้องผูก rep)
+//   test.se       -> พนักงานขาย SE อั๋น (SR0067) ร้าน 5100895 — ร้านมาจาก sale_reps ตอน login
 //   test.he       -> ร้าน HE 5100895 (บ.สมาร์ท โฮมโปรดักส์) ; test.scg -> ร้าน SCG Home 5102653 (บุญถาวร จันทบุรี)
 //   บัญชีร้านแบบทดสอบไม่นับใน "1 บัญชีต่อร้าน" (unique index ยกเว้น is_test) -> ร้านยังมีบัญชีจริงได้ตามปกติ
 // ใช้: node scripts/provision-test-accounts.mjs          (dry-run)
@@ -26,6 +27,7 @@ const ACCOUNTS = [
   { username: "test.areahead", role: "area_head", rep: null, label: "หัวหน้า Area" },
   { username: "test.he", role: "dealer", rep: null, dealer: "5100895", label: "ร้าน Housing Expert" },
   { username: "test.scg", role: "dealer", rep: null, dealer: "5102653", label: "ร้าน SCG Home" },
+  { username: "test.se", role: "sales", rep: "SR0067", label: "พนักงานขาย SE" },
 ];
 
 function tempPassword() {
@@ -51,7 +53,7 @@ for (const acc of ACCOUNTS.filter((a) => !ONLY || a.username === ONLY)) {
   }
   if (acc.rep) {
     const { data: rep } = await sb.from("sale_reps").select("name, nickname, position").eq("rep_code", acc.rep).single();
-    const ok = (acc.role === "area" && rep?.position === "area_mng") || (acc.role === "coach" && rep?.position === "coach");
+    const ok = (acc.role === "area" && rep?.position === "area_mng") || (acc.role === "coach" && rep?.position === "coach") || (acc.role === "sales" && rep?.position === "se");
     if (!ok) throw new Error(`${acc.rep} ไม่ใช่ตำแหน่ง ${acc.role}`);
     repName = rep.nickname ? `${rep.name} (${rep.nickname})` : rep.name;
   }

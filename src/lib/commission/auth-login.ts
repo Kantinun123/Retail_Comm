@@ -53,6 +53,16 @@ function toSessionRole(role: string | null): Role {
   }
 }
 
+/** ข้อมูลจาก /api/me ที่ใช้ตั้ง session */
+export interface MeInfo {
+  role: string;
+  name: string | null;
+  repCode?: string | null;
+  dealerCode: string | null;
+  storeCodes: string[] | null;
+  mustChangePassword?: boolean;
+}
+
 import { usernameToEmail } from "./username";
 export { LOCAL_ACCOUNT_DOMAIN, usernameToEmail } from "./username";
 
@@ -110,6 +120,19 @@ export async function loginWithEmail(
     return { ok: true, role: "area", mustChangePassword: !!profile.must_change_password };
   }
 
+  // พนักงานขาย (บัญชีจริงรายคน): รหัสพนักงาน + ร้านที่สังกัดมาจาก server (/api/me อ่าน sale_reps ปัจจุบัน)
+  if (profile.role === "sales") {
+    const res = await fetch("/api/me", { cache: "no-store" });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; me?: MeInfo } | null;
+    if (!res.ok || !json?.ok || !json.me?.repCode || !json.me.dealerCode) {
+      await sb.auth.signOut();
+      return { ok: false, error: "ไม่พบข้อมูลพนักงาน หรือพนักงานพักงานอยู่ ติดต่อผู้ดูแลระบบ" };
+    }
+    doLogin({ role: "sales", dealerCode: json.me.dealerCode, repCode: json.me.repCode, repName: json.me.name ?? undefined });
+    setMustChangePassword(!!profile.must_change_password);
+    return { ok: true, role: "sales", mustChangePassword: !!profile.must_change_password };
+  }
+
   // identity bridge: เขียนลง sessionStorage keys เดิม
   const role = toSessionRole(profile.role);
   doLogin({
@@ -147,7 +170,7 @@ export async function restoreSession(next?: string | null): Promise<string | nul
   const res = await fetch("/api/me", { cache: "no-store" });
   const json = (await res.json().catch(() => null)) as {
     ok?: boolean;
-    me?: { role: string; name: string | null; dealerCode: string | null; storeCodes: string[] | null; mustChangePassword?: boolean };
+    me?: MeInfo;
   } | null;
   const me = json?.ok ? json.me : undefined;
   if (!res.ok || !me) {
@@ -165,8 +188,10 @@ export async function restoreSession(next?: string | null): Promise<string | nul
   } else if (me.role === "dealer" && me.dealerCode) {
     role = "dealer";
     doLogin({ role, dealerCode: me.dealerCode });
+  } else if (me.role === "sales" && me.repCode && me.dealerCode) {
+    role = "sales";
+    doLogin({ role, dealerCode: me.dealerCode, repCode: me.repCode, repName: me.name ?? undefined });
   } else {
-    // พนักงาน (sales) ยังไม่ได้เปิดบัญชีจริง -> ให้ login ใหม่
     return null;
   }
   setMustChangePassword(!!me.mustChangePassword);

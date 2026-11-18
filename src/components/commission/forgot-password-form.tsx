@@ -9,7 +9,7 @@ interface DealerOpt {
   name: string;
 }
 
-/** ส่งคำขอรีเซ็ตรหัสผ่านถึงผู้ดูแลระบบ (ไม่ต้อง login) — ร้านค้า หรือ Area / Coach / หัวหน้า Area */
+/** ส่งคำขอรีเซ็ตรหัสผ่านถึงผู้ดูแลระบบ (ไม่ต้อง login) — ร้านค้า หรือ พนักงานขาย / Area / Coach / หัวหน้า Area */
 export function ForgotPasswordForm() {
   const [kind, setKind] = useState<"dealer" | "staff">("dealer");
   const [login, setLogin] = useState("");
@@ -86,7 +86,7 @@ export function ForgotPasswordForm() {
       <div className="rounded-2xl bg-gradient-to-br from-[#d32029] via-[#c01f27] to-[#7a0f12] p-4 mb-4 text-white shadow-lg shadow-[#d32029]/20">
         <h2 className="text-[17px] font-bold tracking-tight">ขอรีเซ็ตรหัสผ่าน</h2>
         <p className="text-[12px] text-red-100/90 mt-1 font-light">
-          {kind === "staff" ? "แจ้งอีเมลที่ใช้เข้าระบบและเบอร์ติดต่อ" : "แจ้งร้านและเบอร์ติดต่อ"} ผู้ดูแลระบบจะติดต่อกลับเพื่อยืนยันตัวตน
+          {kind === "staff" ? "แจ้งชื่อผู้ใช้ที่ใช้เข้าระบบและเบอร์ติดต่อ" : "แจ้งร้านและเบอร์ติดต่อ"} ผู้ดูแลระบบจะติดต่อกลับเพื่อยืนยันตัวตน
         </p>
       </div>
 
@@ -94,7 +94,7 @@ export function ForgotPasswordForm() {
         <div className="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100" role="tablist" aria-label="ประเภทบัญชี">
           {([
             ["dealer", "ร้านค้า"],
-            ["staff", "Area / Coach"],
+            ["staff", "พนักงาน / Area / Coach"],
           ] as const).map(([k, l]) => (
             <button
               key={k}
@@ -124,9 +124,9 @@ export function ForgotPasswordForm() {
             </div>
           ) : (
             <div>
-              <span className="text-[13px] font-semibold text-slate-800 block mb-1.5">อีเมลที่ใช้เข้าระบบ</span>
-              <input className={inputCls} value={login} maxLength={120} onChange={(e) => setLogin(e.target.value)} placeholder="เช่น name@scg.com" inputMode="email" autoComplete="username" />
-              <p className="text-[11px] text-slate-400 mt-1">สำหรับ Area, Coach และหัวหน้า Area</p>
+              <span className="text-[13px] font-semibold text-slate-800 block mb-1.5">ชื่อผู้ใช้ / อีเมลที่ใช้เข้าระบบ</span>
+              <input className={inputCls} value={login} maxLength={120} onChange={(e) => setLogin(e.target.value)} placeholder="เช่น SR0123 หรือ name@scg.com" autoComplete="username" />
+              <p className="text-[11px] text-slate-400 mt-1">พนักงานขายใช้รหัสพนักงาน (เช่น SR0123) · Area, Coach และหัวหน้า Area ใช้อีเมล</p>
             </div>
           )}
           <div>

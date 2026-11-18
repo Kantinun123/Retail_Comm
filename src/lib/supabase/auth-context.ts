@@ -51,6 +51,17 @@ export async function getAuthContext(): Promise<AuthContext | null> {
         .eq("rep_code", profile.rep_code);
       allowed = Array.from(new Set((data ?? []).map((r) => r.dealer_code as string)));
     }
+  } else if (profile.role === "sales") {
+    // พนักงานขาย: ร้านมาจาก sale_reps ปัจจุบัน (ย้ายร้านแล้วตามทันที) ; พักงาน/ไม่พบ = ไม่มีสิทธิ์
+    if (!profile.rep_code) return null;
+    const { data: rep } = await createServiceClient()
+      .from("sale_reps")
+      .select("dealer_code, is_active")
+      .eq("rep_code", profile.rep_code)
+      .maybeSingle();
+    if (!rep || rep.is_active === false || !rep.dealer_code) return null;
+    profile.dealer_code = rep.dealer_code as string;
+    allowed = [profile.dealer_code];
   } else if (profile.dealer_code) {
     allowed = [profile.dealer_code];
   }

@@ -35,12 +35,13 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "rejected", label: "ปฏิเสธ/ระงับ" },
 ];
 
-type RoleFilter = "all" | "dealer" | "area" | "coach";
+type RoleFilter = "all" | "dealer" | "area" | "coach" | "sales";
 const ROLE_FILTERS: { key: RoleFilter; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
   { key: "dealer", label: "ร้านค้า" },
   { key: "area", label: "Area" },
   { key: "coach", label: "Coach" },
+  { key: "sales", label: "พนักงานขาย" },
 ];
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   dealer: { label: "ร้านค้า", cls: "bg-red-50 text-[#a11119] border-red-200" },
@@ -52,7 +53,7 @@ const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 /** ป้ายบทบาทในคำขอรีเซ็ตรหัสของกลุ่ม Area */
-const RESET_ROLE_LABEL: Record<string, string> = { area: "Area", coach: "Coach", re: "Coach", area_head: "หัวหน้า Area" };
+const RESET_ROLE_LABEL: Record<string, string> = { area: "Area", coach: "Coach", re: "Coach", area_head: "หัวหน้า Area", sales: "พนักงานขาย" };
 
 export function AdminUsersScreen() {
   const { session, ready } = useSession();
@@ -276,7 +277,7 @@ export function AdminUsersScreen() {
                   {r.kind === "staff" ? (
                     <>
                       <span className="mr-1 rounded-md bg-sky-100 text-sky-800 px-1.5 py-0.5 text-[10px] font-bold align-middle">
-                        {RESET_ROLE_LABEL[r.account_role ?? ""] ?? "Area / Coach"}
+                        {RESET_ROLE_LABEL[r.account_role ?? ""] ?? "บัญชีรายคน"}
                       </span>
                       {r.account_name ?? r.requested_login}
                     </>
@@ -428,7 +429,7 @@ export function AdminUsersScreen() {
             const storeName = u.dealer_name ?? u.requested_dealer_name;
             const storeCode = u.dealer_code ?? u.requested_dealer_code;
             const badge = u.role ? ROLE_BADGE[u.role] : undefined;
-            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re" || u.role === "area_head";
+            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re" || u.role === "area_head" || u.role === "sales";
             return (
               <div key={u.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
                 <div className="flex items-start justify-between gap-2">

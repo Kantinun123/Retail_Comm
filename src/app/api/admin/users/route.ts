@@ -13,8 +13,8 @@ import { emailToUsername, isValidStoreUsername, usernameToEmail } from "@/lib/co
  *   reset  : ออกรหัสชั่วคราวใหม่ — ร้านค้า และ Area / Coach
  */
 
-/** role ที่เป็น Area Manager / Coach — admin รีเซ็ตรหัส / ระงับได้ แต่ไม่ผ่าน flow อนุมัติร้าน */
-const AREA_ROLES = new Set(["area", "coach", "re", "area_head"]);
+/** บัญชีรายคน (Area / Coach / หัวหน้า Area / พนักงานขาย) — admin รีเซ็ตรหัส / ระงับได้ แต่ไม่ผ่าน flow อนุมัติร้าน */
+const AREA_ROLES = new Set(["area", "coach", "re", "area_head", "sales"]);
 
 async function requireAdmin() {
   const ctx = await getAuthContext();
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
     .eq("id", userId)
     .single();
   if (!target) return NextResponse.json({ ok: false, error: "ไม่พบผู้ใช้" }, { status: 404 });
-  // บัญชี admin / sales แก้ผ่านหน้านี้ไม่ได้ ; Area/Coach ทำได้แค่รีเซ็ตรหัส / ระงับ
+  // บัญชี admin แก้ผ่านหน้านี้ไม่ได้ ; บัญชีรายคน (Area/Coach/พนักงานขาย) ทำได้แค่รีเซ็ตรหัส / ระงับ
   const isArea = AREA_ROLES.has(target.role ?? "");
   if (target.role && target.role !== "dealer" && !isArea) {
     return NextResponse.json({ ok: false, error: "แก้ไขบัญชีประเภทนี้ผ่านหน้านี้ไม่ได้" }, { status: 400 });

@@ -193,7 +193,8 @@ function readSession(): SessionData {
     empId,
     dealer,
     me,
-    isSales: role === "sales" && !!empId,
+    // เดโม = empId (employees) ; บัญชีจริง = repCode (sale_reps)
+    isSales: role === "sales" && (!!empId || !!sessionStorage.getItem(KEYS.repCode)),
     repCode,
     repName,
     repCr,
