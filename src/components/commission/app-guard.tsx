@@ -34,6 +34,16 @@ export function AppGuard({ children }: { children: React.ReactNode }) {
       router.replace(AREA_HOME);
       return;
     }
+    // ห้องแบบ / Marketing: ใช้ได้เฉพาะหน้า BOQ (หน้าอื่นออกแบบมาสำหรับร้าน/พนักงาน)
+    if (
+      session?.loggedIn &&
+      (session.role === "designer" || session.role === "marketing") &&
+      pathname &&
+      !["/app/boq", "/app/change-password", "/app/member"].some((p) => pathname === p || pathname.startsWith(p + "/"))
+    ) {
+      router.replace("/app/boq");
+      return;
+    }
     // บัญชีที่ admin แจกให้: ต้องเปลี่ยนรหัสผ่านก่อนใช้หน้าอื่น
     if (
       session?.loggedIn &&

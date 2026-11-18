@@ -1,0 +1,315 @@
+"use client";
+/* ฟอร์มขอ BOQ สินค้า DECAAR (พนักงานขายเท่านั้น) — ไฟล์แนบอัปโหลดทันทีที่เลือก แล้วส่งพร้อมคำขอ */
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { Icon } from "../icon";
+import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/commission/session";
+import {
+  BUILDING_TYPES, CUST_TYPES, JOB_TYPES, NEEDS, SLA_DAYS, createBoq, fetchBoqProducts, fmtNum,
+  type BoqProduct, type BoqRecorder, type UploadedFile,
+} from "@/lib/commission/boq-store";
+import { BoqHeader, Chips, FileUploader, Section, btn, inputCls, labelCls } from "./boq-shared";
+
+type Point = { key: number; code: string; length: string; width: string; detail: string };
+const opt = (l: string[]) => l.map((x) => ({ key: x, label: x }));
+const num = (s: string) => {
+  const n = parseFloat(s.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+};
+
+function ProductPicker({ products, value, onPick }: { products: BoqProduct[]; value: string; onPick: (code: string) => void }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(!value);
+  const prod = products.find((p) => p.code === value);
+  const hits = useMemo(() => {
+    const k = q.trim().toLowerCase();
+    const list = k ? products.filter((p) => `${p.code} ${p.name} ${p.sub ?? ""} ${p.grp ?? ""}`.toLowerCase().includes(k)) : products;
+    return list.slice(0, 30);
+  }, [q, products]);
+  if (prod && !open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p className="text-[13px] font-semibold text-slate-800">{prod.name}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">
+          รหัส {prod.code} · {prod.grp} / {prod.sub}
+          {prod.size ? ` · ${prod.size} ซม.` : ""}
+        </p>
+        <p className="text-[11px] text-[#d32029] mt-1 font-semibold">แตะเพื่อเปลี่ยนสินค้า</p>
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Icon name="search" className="absolute left-3 top-2.5 text-slate-400" style={{ fontSize: 18 }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหารหัส / ชื่อสินค้า เช่น ซีชาแนล, NEX, T-Clip" className={cn(inputCls, "pl-9")} />
+      </div>
+      <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-64 overflow-y-auto bg-white">
+        {hits.map((p) => (
+          <button key={p.code} type="button" onClick={() => { onPick(p.code); setOpen(false); setQ(""); }} className="w-full text-left px-3 py-2 hover:bg-red-50">
+            <p className="text-[12px] font-medium text-slate-800">{p.name}</p>
+            <p className="text-[10px] text-slate-500">{p.code} · {p.sub} · {p.unit === "m" ? "เมตร (ความยาว)" : "กว้าง × ยาว"}</p>
+          </button>
+        ))}
+        {hits.length === 0 && <p className="text-[12px] text-slate-400 p-3 text-center">ไม่พบสินค้า</p>}
+      </div>
+      <p className="text-[10px] text-slate-400">ใบราคา DECAAR {products.length} รายการ · ไม่รวมอุปกรณ์ (ห้องแบบใส่ใน BOQ ให้)</p>
+    </div>
+  );
+}
+
+export function BoqFormScreen() {
+  const { session, ready } = useSession();
+  const router = useRouter();
+  const [products, setProducts] = useState<BoqProduct[]>([]);
+  const [recorder, setRecorder] = useState<BoqRecorder | null>(null);
+  const [loadErr, setLoadErr] = useState("");
+  const [email, setEmail] = useState("");
+  const [customer, setCustomer] = useState("");
+  const [phone, setPhone] = useState("");
+  const [province, setProvince] = useState("");
+  const [custType, setCustType] = useState("");
+  const [custOther, setCustOther] = useState("");
+  const [jobType, setJobType] = useState("");
+  const [building, setBuilding] = useState("");
+  const [need, setNeed] = useState("");
+  const [points, setPoints] = useState<Point[]>([{ key: 1, code: "", length: "", width: "", detail: "" }]);
+  const [photos, setPhotos] = useState<UploadedFile[]>([]);
+  const [plans, setPlans] = useState<UploadedFile[]>([]);
+  const [olds, setOlds] = useState<UploadedFile[]>([]);
+  const [budget, setBudget] = useState("");
+  const [wantDate, setWantDate] = useState("");
+  const [note, setNote] = useState("");
+  const [opNo, setOpNo] = useState("");
+  const [busy, setBusy] = useState(0);
+  const [tried, setTried] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState("");
+
+  useEffect(() => {
+    if (ready && session && !session.isSales) router.replace("/app/boq");
+  }, [ready, session, router]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchBoqProducts()
+      .then((d) => {
+        if (cancelled) return;
+        setProducts(d.products);
+        setRecorder(d.recorder);
+      })
+      .catch((e) => !cancelled && setLoadErr(e instanceof Error ? e.message : "โหลดไม่สำเร็จ"));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const unitOf = (code: string) => products.find((p) => p.code === code)?.unit;
+  const budgetNum = num(budget);
+  const missing = [
+    !customer.trim() && "ชื่อลูกค้า",
+    !custType && "ประเภทลูกค้า",
+    custType === "อื่นๆ" && !custOther.trim() && "ระบุประเภทลูกค้า",
+    !jobType && "ประเภทงาน",
+    !building && "ประเภทอาคาร",
+    !need && "ความต้องการ",
+    points.some((p) => !p.code) && "สินค้าทุกจุด",
+    points.some((p) => p.code && (!(num(p.length) > 0) || (unitOf(p.code) === "area" && !(num(p.width) > 0)))) && "พื้นที่ทุกจุด",
+    photos.length === 0 && "รูปจุดที่ใช้สินค้า",
+    plans.length === 0 && "แบบแปลน",
+    !(budgetNum > 0) && "งบประมาณ",
+    recorder && !recorder.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && "Email ผู้บันทึก",
+  ].filter(Boolean) as string[];
+
+  const submit = async () => {
+    setTried(true);
+    setSaveErr("");
+    if (missing.length || busy) return;
+    setSaving(true);
+    try {
+      const r = await createBoq({
+        customerName: customer,
+        customerPhone: phone,
+        province,
+        customerType: custType,
+        customerTypeOther: custOther,
+        jobType,
+        buildingType: building,
+        need,
+        budget: budgetNum,
+        wantDate: wantDate || undefined,
+        note,
+        opNo,
+        recorderEmail: email,
+        points: points.map((p) => ({ productCode: p.code, length: num(p.length), width: unitOf(p.code) === "area" ? num(p.width) : undefined, detail: p.detail })),
+        files: [...photos, ...plans, ...olds],
+      });
+      router.replace(`/app/boq/${r.id}`);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "ส่งไม่สำเร็จ");
+      setSaving(false);
+    }
+  };
+
+  if (!ready || !session?.isSales) return null;
+  const setPoint = (i: number, patch: Partial<Point>) => setPoints((a) => a.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const onBusy = (b: boolean) => setBusy((n) => Math.max(0, n + (b ? 1 : -1)));
+
+  return (
+    <>
+      <BoqHeader title="สร้างคำขอ BOQ DECAAR" back="/app/boq" />
+      <div className="space-y-3 pb-6">
+        {loadErr && <p className="rounded-xl bg-red-50 border border-red-200 p-3 text-[12px] text-red-700">โหลดรายการสินค้าไม่สำเร็จ: {loadErr}</p>}
+
+        <Section no="1-3" title="ผู้บันทึกข้อมูล" hint="ระบบดึงจากบัญชีพนักงานที่เข้าระบบ">
+          <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+            <p className="text-[10px] text-slate-500">ร้านที่สังกัด</p>
+            <p className="text-[13px] font-semibold text-slate-800">{recorder ? `${recorder.dealerName} (${recorder.dealerCode})` : "…"}</p>
+          </div>
+          <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+            <p className="text-[10px] text-slate-500">ชื่อ-นามสกุลผู้บันทึก</p>
+            <p className="text-[13px] font-semibold text-slate-800">{recorder?.name ?? "…"}</p>
+          </div>
+          {recorder?.email ? (
+            <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+              <p className="text-[10px] text-slate-500">Email ผู้บันทึก</p>
+              <p className="text-[13px] font-semibold text-slate-800">{recorder.email}</p>
+            </div>
+          ) : recorder ? (
+            <div>
+              <label className={labelCls}>Email ผู้บันทึก</label>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" placeholder="ยังไม่มีในระบบ — กรอกครั้งแรก ระบบจะจำไว้" className={inputCls} />
+            </div>
+          ) : null}
+        </Section>
+
+        <Section no="4" title="ข้อมูลลูกค้า">
+          <div>
+            <label className={labelCls}>ชื่อ-นามสกุลลูกค้า</label>
+            <input value={customer} onChange={(e) => setCustomer(e.target.value)} maxLength={120} className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelCls}>เบอร์โทร</label>
+              <input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>จังหวัดหน้างาน</label>
+              <input value={province} onChange={(e) => setProvince(e.target.value)} maxLength={60} className={inputCls} />
+            </div>
+          </div>
+        </Section>
+
+        <Section no="5" title="ประเภทลูกค้า">
+          <Chips options={opt(CUST_TYPES)} value={custType} onChange={setCustType} />
+          {custType === "อื่นๆ" && <input value={custOther} onChange={(e) => setCustOther(e.target.value)} placeholder="ระบุ" maxLength={100} className={inputCls} />}
+        </Section>
+        <Section no="6" title="ประเภทงาน"><Chips options={opt(JOB_TYPES)} value={jobType} onChange={setJobType} /></Section>
+        <Section no="7" title="ประเภทอาคาร"><Chips options={opt(BUILDING_TYPES)} value={building} onChange={setBuilding} /></Section>
+        <Section no="8" title="ความต้องการของลูกค้า">
+          <Chips options={NEEDS} value={need} onChange={setNeed} />
+          {need && <p className="text-[11px] text-slate-500">ห้องแบบต้องส่งภายใน <b>{SLA_DAYS(need)} วันทำการ</b> (ไม่นับเสาร์-อาทิตย์และวันหยุด)</p>}
+        </Section>
+
+        <Section no="9" title={`จุดที่ต้องการทำ BOQ (${points.length} จุด)`} hint="เลขจุดให้ตรงกับเลขที่เขียนบนรูปข้อ 10">
+          {points.map((p, i) => {
+            const unit = unitOf(p.code);
+            const qty = unit === "area" ? num(p.width) * num(p.length) : num(p.length);
+            return (
+              <div key={p.key} className="rounded-2xl border-2 border-slate-200 p-3 space-y-3 bg-white">
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-slate-900 text-white text-[13px] font-bold grid place-items-center">{i + 1}</span>
+                  <p className="text-[13px] font-bold text-slate-800">จุดที่ {i + 1}</p>
+                  {points.length > 1 && (
+                    <button type="button" onClick={() => setPoints((a) => a.filter((_, j) => j !== i))} className="ml-auto text-slate-400 hover:text-red-600" aria-label="ลบจุด">
+                      <Icon name="delete" style={{ fontSize: 20 }} />
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label className={labelCls}>สินค้า</label>
+                  <ProductPicker products={products} value={p.code} onPick={(code) => setPoint(i, { code, length: "", width: "" })} />
+                </div>
+                {unit && (
+                  <div>
+                    <label className={labelCls}>
+                      พื้นที่งาน · <span className="text-[#d32029]">{unit === "m" ? "เมตร (ความยาว)" : "กว้าง × ยาว (เมตร)"}</span>{" "}
+                      <span className="font-normal text-slate-400">(ตามสินค้า)</span>
+                    </label>
+                    {unit === "area" ? (
+                      <div className="flex items-center gap-2">
+                        <input inputMode="decimal" value={p.width} onChange={(e) => setPoint(i, { width: e.target.value })} placeholder="กว้าง (ม.)" className={inputCls} />
+                        <span className="text-slate-400">×</span>
+                        <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ยาว (ม.)" className={inputCls} />
+                      </div>
+                    ) : (
+                      <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ความยาวรวม (ม.)" className={inputCls} />
+                    )}
+                    {qty > 0 && <p className="text-[12px] text-emerald-700 font-semibold mt-1.5">= {fmtNum(qty)} {unit === "area" ? "ตร.ม." : "ม."}</p>}
+                  </div>
+                )}
+                <div>
+                  <label className={labelCls}>รายละเอียด (ถ้ามี)</label>
+                  <input value={p.detail} onChange={(e) => setPoint(i, { detail: e.target.value })} maxLength={300} placeholder="เช่น สี Warm Grey, ผิว Smooth, ติดตั้งแนวตั้ง" className={inputCls} />
+                </div>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setPoints((a) => [...a, { key: Date.now(), code: "", length: "", width: "", detail: "" }])}
+            className="w-full py-2.5 rounded-xl border-2 border-dashed border-[#d32029]/40 text-[#d32029] text-[13px] font-bold"
+          >
+            + เพิ่มจุด
+          </button>
+        </Section>
+
+        <Section no="10" title="รูปจุดที่ใช้สินค้า" hint="ใส่เลขจุดบนรูปให้ตรงกับข้อ 9">
+          <FileUploader kind="photo" label="แนบรูป / ถ่ายรูป" hint="หลายรูปได้ · ระบบย่อรูปก่อนส่ง" accept="image/*" files={photos} onChange={setPhotos} onBusy={onBusy} />
+        </Section>
+        <Section no="11" title="แบบแปลนพื้นที่">
+          <FileUploader kind="plan" label="แนบแบบแปลน" hint="รูปหรือ PDF" accept="image/*,application/pdf" files={plans} onChange={setPlans} onBusy={onBusy} />
+        </Section>
+        <Section title="แบบเดิมจากลูกค้า (ถ้ามี)" hint="กรณีลูกค้ามีแบบอยู่แล้วแต่ต้องการให้ห้องแบบออกแบบใหม่">
+          <FileUploader kind="old_design" label="แนบแบบเดิมของลูกค้า" hint="รูป / PDF" accept="image/*,application/pdf" files={olds} onChange={setOlds} onBusy={onBusy} />
+        </Section>
+        <Section no="12" title="งบประมาณของลูกค้า (บาท)">
+          <input
+            inputMode="numeric"
+            value={budget}
+            onChange={(e) => {
+              const n = e.target.value.replace(/[^\d]/g, "");
+              setBudget(n ? Number(n).toLocaleString("th-TH") : "");
+            }}
+            placeholder="เช่น 150,000"
+            className={cn(inputCls, "text-[16px] font-semibold")}
+          />
+        </Section>
+
+        <Section title="ข้อมูลเพิ่มเติม">
+          <div>
+            <label className={labelCls}>วันที่ต้องการรับ BOQ / วันนัดลูกค้า</label>
+            <input type="date" value={wantDate} onChange={(e) => setWantDate(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>หมายเหตุถึงห้องแบบ</label>
+            <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} placeholder="เช่น ติดตั้งแนวตั้ง เข้าโครงเหล็กหน้างาน" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>เลข Opportunity (CRM) ถ้ามี</label>
+            <input value={opNo} onChange={(e) => setOpNo(e.target.value)} maxLength={40} placeholder="OP2026…" className={inputCls} />
+          </div>
+        </Section>
+
+        {tried && missing.length > 0 && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-[12px] text-red-700">ยังขาด: {missing.join(", ")}</div>}
+        {saveErr && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-[12px] text-red-700">{saveErr}</div>}
+        <div className="flex gap-2">
+          <button type="button" onClick={() => router.push("/app/boq")} className={cn(btn, "bg-white border border-slate-200 text-slate-600")}>ยกเลิก</button>
+          <button type="button" onClick={submit} disabled={saving || busy > 0} className={cn(btn, "flex-1 bg-[#d32029] text-white")}>
+            {saving ? "กำลังส่ง..." : busy > 0 ? "รออัปโหลดไฟล์..." : "ส่งคำขอให้ห้องแบบ"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}

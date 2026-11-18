@@ -3,6 +3,7 @@
 //   test.coach    -> Coach เนม (SR0239)
 //   test.areahead -> หัวหน้า Area (เห็นทุกร้านที่มี Area ดูแล ไม่ต้องผูก rep)
 //   test.se       -> พนักงานขาย SE อั๋น (SR0067) ร้าน 5100895 — ร้านมาจาก sale_reps ตอน login
+//   test.designer / test.designer2 -> ห้องแบบ (BOQ DECAAR) ; test.marketing -> Marketing ดูอย่างเดียว
 //   test.he       -> ร้าน HE 5100895 (บ.สมาร์ท โฮมโปรดักส์) ; test.scg -> ร้าน SCG Home 5102653 (บุญถาวร จันทบุรี)
 //   บัญชีร้านแบบทดสอบไม่นับใน "1 บัญชีต่อร้าน" (unique index ยกเว้น is_test) -> ร้านยังมีบัญชีจริงได้ตามปกติ
 // ใช้: node scripts/provision-test-accounts.mjs          (dry-run)
@@ -28,6 +29,9 @@ const ACCOUNTS = [
   { username: "test.he", role: "dealer", rep: null, dealer: "5100895", label: "ร้าน Housing Expert" },
   { username: "test.scg", role: "dealer", rep: null, dealer: "5102653", label: "ร้าน SCG Home" },
   { username: "test.se", role: "sales", rep: "SR0067", label: "พนักงานขาย SE" },
+  { username: "test.designer", role: "designer", rep: null, label: "ห้องแบบ" },
+  { username: "test.designer2", role: "designer", rep: null, label: "ห้องแบบ คนที่ 2" },
+  { username: "test.marketing", role: "marketing", rep: null, label: "Marketing" },
 ];
 
 function tempPassword() {
@@ -80,7 +84,7 @@ for (const acc of ACCOUNTS.filter((a) => !ONLY || a.username === ONLY)) {
     if (!existing) await sb.auth.admin.deleteUser(userId); // ไม่ให้เหลือ auth user ค้าง
     throw pErr;
   }
-  out.push({ "บัญชี": acc.label, "ผูกกับ": repName ?? "ทุกร้านที่มี Area ดูแล", "ชื่อผู้ใช้": acc.username, "รหัสผ่านชั่วคราว": password });
+  out.push({ "บัญชี": acc.label, "ผูกกับ": repName ?? (acc.role === "area_head" ? "ทุกร้านที่มี Area ดูแล" : "-"), "ชื่อผู้ใช้": acc.username, "รหัสผ่านชั่วคราว": password });
 }
 
 if (APPLY && out.length) {

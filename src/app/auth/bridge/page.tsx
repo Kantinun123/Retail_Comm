@@ -47,6 +47,10 @@ export default function AuthBridgePage() {
           doLogin({ role: "dealer", dealerCode: json.me.dealerCode });
           setMustChangePassword(!!json.me.mustChangePassword);
           router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/home");
+        } else if (role === "designer" || role === "marketing") {
+          doLogin({ role });
+          setMustChangePassword(!!json.me.mustChangePassword);
+          router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/boq");
         } else if (role === "sales" && json.me.repCode && json.me.dealerCode) {
           doLogin({ role: "sales", dealerCode: json.me.dealerCode, repCode: json.me.repCode, repName: name ?? undefined });
           setMustChangePassword(!!json.me.mustChangePassword);

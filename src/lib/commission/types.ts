@@ -1,6 +1,6 @@
 /* Shared domain types for the commission portal */
 
-export type Role = "dealer" | "sales" | "admin" | "area";
+export type Role = "dealer" | "sales" | "admin" | "area" | "designer" | "marketing";
 
 export type GroupKey = "solution" | "product";
 

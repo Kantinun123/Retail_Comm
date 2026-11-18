@@ -133,6 +133,13 @@ export async function loginWithEmail(
     return { ok: true, role: "sales", mustChangePassword: !!profile.must_change_password };
   }
 
+  // ห้องแบบ / Marketing (BOQ DECAAR): ไม่ผูกร้าน
+  if (profile.role === "designer" || profile.role === "marketing") {
+    doLogin({ role: profile.role });
+    setMustChangePassword(!!profile.must_change_password);
+    return { ok: true, role: profile.role, mustChangePassword: !!profile.must_change_password };
+  }
+
   // identity bridge: เขียนลง sessionStorage keys เดิม
   const role = toSessionRole(profile.role);
   doLogin({
@@ -147,6 +154,7 @@ export async function loginWithEmail(
 
 /** หน้าแรกหลัง login ตาม role ของ session */
 export function homeForRole(role: Role | undefined | null): string {
+  if (role === "designer" || role === "marketing") return "/app/boq";
   return role === "sales" ? "/app/home-staff" : role === "area" ? AREA_HOME : "/app/home";
 }
 
@@ -188,6 +196,9 @@ export async function restoreSession(next?: string | null): Promise<string | nul
   } else if (me.role === "dealer" && me.dealerCode) {
     role = "dealer";
     doLogin({ role, dealerCode: me.dealerCode });
+  } else if (me.role === "designer" || me.role === "marketing") {
+    role = me.role;
+    doLogin({ role });
   } else if (me.role === "sales" && me.repCode && me.dealerCode) {
     role = "sales";
     doLogin({ role, dealerCode: me.dealerCode, repCode: me.repCode, repName: me.name ?? undefined });

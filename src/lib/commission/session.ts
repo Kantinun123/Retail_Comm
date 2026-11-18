@@ -427,6 +427,7 @@ export function useSession(): {
 export function useHomeHref(): string {
   const { session } = useSession();
   if (session && session.isSales) return "/app/home-staff";
+  if (session && (session.role === "designer" || session.role === "marketing")) return "/app/boq";
   // Area: มุมมองพนักงาน -> หน้าหลักพนักงาน ; เลือกร้านแล้ว -> หน้าหลักของร้านนั้น ; ยังไม่เลือก -> หน้าหลัก (การ์ดเลือกเรื่อง)
   if (session && session.isArea) return session.areaViewRep ? "/app/home-staff" : session.areaViewDealer ? "/app/home" : AREA_HOME;
   // admin ใช้ Hub ร่วมกับร้านค้า (เวอร์ชันทุกร้าน)

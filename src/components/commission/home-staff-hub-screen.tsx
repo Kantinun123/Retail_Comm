@@ -1,4 +1,5 @@
 "use client";
+import { BoqStaffCard } from "./boq/boq-staff-card";
 
 /* =============================================================
    หน้าหลัก (Hub) พนักงานขาย — เห็นเฉพาะผลประโยชน์/ยอดขายของตัวเอง (scope ด้วย repCode)
@@ -264,6 +265,9 @@ export function HomeStaffHubScreen() {
         )}
 
         <ProfileCard />
+
+        {/* BOQ DECAAR: เฉพาะพนักงานที่ login เอง (ไม่แสดงในมุมมองพนักงานของ admin/Area) */}
+        {session.isSales && <BoqStaffCard />}
 
         <PeriodBar pick={pick} onChange={setPick} years={years} completeness={completeness} />
 
