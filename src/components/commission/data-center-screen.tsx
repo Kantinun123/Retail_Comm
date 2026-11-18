@@ -380,7 +380,7 @@ export function DataCenterScreen() {
   useEffect(() => {
     if (!ready || !isAdmin) return;
     let cancelled = false;
-    fetchDataCenter()
+    fetchDataCenter(version > 0)
       .then((r) => !cancelled && setState(r.ok ? { v: version, data: r.data, error: null, status: 200 } : { v: version, data: null, error: r.error, status: r.status }))
       .catch((e) => !cancelled && setState({ v: version, data: null, error: String(e), status: 0 }));
     return () => {

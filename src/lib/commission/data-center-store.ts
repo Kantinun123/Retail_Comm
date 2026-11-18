@@ -59,8 +59,9 @@ function run(r: Record<string, unknown> | null | undefined): DcRun | null {
 }
 
 /** null = ไม่ใช่ admin / ยังไม่ล็อกอินจริง ; throw = เครือข่ายผิดพลาด */
-export async function fetchDataCenter(): Promise<{ ok: true; data: DcSummary } | { ok: false; status: number; error: string }> {
-  const res = await fetch("/api/admin/data-center", { cache: "no-store" });
+/** live = true (กดโหลดใหม่): ลองคำนวณสด ; ไม่งั้นอ่านค่าที่เก็บไว้ (คำนวณทุก 5 นาที) */
+export async function fetchDataCenter(live = false): Promise<{ ok: true; data: DcSummary } | { ok: false; status: number; error: string }> {
+  const res = await fetch(`/api/admin/data-center${live ? "?live=1" : ""}`, { cache: "no-store" });
   const raw = (await res.json()) as Record<string, unknown>;
   if (!res.ok || !raw.ok) return { ok: false, status: res.status, error: String(raw.error ?? "error") };
   return {
