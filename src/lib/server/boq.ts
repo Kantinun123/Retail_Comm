@@ -90,16 +90,27 @@ export async function designerIds(sb: Sb, isTest: boolean): Promise<string[]> {
   return (data ?? []).map((r) => r.id as string);
 }
 
-/** บัญชีพนักงานขายเจ้าของคำขอ */
-export async function salesUserIds(sb: Sb, repCode: string): Promise<string[]> {
-  const { data } = await sb.from("profiles").select("id").eq("role", "sales").eq("rep_code", repCode).eq("status", "approved");
+/** บัญชีพนักงานขายเจ้าของคำขอ (บัญชีทดสอบที่ผูกคนเดียวกันแยกกลุ่มด้วย is_test) */
+export async function salesUserIds(sb: Sb, repCode: string, isTest: boolean): Promise<string[]> {
+  const { data } = await sb.from("profiles").select("id").eq("role", "sales").eq("rep_code", repCode).eq("status", "approved").eq("is_test", isTest);
   return (data ?? []).map((r) => r.id as string);
 }
+
+export async function marketingIds(sb: Sb, isTest: boolean): Promise<string[]> {
+  const { data } = await sb.from("profiles").select("id").eq("role", "marketing").eq("status", "approved").eq("is_test", isTest);
+  return (data ?? []).map((r) => r.id as string);
+}
+
+/** Win ยอดใหญ่ -> แจ้ง Marketing (บาท) */
+export const BIG_WIN = 300000;
+/** Loss ที่เสียให้ยี่ห้ออื่น -> แจ้ง Marketing */
+export const LOSS_TO_BRAND = ["price_other_brand", "stock_other_brand"];
 
 export async function notifyBoq(
   sb: Sb,
   req: { id: number; req_no: string; customer_name: string; rep_code: string; designer_id: string | null; is_test: boolean },
-  event: "new" | "claimed" | "submitted" | "revise" | "approved" | "released" | "cancelled"
+  event: "new" | "claimed" | "submitted" | "revise" | "approved" | "released" | "cancelled" | "win_big" | "loss_brand",
+  extra?: string
 ) {
   const who = `${req.req_no} · ${req.customer_name}`;
   const url = reqUrl(req.id);
@@ -108,15 +119,19 @@ export async function notifyBoq(
     case "released":
       return safePush(sb, await designerIds(sb, req.is_test), event === "new" ? "คำขอ BOQ DECAAR ใหม่" : "มีงาน BOQ ถูกปล่อยคืน", `${who} — รอห้องแบบรับงาน`, url);
     case "claimed":
-      return safePush(sb, await salesUserIds(sb, req.rep_code), "ห้องแบบรับงานแล้ว", who, url);
+      return safePush(sb, await salesUserIds(sb, req.rep_code, req.is_test), "ห้องแบบรับงานแล้ว", who, url);
     case "submitted":
-      return safePush(sb, await salesUserIds(sb, req.rep_code), "ห้องแบบส่ง BOQ แล้ว", `${who} — รอคุณตรวจ`, url);
+      return safePush(sb, await salesUserIds(sb, req.rep_code, req.is_test), "ห้องแบบส่ง BOQ แล้ว", `${who} — รอคุณตรวจ`, url);
     case "revise":
       return req.designer_id ? safePush(sb, [req.designer_id], "พนักงานขอแก้ไข BOQ", who, url) : undefined;
     case "approved":
       return req.designer_id ? safePush(sb, [req.designer_id], "BOQ ผ่านแล้ว · ปิดงานห้องแบบ", who, url) : undefined;
     case "cancelled":
       return req.designer_id ? safePush(sb, [req.designer_id], "คำขอ BOQ ถูกยกเลิก", who, url) : undefined;
+    case "win_big":
+      return safePush(sb, await marketingIds(sb, req.is_test), "Win ยอดใหญ่ · BOQ DECAAR", `${who} — ${extra ?? ""}`, url);
+    case "loss_brand":
+      return safePush(sb, await marketingIds(sb, req.is_test), "Loss ให้ยี่ห้ออื่น · BOQ DECAAR", `${who} — ${extra ?? ""}`, url);
   }
 }
 

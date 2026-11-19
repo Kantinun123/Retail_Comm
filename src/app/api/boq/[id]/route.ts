@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, type AuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
-import { BOQ_BUCKET, actorName, addEvent, boqRoleOf, canViewRequest, notifyBoq } from "@/lib/server/boq";
+import { BIG_WIN, BOQ_BUCKET, LOSS_TO_BRAND, actorName, addEvent, boqRoleOf, canViewRequest, notifyBoq } from "@/lib/server/boq";
 
 type Sb = ReturnType<typeof createServiceClient>;
 type Params = { params: Promise<{ id: string }> };
@@ -230,6 +230,7 @@ export async function POST(req: Request, { params }: Params) {
       if (!(amount > 0) || amount > 1e10) return bad("กรุณาใส่ยอดปิดจริง");
       if (!(await move(["quoted"], { status: "win", final_amount: amount, closed_at: now, loss_reason: null, result_note: text || null }))) return forbid();
       await addEvent(sb, id, ctx, name, "win", `Win ยอดปิดจริง ${baht(amount)}`, "ok");
+      if (amount >= BIG_WIN) await notifyBoq(sb, info, "win_big", `ยอดปิดจริง ${baht(amount)}`);
       break;
     }
     case "loss": {
@@ -240,6 +241,7 @@ export async function POST(req: Request, { params }: Params) {
       if (reason === "other" && !text) return bad("กรุณาระบุเหตุผล");
       if (!(await move(["quoted"], { status: "loss", loss_reason: reason, result_note: text || null, closed_at: now, final_amount: null }))) return forbid();
       await addEvent(sb, id, ctx, name, "loss", reason === "other" ? `Lost - ${text}` : `${lr.label}${text ? ` — ${text}` : ""}`, "bad");
+      if (LOSS_TO_BRAND.includes(reason)) await notifyBoq(sb, info, "loss_brand", `${lr.label}${text ? ` (${text})` : ""}`);
       break;
     }
     default:

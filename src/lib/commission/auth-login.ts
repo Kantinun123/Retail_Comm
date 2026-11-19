@@ -154,7 +154,8 @@ export async function loginWithEmail(
 
 /** หน้าแรกหลัง login ตาม role ของ session */
 export function homeForRole(role: Role | undefined | null): string {
-  if (role === "designer" || role === "marketing") return "/app/boq";
+  if (role === "marketing") return "/app/boq/overview";
+  if (role === "designer") return "/app/boq";
   return role === "sales" ? "/app/home-staff" : role === "area" ? AREA_HOME : "/app/home";
 }
 

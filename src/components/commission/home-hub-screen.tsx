@@ -31,6 +31,7 @@ import { LyText, TargetBar, TargetProgress } from "./target-progress";
 import { pctLabel, tgTone } from "@/lib/commission/targets-store";
 import { yearsOf } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
+import { BoqSummaryCard } from "./boq/boq-summary-card";
 import { EmployeeRequestCard } from "./employee-request-card";
 import { AttentionList, MonthOverview, PerformanceCards, buildAttention, perfStatus, useLatestEvalFails } from "./home-performance";
 import { PeriodBar, defaultPick, toView, type PeriodPick } from "./hub-period";
@@ -717,6 +718,11 @@ export function HomeHubScreen() {
               </div>
             )}
           </section>
+        )}
+
+        {/* BOQ DECAAR ของร้าน (ต่อท้ายหน้าเดิม ไม่เปลี่ยนส่วนอื่น) — admin ดูทุกร้านที่หน้าหลัก admin */}
+        {!adminAllStores && dealerCode && (
+          <BoqSummaryCard dealer={dealerCode} title="BOQ DECAAR ของร้าน" sub="งานที่พนักงานในร้านขอ (ดูอย่างเดียว) · แตะเพื่อดูรายละเอียด" rowsBy="reps" />
         )}
 
         <p className="text-[11px] text-slate-400 text-center">

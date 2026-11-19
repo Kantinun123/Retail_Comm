@@ -137,6 +137,12 @@ export function BoqListScreen() {
     <>
       <BoqHeader title={title} back={role === "sales" ? "/app/home-staff" : role === "designer" || role === "marketing" ? undefined : "/app/home"} />
       <div className="space-y-3 pb-4">
+        {data && role !== "sales" && role !== "designer" && (
+          <div className="flex gap-2">
+            <Link href="/app/boq/overview" className="flex-1 text-center py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-[12px] font-bold">ภาพรวม</Link>
+            <span className="flex-1 text-center py-2 rounded-xl bg-slate-900 text-white text-[12px] font-bold">รายการงาน</span>
+          </div>
+        )}
         {data && !data.enabled && (
           <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-800">ระบบขอ BOQ DECAAR ยังไม่เปิดใช้งาน</p>
         )}

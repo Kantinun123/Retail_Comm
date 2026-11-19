@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
+import { BoqSummaryCard } from "./boq/boq-summary-card";
 import { ProfileCard } from "./profile-card";
 import { doLogout, useSession, enterStoreView, enterStaffView } from "@/lib/commission/session";
 import { getDealers } from "@/lib/commission/logic";
@@ -248,6 +249,7 @@ export function AdminHomeScreen() {
           </div>
         </section>
 
+        <BoqSummaryCard title="BOQ DECAAR" sub="ทุกร้าน · แตะเพื่อดูภาพรวม / รายการงาน / วันหยุด" showAttention rowsBy="stores" />
         {/* กลุ่ม: จัดการระบบ */}
         <section>
           <h3 className="text-[12px] font-bold text-[#5b21b6] mb-2 px-1">จัดการระบบ</h3>

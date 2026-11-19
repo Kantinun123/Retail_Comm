@@ -2,6 +2,8 @@
 /* BOQ สินค้า DECAAR — ตัวเรียก API ฝั่งหน้าจอ + ค่าคงที่ที่ใช้แสดงผล */
 import { createClient } from "@/lib/supabase/client";
 import { fileToResizedBlob } from "./image";
+import type { BoqSummary } from "@/lib/server/boq-summary";
+export type { BoqSummary };
 
 export type BoqStatus = "waiting" | "working" | "submitted" | "revise" | "boq_ok" | "quoted" | "win" | "loss" | "cancelled";
 export type BoqRole = "sales" | "designer" | "marketing" | "admin" | "viewer";
@@ -124,6 +126,14 @@ export const boqAction = (id: number, body: Record<string, unknown>) =>
   getJson<{ ok: true }>(`/api/boq/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 export const createBoq = (body: Record<string, unknown>) =>
   getJson<{ id: number; reqNo: string }>("/api/boq", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+export interface BoqFilterInput { year?: number | "all"; month?: number | null; model?: string | null; region?: string | null; area?: string | null; dealer?: string | null }
+export const boqFilterQuery = (f: BoqFilterInput) => {
+  const sp = new URLSearchParams();
+  Object.entries(f).forEach(([k, v]) => v != null && v !== "" && sp.set(k, String(v)));
+  return sp.toString();
+};
+export const fetchBoqSummary = (f: BoqFilterInput = {}) => getJson<{ ok: true } & BoqSummary>(`/api/boq/summary?${boqFilterQuery(f)}`);
+export const boqExportUrl = (f: BoqFilterInput) => `/api/boq/export?${boqFilterQuery(f)}`;
 export const fileUrl = (id: number, download = false) => `/api/boq/file?id=${id}${download ? "&download=1" : ""}`;
 
 export interface UploadedFile { path: string; name: string; size: number; mime: string; kind: BoqFileKind }
