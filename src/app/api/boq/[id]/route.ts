@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, type AuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
-import { BIG_WIN, BOQ_BUCKET, LOSS_TO_BRAND, actorName, addEvent, boqRoleOf, canViewRequest, notifyBoq } from "@/lib/server/boq";
+import { BIG_WIN, BOQ_BUCKET, LOSS_TO_BRAND, actorName, addEvent, boqRoleOf, canViewRequest, diffPoints, dueAfterBusinessDays, loadHolidays, notifyBoq, slaDays, validatePoints, type PointIn, type PointRow } from "@/lib/server/boq";
 
 type Sb = ReturnType<typeof createServiceClient>;
 type Params = { params: Promise<{ id: string }> };
@@ -24,6 +24,7 @@ function capsFor(ctx: AuthContext, r: Record<string, unknown>) {
     release: mineDesigner && (st === "working" || st === "revise"),
     submit: mineDesigner && (st === "working" || st === "revise"),
     review: mineSales && st === "submitted",
+    edit: mineSales && st === "waiting",
     quote: mineSales && (st === "boq_ok" || st === "quoted"),
     result: mineSales && st === "quoted",
     cancel: mineSales && ["waiting", "working", "revise", "submitted"].includes(st),
@@ -119,6 +120,7 @@ interface ActionBody {
   quoteNo?: string;
   amount?: number;
   reason?: string;
+  points?: PointIn[];
 }
 
 export async function POST(req: Request, { params }: Params) {
@@ -187,12 +189,54 @@ export async function POST(req: Request, { params }: Params) {
       await notifyBoq(sb, info, "submitted");
       break;
     }
-    case "revise": {
-      if (!caps.review) return forbid();
-      if (!text) return bad("กรุณาใส่รายละเอียดที่ต้องแก้");
-      if (!(await move(["submitted"], { status: "revise" }))) return forbid();
-      await addEvent(sb, id, ctx, name, "revise", `ขอแก้ไข: ${text}`, "warn");
-      await notifyBoq(sb, info, "revise");
+    case "revise":
+    case "edit": {
+      // revise = แจ้งแก้หลังห้องแบบส่ง BOQ (ข้อความบังคับ + กำหนดส่งใหม่ตาม SLA เดิม)
+      // edit   = พนักงานแก้คำขอเองก่อนห้องแบบรับงาน
+      const isRevise = b.action === "revise";
+      if (isRevise ? !caps.review : !caps.edit) return forbid();
+      if (isRevise && !text) return bad("กรุณาใส่รายละเอียดที่ต้องแก้");
+      // จุดที่ทำ BOQ (ถ้าส่งมา = แทนชุดเดิม ; เก็บชุดเดิมไว้ใน event)
+      let changes: string[] = [];
+      let snapshot: { before: PointRow[]; after: PointRow[] } | null = null;
+      if (b.points) {
+        const v = await validatePoints(sb, b.points);
+        if (!v.ok) return bad(v.error);
+        const { data: old } = await sb.from("boq_points").select("no, product_code, length, width, detail").eq("request_id", id).order("no");
+        const before = ((old ?? []) as PointRow[]).map((p) => ({ ...p, length: Number(p.length), width: p.width == null ? null : Number(p.width) }));
+        changes = await diffPoints(sb, before, v.points);
+        if (changes.length) snapshot = { before, after: v.points };
+      }
+      // ไฟล์แนบ: ต้องอัปโหลดผ่าน /api/boq/upload (kind revise) ของคำขอนี้
+      const prefix = `req/${id}/revise/`;
+      const files = (b.files ?? []).slice(0, 30).filter((f) => f.kind === "revise" && typeof f.path === "string" && f.path.startsWith(prefix) && !f.path.includes(".."));
+      for (const f of files) {
+        const { error } = await sb.storage.from(BOQ_BUCKET).createSignedUrl(f.path!, 30);
+        if (error) return bad(`ไฟล์ ${f.name ?? ""} อัปโหลดไม่สำเร็จ ลองแนบใหม่`);
+      }
+      if (!isRevise && !text && !changes.length && !files.length) return bad("ยังไม่มีอะไรเปลี่ยน");
+      if (isRevise) {
+        const due = dueAfterBusinessDays(new Date(), slaDays(r.need as string), await loadHolidays(sb));
+        if (!(await move(["submitted"], { status: "revise", due_at: due.toISOString() }))) return forbid();
+      } else if (!(await move(["waiting"], {}))) return forbid();
+      if (snapshot) {
+        await sb.from("boq_points").delete().eq("request_id", id);
+        await sb.from("boq_points").insert(snapshot.after.map((p) => ({ ...p, request_id: id })));
+      }
+      const { data: last } = await sb.from("boq_versions").select("v").eq("request_id", id).order("v", { ascending: false }).limit(1);
+      const round = isRevise ? ((last?.[0]?.v as number | undefined) ?? 0) : 0;
+      if (files.length) {
+        await sb.from("boq_files").insert(
+          files.map((f) => ({ request_id: id, kind: "revise", version: round, path: f.path, name: String(f.name ?? "file").slice(0, 200), size: Number(f.size) || null, mime: f.mime ? String(f.mime).slice(0, 100) : null, uploaded_by: ctx.userId }))
+        );
+      }
+      const lines = [
+        isRevise ? `ขอแก้ไข: ${text}` : `แก้ไขคำขอ${text ? `: ${text}` : ""}`,
+        ...changes,
+        ...(files.length ? [`แนบไฟล์เพิ่ม ${files.length} ไฟล์`] : []),
+      ];
+      await addEvent(sb, id, ctx, name, isRevise ? "revise" : "edited", lines.join("\n"), "warn", { round, changes, files: files.map((f) => f.name), ...(snapshot ?? {}) });
+      if (isRevise) await notifyBoq(sb, info, "revise");
       break;
     }
     case "approve": {

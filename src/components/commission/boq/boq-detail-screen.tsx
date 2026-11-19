@@ -5,10 +5,132 @@ import { Icon } from "../icon";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/commission/session";
 import {
-  DESIGNER_PHASE, baht, boqAction, dateTh, fetchBoq, fileUrl, needLabel, pointText, slaBadge,
-  type BoqCaps, type BoqDetail, type BoqFile, type BoqRole, type LossReason, type UploadedFile,
+  DESIGNER_PHASE, baht, boqAction, dateTh, fetchBoq, fetchBoqProducts, fileUrl, fmtNum, needLabel, pointText, slaBadge,
+  type BoqCaps, type BoqDetail, type BoqFile, type BoqProduct, type BoqRole, type LossReason, type UploadedFile,
 } from "@/lib/commission/boq-store";
 import { BoqHeader, FileUploader, Row, StatusPill, Stepper, btn, card, inputCls, labelCls } from "./boq-shared";
+import { ProductPicker } from "./boq-form-screen";
+
+type EditPoint = { key: number; code: string; length: string; width: string; detail: string };
+const numOf = (s: string) => {
+  const n = parseFloat(s.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** แจ้งแก้ / แก้คำขอ: ข้อความ + แนบไฟล์ + แก้จุดที่ทำ BOQ (ไม่บังคับ) */
+function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revise" | "edit"; onCancel: () => void; onDone: () => void }) {
+  const [text, setText] = useState("");
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [busy, setBusy] = useState(0);
+  const [editPts, setEditPts] = useState(false);
+  const [products, setProducts] = useState<BoqProduct[] | null>(null);
+  const [points, setPoints] = useState<EditPoint[]>(() =>
+    j.points.map((p, i) => ({ key: i + 1, code: p.code, length: p.length == null ? "" : String(p.length), width: p.width == null ? "" : String(p.width), detail: p.detail ?? "" }))
+  );
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const onBusy = (b: boolean) => setBusy((n) => Math.max(0, n + (b ? 1 : -1)));
+  const openPoints = () => {
+    setEditPts(true);
+    if (!products) fetchBoqProducts().then((d) => setProducts(d.products)).catch(() => setErr("โหลดรายการสินค้าไม่สำเร็จ"));
+  };
+  const list = products ?? [];
+  const unitOf = (code: string) => list.find((p) => p.code === code)?.unit ?? j.points.find((p) => p.code === code)?.product?.unit;
+  const setPoint = (i: number, patch: Partial<EditPoint>) => setPoints((a) => a.map((x, k) => (k === i ? { ...x, ...patch } : x)));
+  const badPoint = editPts && points.some((p) => !p.code || !(numOf(p.length) > 0) || (unitOf(p.code) === "area" && !(numOf(p.width) > 0)));
+  const nothing = mode === "edit" && !text.trim() && !files.length && !editPts;
+  const submit = async () => {
+    setSaving(true);
+    setErr("");
+    try {
+      await boqAction(j.id, {
+        action: mode,
+        text,
+        files,
+        points: editPts ? points.map((p) => ({ productCode: p.code, length: numOf(p.length), width: unitOf(p.code) === "area" ? numOf(p.width) : undefined, detail: p.detail })) : undefined,
+      });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "ส่งไม่สำเร็จ");
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className={labelCls}>{mode === "revise" ? "รายละเอียดที่ต้องแก้" : "หมายเหตุการแก้ไข (ถ้ามี)"}</label>
+        <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder={mode === "revise" ? "เช่น จุดที่ 2 เปลี่ยนเป็นสีวอร์มเกรย์" : "เช่น ลูกค้าเปลี่ยนขนาดระเบียง"} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>แนบไฟล์เพิ่ม (ถ้ามี)</label>
+        <FileUploader kind="revise" requestId={j.id} label="แนบรูป / PDF" hint="รูปหน้างานใหม่ แบบที่ลูกค้าแก้ ฯลฯ · หลายไฟล์ได้" accept="image/*,application/pdf" files={files} onChange={setFiles} onBusy={onBusy} />
+      </div>
+      {!editPts ? (
+        <button type="button" onClick={openPoints} className="w-full py-2.5 rounded-xl border-2 border-dashed border-sky-300 text-sky-700 text-[12.5px] font-bold flex items-center justify-center gap-1.5">
+          <Icon name="edit_note" style={{ fontSize: 18 }} /> แก้ไขจุดที่ทำ BOQ (สินค้า / ขนาด)
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] font-bold text-slate-800">แก้ไขจุดที่ทำ BOQ ({points.length} จุด)</p>
+            <button type="button" onClick={() => setEditPts(false)} className="text-[11px] text-slate-500 underline">ไม่แก้จุด</button>
+          </div>
+          {!products && <p className="text-[11px] text-slate-400">กำลังโหลดรายการสินค้า...</p>}
+          {products && points.map((p, i) => {
+            const unit = unitOf(p.code);
+            const qty = unit === "area" ? numOf(p.width) * numOf(p.length) : numOf(p.length);
+            return (
+              <div key={p.key} className="rounded-2xl border-2 border-slate-200 p-3 space-y-2.5 bg-white">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-full bg-slate-900 text-white text-[12px] font-bold grid place-items-center">{i + 1}</span>
+                  <p className="text-[12.5px] font-bold text-slate-800">จุดที่ {i + 1}</p>
+                  {points.length > 1 && (
+                    <button type="button" onClick={() => setPoints((a) => a.filter((_, k) => k !== i))} className="ml-auto text-slate-400 hover:text-red-600" aria-label="ลบจุด">
+                      <Icon name="delete" style={{ fontSize: 19 }} />
+                    </button>
+                  )}
+                </div>
+                <ProductPicker products={list} value={p.code} onPick={(code) => setPoint(i, { code, length: "", width: "" })} />
+                {unit && (
+                  unit === "area" ? (
+                    <div className="flex items-center gap-2">
+                      <input inputMode="decimal" value={p.width} onChange={(e) => setPoint(i, { width: e.target.value })} placeholder="กว้าง (ม.)" className={inputCls} />
+                      <span className="text-slate-400">×</span>
+                      <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ยาว (ม.)" className={inputCls} />
+                    </div>
+                  ) : (
+                    <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ความยาวรวม (ม.)" className={inputCls} />
+                  )
+                )}
+                {qty > 0 && <p className="text-[11.5px] text-emerald-700 font-semibold">= {fmtNum(qty)} {unit === "area" ? "ตร.ม." : "ม."}</p>}
+                <input value={p.detail} onChange={(e) => setPoint(i, { detail: e.target.value })} maxLength={300} placeholder="รายละเอียด (ถ้ามี)" className={inputCls} />
+              </div>
+            );
+          })}
+          {products && (
+            <button type="button" onClick={() => setPoints((a) => [...a, { key: Date.now(), code: "", length: "", width: "", detail: "" }])} className="w-full py-2 rounded-xl border-2 border-dashed border-[#d32029]/40 text-[#d32029] text-[12.5px] font-bold">
+              + เพิ่มจุด
+            </button>
+          )}
+        </div>
+      )}
+      {mode === "revise" && <p className="text-[11px] text-slate-500">ส่งแล้วห้องแบบได้กำหนดส่งใหม่ {j.need === "boq_3d" ? 5 : 3} วันทำการ นับจากตอนนี้</p>}
+      {err && <p className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{err}</p>}
+      <div className="flex gap-2">
+        <button type="button" onClick={onCancel} className={cn(btn, "bg-white border border-slate-200 text-slate-600")}>กลับ</button>
+        <button
+          type="button"
+          disabled={saving || busy > 0 || (mode === "revise" && !text.trim()) || badPoint || nothing}
+          onClick={submit}
+          className={cn(btn, "flex-1 text-white", mode === "revise" ? "bg-orange-600" : "bg-[#d32029]")}
+        >
+          {saving ? "กำลังส่ง..." : busy > 0 ? "รออัปโหลดไฟล์..." : mode === "revise" ? "ส่งกลับให้ห้องแบบแก้" : "บันทึกการแก้ไข"}
+        </button>
+      </div>
+      {badPoint && <p className="text-[11px] text-red-600 text-center">กรุณาเลือกสินค้าและใส่ขนาดให้ครบทุกจุด</p>}
+    </div>
+  );
+}
 
 type Loaded = { role: BoqRole; caps: BoqCaps; lossReasons: LossReason[]; item: BoqDetail };
 
@@ -35,7 +157,7 @@ const toNum = (v: string) => Number(v.replace(/,/g, "")) || 0;
 
 function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
   const { item: j, caps, lossReasons, role } = d;
-  const [mode, setMode] = useState<"" | "revise" | "ok" | "win" | "loss" | "requote" | "release" | "cancel">("");
+  const [mode, setMode] = useState<"" | "revise" | "edit" | "ok" | "win" | "loss" | "requote" | "release" | "cancel">("");
   const [text, setText] = useState("");
   const [boqFiles, setBoqFiles] = useState<UploadedFile[]>([]);
   const [d3Files, setD3Files] = useState<UploadedFile[]>([]);
@@ -91,7 +213,16 @@ function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
       </>, "border-orange-300");
     }
     return box(j.status === "revise" ? `แก้ไข BOQ (รอบที่ ${j.versions.length + 1})` : "อัปโหลด BOQ", <>
-      {j.status === "revise" && lastRevise && <div className="rounded-xl bg-orange-50 border border-orange-200 p-2.5 text-[12px] text-orange-800">{lastRevise.text}</div>}
+      {j.status === "revise" && lastRevise && (
+        <div className="rounded-xl bg-orange-50 border border-orange-200 p-2.5 space-y-1.5">
+          <p className="text-[12px] text-orange-800 whitespace-pre-line">{lastRevise.text}</p>
+          {(() => {
+            const round = j.versions.at(-1)?.v ?? 0;
+            const rf = j.files.filter((f) => f.kind === "revise" && f.version === round);
+            return rf.length > 0 ? <div className="grid gap-1.5">{rf.map((f) => <FileLink key={f.id} f={f} />)}</div> : null;
+          })()}
+        </div>
+      )}
       <div>
         <label className={labelCls}>ไฟล์ BOQ</label>
         <FileUploader kind="boq" requestId={j.id} label="แนบไฟล์ BOQ" hint="Excel / PDF" accept=".xlsx,.xls,.pdf,application/pdf" files={boqFiles} onChange={setBoqFiles} onBusy={onBusy} />
@@ -133,10 +264,7 @@ function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
           <button type="button" onClick={() => setMode("cancel")} className="text-[12px] text-slate-500 underline">ยกเลิกคำขอ</button>
         </>
       )}
-      {mode === "revise" && <>
-        <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="รายละเอียดที่ต้องแก้ เช่น จุดที่ 2 เปลี่ยนเป็นสีวอร์มเกรย์" className={inputCls} />
-        <div className="flex gap-2">{back}<button type="button" disabled={saving || !text.trim()} onClick={() => run({ action: "revise", text })} className={cn(btn, "flex-1 bg-orange-600 text-white")}>ส่งกลับให้ห้องแบบแก้</button></div>
-      </>}
+      {mode === "revise" && <ChangeEditor j={j} mode="revise" onCancel={() => setMode("")} onDone={onDone} />}
       {mode === "ok" && <>
         <label className={labelCls}>ใช้ BOQ เวอร์ชันไหน</label>
         <div className="flex gap-2 flex-wrap">
@@ -155,8 +283,18 @@ function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
       <p className="text-[12px] text-slate-600">
         {j.status === "waiting" ? "ยังไม่มีห้องแบบรับงาน" : `${j.designerName ?? "ห้องแบบ"} กำลังทำ`} — กำหนดส่ง {dateTh(j.dueAt, true)}
       </p>
-      {mode === "cancel" ? <CancelBox text={text} setText={setText} back={back} saving={saving} run={run} /> : (
-        <button type="button" onClick={() => setMode("cancel")} className="text-[12px] text-slate-500 underline">ยกเลิกคำขอ</button>
+      {mode === "cancel" ? <CancelBox text={text} setText={setText} back={back} saving={saving} run={run} /> : mode === "edit" ? (
+        <ChangeEditor j={j} mode="edit" onCancel={() => setMode("")} onDone={onDone} />
+      ) : (
+        <div className="space-y-2">
+          {caps.edit && (
+            <button type="button" onClick={() => setMode("edit")} className={cn(btn, "w-full bg-white border border-sky-300 text-sky-700 flex items-center justify-center gap-1.5")}>
+              <Icon name="edit" style={{ fontSize: 17 }} /> แก้ไขคำขอ (ก่อนห้องแบบรับงาน)
+            </button>
+          )}
+          {!caps.edit && j.status !== "waiting" && <p className="text-[11px] text-slate-400">ห้องแบบกำลังทำงานจากข้อมูลชุดนี้ ถ้าต้องเปลี่ยน ให้แจ้งแก้ตอนห้องแบบส่ง BOQ แล้ว</p>}
+          <button type="button" onClick={() => setMode("cancel")} className="text-[12px] text-slate-500 underline">ยกเลิกคำขอ</button>
+        </div>
       )}
     </>, "border-slate-200");
   }
@@ -290,6 +428,7 @@ export function BoqDetailScreen({ id }: { id: number }) {
             { k: "photo" as const, t: "รูปจุดที่ใช้สินค้า" },
             { k: "plan" as const, t: "แบบแปลน" },
             { k: "old_design" as const, t: "แบบเดิมจากลูกค้า" },
+            { k: "revise" as const, t: "ไฟล์แนบเพิ่ม (ตอนแก้คำขอ / แจ้งแก้)" },
           ].map(({ k, t }) => byKind(k).length > 0 && (
             <div key={k} className="pt-1">
               <p className="text-[11px] text-slate-500 mb-1">{t}</p>
@@ -336,7 +475,7 @@ export function BoqDetailScreen({ id }: { id: number }) {
             {[...j.events].reverse().map((e, i) => (
               <li key={i} className="pl-4 relative">
                 <span className={cn("absolute -left-[7px] top-1 w-3 h-3 rounded-full border-2 border-white", e.tone === "warn" ? "bg-orange-500" : e.tone === "ok" ? "bg-emerald-500" : e.tone === "bad" ? "bg-slate-500" : "bg-[#d32029]")} />
-                <p className="text-[12px] text-slate-800">{e.text}</p>
+                <p className="text-[12px] text-slate-800 whitespace-pre-line">{e.text}</p>
                 <p className="text-[10px] text-slate-400">{e.actor_name ?? "-"} · {dateTh(e.at, true)}</p>
               </li>
             ))}

@@ -7,7 +7,7 @@ export type { BoqSummary };
 
 export type BoqStatus = "waiting" | "working" | "submitted" | "revise" | "boq_ok" | "quoted" | "win" | "loss" | "cancelled";
 export type BoqRole = "sales" | "designer" | "marketing" | "admin" | "viewer";
-export type BoqFileKind = "photo" | "plan" | "old_design" | "boq" | "d3";
+export type BoqFileKind = "photo" | "plan" | "old_design" | "boq" | "d3" | "revise";
 
 export const STATUS_META: Record<BoqStatus, { label: string; cls: string }> = {
   waiting: { label: "รอห้องแบบรับงาน", cls: "bg-amber-100 text-amber-800" },
@@ -107,7 +107,7 @@ export interface BoqDetail {
   quotes: { no: string; amount: number; at: string }[];
   events: { at: string; actor_name: string | null; kind: string; text: string; tone: "warn" | "ok" | "bad" | null }[];
 }
-export interface BoqCaps { claim: boolean; release: boolean; submit: boolean; review: boolean; quote: boolean; result: boolean; cancel: boolean }
+export interface BoqCaps { claim: boolean; release: boolean; submit: boolean; review: boolean; edit: boolean; quote: boolean; result: boolean; cancel: boolean }
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: "no-store", ...init });
@@ -143,7 +143,7 @@ export async function uploadBoqFile(file: File, kind: BoqFileKind, requestId?: n
   let blob: Blob = file;
   let name = file.name;
   let mime = file.type || "application/octet-stream";
-  if (/^image\/(jpeg|png|webp)$/.test(mime) && (kind === "photo" || kind === "plan" || kind === "old_design")) {
+  if (/^image\/(jpeg|png|webp)$/.test(mime) && (kind === "photo" || kind === "plan" || kind === "old_design" || kind === "revise")) {
     blob = await fileToResizedBlob(file, 2000, 0.85);
     mime = "image/jpeg";
     name = name.replace(/\.[^.]+$/, "") + ".jpg";

@@ -9,7 +9,7 @@ type Sb = ReturnType<typeof createServiceClient>;
 export const BOQ_BUCKET = "boq-files";
 export const BOQ_STATUSES = ["waiting", "working", "submitted", "revise", "boq_ok", "quoted", "win", "loss", "cancelled"] as const;
 export type BoqStatus = (typeof BOQ_STATUSES)[number];
-export const FILE_KINDS = ["photo", "plan", "old_design", "boq", "d3"] as const;
+export const FILE_KINDS = ["photo", "plan", "old_design", "boq", "d3", "revise"] as const;
 export type BoqFileKind = (typeof FILE_KINDS)[number];
 
 /** SLA ห้องแบบ (วันทำการ) นับจากเวลาที่พนักงานส่งคำขอ */
@@ -73,8 +73,8 @@ export async function actorName(sb: Sb, ctx: AuthContext): Promise<string> {
   return (data?.full_name as string | null) ?? ctx.email ?? "ผู้ใช้";
 }
 
-export async function addEvent(sb: Sb, requestId: number, ctx: AuthContext | null, name: string, kind: string, text: string, tone?: "warn" | "ok" | "bad") {
-  await sb.from("boq_events").insert({ request_id: requestId, actor_id: ctx?.userId ?? null, actor_name: name, kind, text, tone: tone ?? null });
+export async function addEvent(sb: Sb, requestId: number, ctx: AuthContext | null, name: string, kind: string, text: string, tone?: "warn" | "ok" | "bad", data?: unknown) {
+  await sb.from("boq_events").insert({ request_id: requestId, actor_id: ctx?.userId ?? null, actor_name: name, kind, text, tone: tone ?? null, data: data ?? null });
 }
 
 /* ---------- แจ้งเตือน ---------- */
@@ -141,4 +141,54 @@ export function safeFileName(name: string): string {
   // Storage key ใช้ ASCII เท่านั้น (ชื่อไทยเก็บใน boq_files.name แทน)
   const base = name.slice(0, name.length - ext.length).replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "file";
   return `${base}${ext}`;
+}
+
+/* ---------- จุดที่ทำ BOQ: ตรวจ + เทียบก่อน/หลังแก้ ---------- */
+export type PointIn = { productCode?: string; length?: number; width?: number; detail?: string };
+export type PointRow = { no: number; product_code: string; length: number; width: number | null; detail: string | null };
+
+/** ตรวจจุดที่ส่งมา (สินค้าต้องมีอยู่ + ขนาดตามหน่วย) ; คืน error เป็นข้อความไทย */
+export async function validatePoints(sb: Sb, input: PointIn[] | undefined): Promise<{ ok: true; points: PointRow[] } | { ok: false; error: string }> {
+  const pts = (input ?? []).slice(0, 50);
+  if (!pts.length) return { ok: false, error: "กรุณาเพิ่มจุดที่ต้องการทำ BOQ อย่างน้อย 1 จุด" };
+  const txt = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const codes = [...new Set(pts.map((p) => txt(p.productCode, 30)))];
+  const { data: prods } = await sb.from("boq_products").select("code, unit").in("code", codes).eq("is_active", true);
+  const unitOf = new Map((prods ?? []).map((p) => [p.code as string, p.unit as string]));
+  const points: PointRow[] = [];
+  for (const [i, p] of pts.entries()) {
+    const code = txt(p.productCode, 30);
+    const unit = unitOf.get(code);
+    if (!unit) return { ok: false, error: `จุดที่ ${i + 1}: กรุณาเลือกสินค้า` };
+    const length = Number(p.length);
+    const width = Number(p.width);
+    if (!(length > 0) || length > 100000) return { ok: false, error: `จุดที่ ${i + 1}: กรุณาใส่ความยาว` };
+    if (unit === "area" && (!(width > 0) || width > 100000)) return { ok: false, error: `จุดที่ ${i + 1}: กรุณาใส่ความกว้าง` };
+    points.push({ no: i + 1, product_code: code, length, width: unit === "area" ? width : null, detail: txt(p.detail, 300) || null });
+  }
+  return { ok: true, points };
+}
+
+/** สรุปความต่างของจุดเป็นข้อความ เช่น "จุดที่ 2: A → B · ยาว 12 → 14 ม." ; [] = ไม่เปลี่ยน */
+export async function diffPoints(sb: Sb, before: PointRow[], after: PointRow[]): Promise<string[]> {
+  const codes = [...new Set([...before, ...after].map((p) => p.product_code))];
+  const { data } = codes.length ? await sb.from("boq_products").select("code, name").in("code", codes) : { data: [] };
+  const name = new Map((data ?? []).map((p) => [p.code as string, p.name as string]));
+  const n = (v: number | null) => (v == null ? "-" : Number(v).toLocaleString("th-TH", { maximumFractionDigits: 2 }));
+  const out: string[] = [];
+  const max = Math.max(before.length, after.length);
+  for (let i = 1; i <= max; i++) {
+    const a = before.find((p) => p.no === i);
+    const b = after.find((p) => p.no === i);
+    if (a && !b) { out.push(`ลบจุดที่ ${i} (${name.get(a.product_code) ?? a.product_code})`); continue; }
+    if (!a && b) { out.push(`เพิ่มจุดที่ ${i}: ${name.get(b.product_code) ?? b.product_code} ${b.width != null ? `${n(b.width)}×${n(b.length)} ม.` : `${n(b.length)} ม.`}`); continue; }
+    if (!a || !b) continue;
+    const parts: string[] = [];
+    if (a.product_code !== b.product_code) parts.push(`${name.get(a.product_code) ?? a.product_code} → ${name.get(b.product_code) ?? b.product_code}`);
+    if (Number(a.width ?? 0) !== Number(b.width ?? 0)) parts.push(`กว้าง ${n(a.width)} → ${n(b.width)} ม.`);
+    if (Number(a.length) !== Number(b.length)) parts.push(`ยาว ${n(a.length)} → ${n(b.length)} ม.`);
+    if ((a.detail ?? "") !== (b.detail ?? "")) parts.push(`รายละเอียด "${a.detail ?? "-"}" → "${b.detail ?? "-"}"`);
+    if (parts.length) out.push(`จุดที่ ${i}: ${parts.join(" · ")}`);
+  }
+  return out;
 }

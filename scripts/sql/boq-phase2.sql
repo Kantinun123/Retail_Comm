@@ -188,3 +188,8 @@ values ('boq-files', 'boq-files', false, 52428800, array[
   'application/zip', 'application/x-zip-compressed', 'application/octet-stream', 'application/vnd.sketchup.skp'
 ])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- (19 พ.ย. 69) ไฟล์แนบตอนแจ้งแก้ / แก้คำขอ + เก็บจุดก่อน/หลังแก้
+alter table public.boq_files drop constraint boq_files_kind_check;
+alter table public.boq_files add constraint boq_files_kind_check check (kind in ('photo', 'plan', 'old_design', 'boq', 'd3', 'revise'));
+alter table public.boq_events add column if not exists data jsonb;

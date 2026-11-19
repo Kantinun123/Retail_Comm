@@ -43,7 +43,7 @@ function ExampleImage({ src, caption }: { src: string; caption: string }) {
   );
 }
 
-function ProductPicker({ products, value, onPick }: { products: BoqProduct[]; value: string; onPick: (code: string) => void }) {
+export function ProductPicker({ products, value, onPick }: { products: BoqProduct[]; value: string; onPick: (code: string) => void }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(!value);
   const prod = products.find((p) => p.code === value);
@@ -102,7 +102,6 @@ export function BoqFormScreen() {
   const [points, setPoints] = useState<Point[]>([{ key: 1, code: "", length: "", width: "", detail: "" }]);
   const [photos, setPhotos] = useState<UploadedFile[]>([]);
   const [plans, setPlans] = useState<UploadedFile[]>([]);
-  const [olds, setOlds] = useState<UploadedFile[]>([]);
   const [budget, setBudget] = useState("");
   const [wantDate, setWantDate] = useState("");
   const [note, setNote] = useState("");
@@ -167,7 +166,7 @@ export function BoqFormScreen() {
         opNo,
         recorderEmail: email,
         points: points.map((p) => ({ productCode: p.code, length: num(p.length), width: unitOf(p.code) === "area" ? num(p.width) : undefined, detail: p.detail })),
-        files: [...photos, ...plans, ...olds],
+        files: [...photos, ...plans],
       });
       router.replace(`/app/boq/${r.id}`);
     } catch (e) {
@@ -297,9 +296,7 @@ export function BoqFormScreen() {
           <ExampleImage src="/boq/example-plan.jpg" caption="แบบแปลน / รูปด้าน ที่มีระยะกว้าง-ยาว-สูง กำกับชัดเจน" />
           <FileUploader kind="plan" label="แนบแบบแปลน" hint="รูปหรือ PDF" accept="image/*,application/pdf" files={plans} onChange={setPlans} onBusy={onBusy} />
         </Section>
-        <Section title="แบบเดิมจากลูกค้า (ถ้ามี)" hint="กรณีลูกค้ามีแบบอยู่แล้วแต่ต้องการให้ห้องแบบออกแบบใหม่">
-          <FileUploader kind="old_design" label="แนบแบบเดิมของลูกค้า" hint="รูป / PDF" accept="image/*,application/pdf" files={olds} onChange={setOlds} onBusy={onBusy} />
-        </Section>
+        {/* "แบบเดิมจากลูกค้า (ถ้ามี)" ซ่อนไว้ตามที่ผู้ใช้ขอ (API ยังรองรับ kind old_design) */}
         <Section no="12" title="งบประมาณของลูกค้า (บาท)">
           <input
             inputMode="numeric"

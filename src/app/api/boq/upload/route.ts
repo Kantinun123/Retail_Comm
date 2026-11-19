@@ -29,10 +29,20 @@ export async function POST(req: Request) {
   const role = boqRoleOf(ctx);
   let path: string;
   if (body?.requestId) {
-    if (kind !== "boq" && kind !== "d3") return NextResponse.json({ ok: false, error: "bad kind" }, { status: 400 });
-    const { data: r } = await sb.from("boq_requests").select("id, status, designer_id").eq("id", body.requestId).maybeSingle();
-    if (!r || role !== "designer" || r.designer_id !== ctx.userId || !["working", "revise"].includes(r.status as string)) {
-      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+    const { data: r } = await sb.from("boq_requests").select("id, status, designer_id, rep_code").eq("id", body.requestId).maybeSingle();
+    if (!r) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+    if (kind === "boq" || kind === "d3") {
+      // ห้องแบบที่รับงาน ส่งไฟล์ BOQ / 3D
+      if (role !== "designer" || r.designer_id !== ctx.userId || !["working", "revise"].includes(r.status as string)) {
+        return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+      }
+    } else if (kind === "revise") {
+      // พนักงานเจ้าของคำขอ แนบไฟล์ตอนแจ้งแก้ (ส่ง BOQ แล้ว) หรือแก้คำขอก่อนห้องแบบรับงาน
+      if (role !== "sales" || r.rep_code !== ctx.repCode || !["submitted", "waiting"].includes(r.status as string)) {
+        return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+      }
+    } else {
+      return NextResponse.json({ ok: false, error: "bad kind" }, { status: 400 });
     }
     path = `req/${r.id}/${kind}/${randomUUID()}-${safeFileName(name)}`;
   } else {
