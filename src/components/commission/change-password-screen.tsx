@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./icon";
-import { useSession } from "@/lib/commission/session";
+import { doLogout, useSession } from "@/lib/commission/session";
 import { homeForRole, setMustChangePassword } from "@/lib/commission/auth-login";
 
 const MIN_LEN = 8;
@@ -45,7 +45,14 @@ export function ChangePasswordScreen() {
         return;
       }
       setMustChangePassword(false);
-      router.replace(homeForRole(session?.role));
+      if (j.relogin) {
+        // server ล็อกอินใหม่ไม่สำเร็จ -> ให้เข้าระบบด้วยรหัสใหม่เอง
+        doLogout();
+        router.replace("/");
+        return;
+      }
+      // โหลดหน้าใหม่ทั้งหน้า ให้ Supabase client อ่าน cookie session ใหม่ (session เดิมถูกยกเลิกตอนเปลี่ยนรหัส)
+      window.location.replace(homeForRole(session?.role));
     } catch {
       setError("เกิดข้อผิดพลาด ลองใหม่อีกครั้ง");
     } finally {

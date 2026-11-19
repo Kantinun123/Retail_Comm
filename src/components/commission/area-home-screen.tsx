@@ -58,7 +58,7 @@ export function AreaHomeScreen() {
     let cancelled = false;
     fetchStores()
       .then((list) => !cancelled && setStores(list.filter((s) => s.isActive && (areaStores ?? []).includes(s.code))))
-      .catch(() => !cancelled && setStores([]));
+      .catch(() => !cancelled && setStores(null));
     return () => {
       cancelled = true;
     };

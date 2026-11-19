@@ -36,5 +36,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
   await svc.from("profiles").update({ must_change_password: false }).eq("id", user.id);
+  // เปลี่ยนรหัสผ่านผ่าน admin API ทำให้ Supabase ยกเลิก session ทั้งหมดของผู้ใช้ (รวมเครื่องนี้)
+  // -> ทุก API ต่อจากนี้ได้ 401 ทั้งที่หน้าจอยัง "ล็อกอินอยู่" (เช่น Area เห็น "ดูแล 0 ร้าน")
+  // จึงล็อกอินใหม่ด้วยรหัสใหม่ทันที ให้ cookie session ใหม่ติดไปกับ response นี้
+  if (user.email) {
+    const { error: reErr } = await sb.auth.signInWithPassword({ email: user.email, password: newPassword });
+    if (reErr) return NextResponse.json({ ok: true, relogin: true });
+  }
   return NextResponse.json({ ok: true });
 }
