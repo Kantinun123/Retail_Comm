@@ -14,7 +14,8 @@ const NOTE: Record<PushState, string> = {
   on: "เปิดอยู่บนอุปกรณ์นี้",
 };
 
-export function PushToggle() {
+/** offNote = ข้อความตอนยังไม่เปิด ; hideWhenOn = ซ่อนเมื่อเปิดแล้ว (ใช้เป็นแถบชวนเปิดในหน้างาน) */
+export function PushToggle({ offNote, hideWhenOn = false }: { offNote?: string; hideWhenOn?: boolean } = {}) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export function PushToggle() {
   }, []);
 
   if (state === null) return null;
+  if (hideWhenOn && state === "on" && !msg) return null;
   const canToggle = state === "on" || state === "off";
 
   async function toggle() {
@@ -55,7 +57,7 @@ export function PushToggle() {
         <Icon name="notifications_active" className="text-slate-500" />
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-slate-800">แจ้งเตือนบนมือถือ</p>
-          <p className="text-[11px] text-slate-500">{NOTE[state]}</p>
+          <p className="text-[11px] text-slate-500">{state === "off" && offNote ? offNote : NOTE[state]}</p>
         </div>
         {canToggle && (
           <button

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../icon";
 import { BottomNav } from "../bottom-nav";
+import { PushToggle } from "../push-toggle";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/commission/session";
 import { DESIGNER_PHASE, baht, dateTh, fetchBoqList, needLabel, slaBadge, type BoqListItem, type BoqRole, type BoqStatus } from "@/lib/commission/boq-store";
@@ -137,6 +138,9 @@ export function BoqListScreen() {
     <>
       <BoqHeader title={title} back={role === "sales" ? "/app/home-staff" : role === "designer" || role === "marketing" ? undefined : "/app/home"} />
       <div className="space-y-3 pb-4">
+        {(role === "designer" || role === "marketing" || role === "sales") && (
+          <PushToggle hideWhenOn offNote={role === "designer" ? "เปิดไว้เพื่อรู้ทันทีเมื่อมีคำขอ BOQ ใหม่ / ถูกขอแก้ไข" : role === "sales" ? "เปิดไว้เพื่อรู้ทันทีเมื่อห้องแบบรับงาน / ส่ง BOQ แล้ว" : "เปิดไว้รับสรุปรายสัปดาห์ และงานที่เกินกำหนด"} />
+        )}
         {data && role !== "sales" && role !== "designer" && (
           <div className="flex gap-2">
             <Link href="/app/boq/overview" className="flex-1 text-center py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-[12px] font-bold">ภาพรวม</Link>

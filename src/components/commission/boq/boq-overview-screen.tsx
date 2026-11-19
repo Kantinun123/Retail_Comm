@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/commission/session";
 import { STATUS_META, baht, boqExportUrl, fetchBoqSummary, type BoqFilterInput, type BoqStatus, type BoqSummary } from "@/lib/commission/boq-store";
 import { BoqHeader, card } from "./boq-shared";
+import { PushToggle } from "../push-toggle";
 
 const TH_MONTH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const sel = "w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[12px] outline-none";
@@ -128,6 +129,7 @@ export function BoqOverviewScreen() {
           <Link href="/app/boq" className="flex-1 text-center py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-[12px] font-bold">รายการงาน</Link>
         </div>
 
+        {marketing && <PushToggle hideWhenOn offNote="เปิดไว้รับสรุปรายสัปดาห์ งานเกินกำหนด และ Win ยอดใหญ่ / Loss ให้ยี่ห้ออื่น" />}
         <section className={cn(card, "p-3 space-y-2")}>
           <p className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5"><Icon name="tune" className="text-sky-700" style={{ fontSize: 17 }} />ตัวกรอง</p>
           <div className="grid grid-cols-2 gap-2">
