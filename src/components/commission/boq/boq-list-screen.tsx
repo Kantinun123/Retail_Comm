@@ -145,6 +145,13 @@ export function BoqListScreen() {
             <Icon name="add_circle" style={{ fontSize: 20 }} /> ขอ BOQ DECAAR ใหม่
           </Link>
         )}
+        {role === "admin" && (
+          <Link href="/app/boq/holidays" className={cn(card, "flex items-center gap-2 px-3.5 py-2.5 text-[12px] font-semibold text-slate-700")}>
+            <Icon name="event_busy" className="text-[#d32029]" style={{ fontSize: 18 }} />
+            <span className="flex-1">วันหยุด (ไม่นับใน SLA ห้องแบบ)</span>
+            <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
+          </Link>
+        )}
         {error && <p className="rounded-xl bg-red-50 border border-red-200 p-3 text-[12px] text-red-700">โหลดไม่สำเร็จ: {error}</p>}
         {!data && !error && <p className="text-center text-[12px] text-slate-400 py-8">กำลังโหลด...</p>}
 
