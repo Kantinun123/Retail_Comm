@@ -18,6 +18,31 @@ const num = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/** รูปตัวอย่าง: รูปย่อ แตะเพื่อดูเต็มจอ (แตะอีกครั้งเพื่อปิด) */
+function ExampleImage({ src, caption }: { src: string; caption: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="w-full flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50/60 p-2 text-left">
+        {/* eslint-disable-next-line @next/next/no-img-element -- รูปตัวอย่างใน public */}
+        <img src={src} alt={caption} className="w-24 h-16 object-cover rounded-lg border border-white shadow-sm shrink-0" />
+        <div className="min-w-0">
+          <p className="text-[12px] font-bold text-sky-800 flex items-center gap-1"><Icon name="image_search" style={{ fontSize: 16 }} />ดูรูปตัวอย่าง</p>
+          <p className="text-[10.5px] text-slate-600 leading-snug">{caption}</p>
+        </div>
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col items-center justify-center p-3" onClick={() => setOpen(false)} role="dialog" aria-label={caption}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- รูปตัวอย่างใน public */}
+          <img src={src} alt={caption} className="max-w-full max-h-[80vh] object-contain rounded-lg bg-white" />
+          <p className="text-[12px] text-white/90 mt-3 text-center">{caption}</p>
+          <p className="text-[11px] text-white/60 mt-1">แตะที่ใดก็ได้เพื่อปิด · ซูมด้วยสองนิ้วได้</p>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ProductPicker({ products, value, onPick }: { products: BoqProduct[]; value: string; onPick: (code: string) => void }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(!value);
@@ -265,9 +290,11 @@ export function BoqFormScreen() {
         </Section>
 
         <Section no="10" title="รูปจุดที่ใช้สินค้า" hint="ใส่เลขจุดบนรูปให้ตรงกับข้อ 9">
+          <ExampleImage src="/boq/example-photo.jpg" caption="เขียนเลขจุดบนรูปให้ตรงกับข้อ 9 พร้อมชื่อสินค้า / สี / หมายเหตุการติดตั้ง" />
           <FileUploader kind="photo" label="แนบรูป / ถ่ายรูป" hint="หลายรูปได้ · ระบบย่อรูปก่อนส่ง" accept="image/*" files={photos} onChange={setPhotos} onBusy={onBusy} />
         </Section>
         <Section no="11" title="แบบแปลนพื้นที่">
+          <ExampleImage src="/boq/example-plan.jpg" caption="แบบแปลน / รูปด้าน ที่มีระยะกว้าง-ยาว-สูง กำกับชัดเจน" />
           <FileUploader kind="plan" label="แนบแบบแปลน" hint="รูปหรือ PDF" accept="image/*,application/pdf" files={plans} onChange={setPlans} onBusy={onBusy} />
         </Section>
         <Section title="แบบเดิมจากลูกค้า (ถ้ามี)" hint="กรณีลูกค้ามีแบบอยู่แล้วแต่ต้องการให้ห้องแบบออกแบบใหม่">
