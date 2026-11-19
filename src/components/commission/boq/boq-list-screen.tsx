@@ -17,7 +17,7 @@ type Tab = { key: string; label: string; match: (j: BoqListItem) => boolean };
 
 function JobCard({ j, role, me, now }: { j: BoqListItem; role: BoqRole; me: string; now: Date }) {
   const sla = DESIGNER_PHASE.includes(j.status) ? slaBadge(j.dueAt, now) : null;
-  const lockedByOther = role === "designer" && j.designerId && j.designerId !== me && DESIGNER_PHASE.includes(j.status);
+  const lockedByOther = role === "designer" && j.designerId && j.designerId !== me && (DESIGNER_PHASE.includes(j.status) || j.status === "need_info");
   const okDays = j.status === "boq_ok" && j.boqOkAt ? Math.floor((now.getTime() - new Date(j.boqOkAt).getTime()) / 86400000) : 0;
   return (
     <Link href={`/app/boq/${j.id}`} className={cn(card, "block p-3.5 hover:-translate-y-0.5 transition-all", lockedByOther && "opacity-60")}>
@@ -69,6 +69,7 @@ function Tabs({ tabs, items, value, onChange }: { tabs: Tab[]; items: BoqListIte
 
 const st = (...s: BoqStatus[]) => (j: BoqListItem) => s.includes(j.status);
 const SALES_TABS: Tab[] = [
+  { key: "info", label: "ห้องแบบขอข้อมูล", match: st("need_info") },
   { key: "review", label: "รอฉันตรวจ", match: st("submitted") },
   { key: "quote", label: "รอใบเสนอราคา", match: st("boq_ok") },
   { key: "result", label: "รอผล", match: st("quoted") },
@@ -76,9 +77,9 @@ const SALES_TABS: Tab[] = [
   { key: "closed", label: "ปิดแล้ว", match: st("win", "loss", "cancelled") },
 ];
 const VIEW_TABS: Tab[] = [
-  { key: "active", label: "กำลังดำเนินการ", match: st("waiting", "working", "revise", "submitted", "boq_ok", "quoted") },
+  { key: "active", label: "กำลังดำเนินการ", match: st("waiting", "working", "revise", "need_info", "submitted", "boq_ok", "quoted") },
   { key: "design", label: "ห้องแบบ", match: st("waiting", "working", "revise") },
-  { key: "sales", label: "รอพนักงาน", match: st("submitted", "boq_ok", "quoted") },
+  { key: "sales", label: "รอพนักงาน", match: st("need_info", "submitted", "boq_ok", "quoted") },
   { key: "win", label: "Win", match: st("win") },
   { key: "loss", label: "Loss", match: st("loss") },
   { key: "all", label: "ทั้งหมด", match: () => true },
@@ -109,8 +110,8 @@ export function BoqListScreen() {
   const designerTabs: Tab[] = useMemo(
     () => [
       { key: "queue", label: "รอรับงาน", match: st("waiting") },
-      { key: "mine", label: "งานของฉัน", match: (j) => j.designerId === me && ["working", "revise", "submitted"].includes(j.status) },
-      { key: "all", label: "ห้องแบบทั้งหมด", match: st("waiting", "working", "revise", "submitted") },
+      { key: "mine", label: "งานของฉัน", match: (j) => j.designerId === me && ["working", "revise", "need_info", "submitted"].includes(j.status) },
+      { key: "all", label: "ห้องแบบทั้งหมด", match: st("waiting", "working", "revise", "need_info", "submitted") },
       { key: "done", label: "ส่งแล้ว", match: (j) => j.designerId === me && ["boq_ok", "quoted", "win", "loss"].includes(j.status) },
     ],
     [me]

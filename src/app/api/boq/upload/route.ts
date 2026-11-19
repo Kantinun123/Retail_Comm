@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       }
     } else if (kind === "revise") {
       // พนักงานเจ้าของคำขอ แนบไฟล์ตอนแจ้งแก้ (ส่ง BOQ แล้ว) หรือแก้คำขอก่อนห้องแบบรับงาน
-      if (role !== "sales" || r.rep_code !== ctx.repCode || !["submitted", "waiting"].includes(r.status as string)) {
+      if (role !== "sales" || r.rep_code !== ctx.repCode || !["submitted", "waiting", "need_info"].includes(r.status as string)) {
         return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
       }
     } else {

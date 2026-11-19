@@ -115,6 +115,7 @@ export function BoqOverviewScreen() {
   const pipe: { st: BoqStatus[]; label: string; cls: string }[] = [
     { st: ["waiting"], label: "รอห้องแบบรับ", cls: "bg-amber-50 text-amber-800" },
     { st: ["working", "revise"], label: "ห้องแบบกำลังทำ", cls: "bg-sky-50 text-sky-800" },
+    { st: ["need_info"], label: "รอทีมขายเติมข้อมูล", cls: "bg-rose-50 text-rose-800" },
     { st: ["submitted"], label: "รอพนักงานตรวจ", cls: "bg-violet-50 text-violet-800" },
     { st: ["boq_ok"], label: "รอใบเสนอราคา", cls: "bg-teal-50 text-teal-800" },
     { st: ["quoted"], label: "รอผล Win/Loss", cls: "bg-indigo-50 text-indigo-800" },
@@ -229,11 +230,12 @@ export function BoqOverviewScreen() {
               </div>
             </section>
 
-            {(s.attention.staleOk.n > 0 || s.attention.staleQuote.n > 0 || s.attention.overdue.n > 0) && (
+            {(s.attention.staleOk.n > 0 || s.attention.staleQuote.n > 0 || s.attention.overdue.n > 0 || s.attention.staleInfo.n > 0) && (
               <section>
                 <H3 icon="notification_important">เรื่องที่ต้องตาม</H3>
                 <div className="space-y-1.5 text-[11.5px]">
                   {s.attention.overdue.n > 0 && <p className="rounded-xl bg-red-50 text-red-700 px-3 py-2">ห้องแบบเกินกำหนด {s.attention.overdue.n} งาน · {s.attention.overdue.stores.join(", ")}</p>}
+                  {s.attention.staleInfo.n > 0 && <p className="rounded-xl bg-rose-50 text-rose-800 px-3 py-2">ห้องแบบรอข้อมูลจากทีมขายเกิน 2 วัน {s.attention.staleInfo.n} งาน · {s.attention.staleInfo.stores.join(", ")}</p>}
                   {s.attention.staleOk.n > 0 && <p className="rounded-xl bg-amber-50 text-amber-800 px-3 py-2">BOQ ผ่านเกิน 7 วัน ยังไม่เสนอราคา {s.attention.staleOk.n} งาน · {s.attention.staleOk.stores.join(", ")}</p>}
                   {s.attention.staleQuote.n > 0 && <p className="rounded-xl bg-amber-50 text-amber-800 px-3 py-2">เสนอราคาเกิน 30 วัน ยังไม่มีผล {s.attention.staleQuote.n} งาน · {s.attention.staleQuote.stores.join(", ")}</p>}
                 </div>

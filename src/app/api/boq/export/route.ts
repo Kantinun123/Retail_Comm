@@ -6,7 +6,7 @@ import { boqRoleOf } from "@/lib/server/boq";
 import { loadScoped, parseFilters } from "@/lib/server/boq-summary";
 
 const STATUS_TH: Record<string, string> = {
-  waiting: "รอห้องแบบรับงาน", working: "ห้องแบบกำลังทำ", submitted: "ส่ง BOQ แล้ว รอตรวจ", revise: "ขอแก้ไข",
+  waiting: "รอห้องแบบรับงาน", working: "ห้องแบบกำลังทำ", submitted: "ส่ง BOQ แล้ว รอตรวจ", revise: "ขอแก้ไข", need_info: "รอพนักงานเติมข้อมูล",
   boq_ok: "BOQ ผ่าน รอใบเสนอราคา", quoted: "เสนอราคาแล้ว รอผล", win: "Win", loss: "Loss", cancelled: "ยกเลิก",
 };
 const bkk = (iso: string | null) => (iso ? new Date(new Date(iso).getTime() + 7 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ") : "");

@@ -198,3 +198,8 @@ create table if not exists public.boq_win_reasons (code text primary key, label 
 alter table public.boq_win_reasons enable row level security;
 -- seed: price_value, quality_brand, boq_3d, service_speed, promotion, contractor, stock_ready (ดู migration boq_win_reasons)
 alter table public.boq_requests add column if not exists win_reasons text[];
+-- (19 พ.ย. 69) ห้องแบบขอข้อมูลเพิ่ม: สถานะ need_info (หยุดนับ SLA) + เวลาที่ขอ (ใช้เตือนทุก 2 วันทำการ)
+alter table public.boq_requests drop constraint boq_requests_status_check;
+alter table public.boq_requests add constraint boq_requests_status_check
+  check (status in ('waiting', 'working', 'submitted', 'revise', 'need_info', 'boq_ok', 'quoted', 'win', 'loss', 'cancelled'));
+alter table public.boq_requests add column if not exists need_info_at timestamptz;

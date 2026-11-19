@@ -7,7 +7,16 @@ import { pushToUser } from "@/lib/server/push";
 type Sb = ReturnType<typeof createServiceClient>;
 
 export const BOQ_BUCKET = "boq-files";
-export const BOQ_STATUSES = ["waiting", "working", "submitted", "revise", "boq_ok", "quoted", "win", "loss", "cancelled"] as const;
+export const BOQ_STATUSES = ["waiting", "working", "submitted", "revise", "need_info", "boq_ok", "quoted", "win", "loss", "cancelled"] as const;
+
+/** ข้อมูลที่ห้องแบบขอเพิ่ม (ร่าง) — ต้องตรงกับ NEED_INFO_ITEMS ฝั่งหน้าจอ */
+export const NEED_INFO_ITEMS: Record<string, string> = {
+  photo: "รูปจุดที่ใช้สินค้าไม่ชัด / ไม่ครบ",
+  plan: "ไม่มีแบบแปลน / ขนาด",
+  size_mismatch: "ขนาดพื้นที่ไม่ตรงกับรูป",
+  spec: "ไม่ได้ระบุสี / รุ่นสินค้า",
+  site_photo: "ไม่มีรูปหน้างานจริง",
+};
 export type BoqStatus = (typeof BOQ_STATUSES)[number];
 export const FILE_KINDS = ["photo", "plan", "old_design", "boq", "d3", "revise"] as const;
 export type BoqFileKind = (typeof FILE_KINDS)[number];
@@ -109,7 +118,7 @@ export const LOSS_TO_BRAND = ["price_other_brand", "stock_other_brand"];
 export async function notifyBoq(
   sb: Sb,
   req: { id: number; req_no: string; customer_name: string; rep_code: string; designer_id: string | null; is_test: boolean },
-  event: "new" | "claimed" | "submitted" | "revise" | "approved" | "released" | "cancelled" | "win_big" | "loss_brand",
+  event: "new" | "claimed" | "submitted" | "revise" | "approved" | "released" | "cancelled" | "win_big" | "loss_brand" | "need_info" | "info_provided",
   extra?: string
 ) {
   const who = `${req.req_no} · ${req.customer_name}`;
@@ -124,6 +133,10 @@ export async function notifyBoq(
       return safePush(sb, await salesUserIds(sb, req.rep_code, req.is_test), "ห้องแบบส่ง BOQ แล้ว", `${who} — รอคุณตรวจ`, url);
     case "revise":
       return req.designer_id ? safePush(sb, [req.designer_id], "พนักงานขอแก้ไข BOQ", who, url) : undefined;
+    case "need_info":
+      return safePush(sb, await salesUserIds(sb, req.rep_code, req.is_test), "ห้องแบบขอข้อมูลเพิ่ม", `${who} — ${extra ?? "กรุณาเติมข้อมูล"}`, url);
+    case "info_provided":
+      return req.designer_id ? safePush(sb, [req.designer_id], "พนักงานเติมข้อมูลแล้ว", `${who} — ทำ BOQ ต่อได้`, url) : undefined;
     case "approved":
       return req.designer_id ? safePush(sb, [req.designer_id], "BOQ ผ่านแล้ว · ปิดงานห้องแบบ", who, url) : undefined;
     case "cancelled":

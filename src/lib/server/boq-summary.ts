@@ -51,6 +51,7 @@ export interface ScopedRow {
   due_at: string;
   claimed_at: string | null;
   boq_ok_at: string | null;
+  need_info_at: string | null;
   closed_at: string | null;
   final_amount: number | null;
   loss_reason: string | null;
@@ -67,7 +68,7 @@ export async function loadScoped(sb: Sb, ctx: AuthContext, f: BoqFilters) {
   const role = boqRoleOf(ctx);
   let q = sb
     .from("boq_requests")
-    .select("id, req_no, status, dealer_code, rep_code, designer_id, customer_name, customer_phone, province, customer_type, job_type, building_type, need, budget, created_at, due_at, claimed_at, boq_ok_at, closed_at, final_amount, loss_reason, win_reasons, result_note, approved_version, op_no")
+    .select("id, req_no, status, dealer_code, rep_code, designer_id, customer_name, customer_phone, province, customer_type, job_type, building_type, need, budget, created_at, due_at, claimed_at, boq_ok_at, need_info_at, closed_at, final_amount, loss_reason, win_reasons, result_note, approved_version, op_no")
     .order("created_at", { ascending: false })
     .limit(5000);
   if (role !== "admin") q = q.eq("is_test", ctx.isTest);
@@ -195,6 +196,8 @@ export async function buildSummary(sb: Sb, ctx: AuthContext, f: BoqFilters) {
   // เรื่องที่ต้องตาม
   const overdue = rows.filter((r) => ["waiting", "working", "revise"].includes(r.status) && new Date(r.due_at).getTime() < now);
   const staleOk = rows.filter((r) => r.status === "boq_ok" && r.boq_ok_at && now - new Date(r.boq_ok_at).getTime() > 7 * DAY);
+  // รอทีมขายเติมข้อมูลเกิน 2 วัน (ประมาณ ; การเตือนจริงนับวันทำการ)
+  const staleInfo = rows.filter((r) => r.status === "need_info" && r.need_info_at && now - new Date(r.need_info_at).getTime() > 2 * DAY);
   const staleQuote = rows.filter((r) => {
     if (r.status !== "quoted") return false;
     const q = quotes.filter((x) => x.request_id === r.id).map((x) => x.created_at).sort()[0];
@@ -254,6 +257,7 @@ export async function buildSummary(sb: Sb, ctx: AuthContext, f: BoqFilters) {
       overdue: { n: overdue.length, stores: names(overdue) },
       staleOk: { n: staleOk.length, stores: names(staleOk) },
       staleQuote: { n: staleQuote.length, stores: names(staleQuote) },
+      staleInfo: { n: staleInfo.length, stores: names(staleInfo) },
       unclaimed: rows.filter((r) => r.status === "waiting").length,
     },
     stores: byStore.slice(0, 50),

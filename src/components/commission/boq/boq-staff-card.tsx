@@ -35,12 +35,14 @@ export function BoqStaffCard() {
   if (!enabled || !items) return null;
 
   const n = (s: string[]) => items.filter((j) => s.includes(j.status)).length;
+  const info = n(["need_info"]);
   const review = n(["submitted"]);
   const quote = n(["boq_ok"]);
   const result = n(["quoted"]);
   const design = n(["waiting", "working", "revise"]);
-  const todo = review + quote + result;
+  const todo = info + review + quote + result;
   const alerts = [
+    ...items.filter((j) => j.status === "need_info").slice(0, 2).map((j) => ({ id: j.id, icon: "help", cls: "bg-rose-50 text-rose-800", text: `${j.customerName} — ห้องแบบขอข้อมูลเพิ่ม` })),
     ...items.filter((j) => j.status === "submitted").slice(0, 2).map((j) => ({ id: j.id, icon: "mark_email_unread", cls: "bg-violet-50/70 text-slate-700", text: `${j.customerName} — ห้องแบบส่ง BOQ แล้ว รอคุณตรวจ` })),
     ...items
       .filter((j) => j.status === "boq_ok" && j.boqOkAt && now - new Date(j.boqOkAt).getTime() >= 7 * 86400000)

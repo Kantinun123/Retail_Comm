@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext, type AuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
-import { BIG_WIN, BOQ_BUCKET, LOSS_TO_BRAND, actorName, addEvent, boqRoleOf, canViewRequest, diffPoints, dueAfterBusinessDays, loadHolidays, notifyBoq, slaDays, validatePoints, type PointIn, type PointRow } from "@/lib/server/boq";
+import { BIG_WIN, BOQ_BUCKET, LOSS_TO_BRAND, NEED_INFO_ITEMS, actorName, addEvent, boqRoleOf, canViewRequest, diffPoints, dueAfterBusinessDays, loadHolidays, notifyBoq, slaDays, validatePoints, type PointIn, type PointRow } from "@/lib/server/boq";
 
 type Sb = ReturnType<typeof createServiceClient>;
 type Params = { params: Promise<{ id: string }> };
@@ -25,9 +25,11 @@ function capsFor(ctx: AuthContext, r: Record<string, unknown>) {
     submit: mineDesigner && (st === "working" || st === "revise"),
     review: mineSales && st === "submitted",
     edit: mineSales && st === "waiting",
+    requestInfo: mineDesigner && (st === "working" || st === "revise"),
+    provideInfo: mineSales && st === "need_info",
     quote: mineSales && (st === "boq_ok" || st === "quoted"),
     result: mineSales && st === "quoted",
-    cancel: mineSales && ["waiting", "working", "revise", "submitted"].includes(st),
+    cancel: mineSales && ["waiting", "working", "revise", "need_info", "submitted"].includes(st),
   };
 }
 
@@ -62,6 +64,7 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({
     ok: true,
     role: boqRoleOf(ctx),
+    me: ctx.userId,
     caps: capsFor(ctx, r),
     lossReasons: reasons.data ?? [],
     winReasons: winReasons ?? [],
@@ -125,6 +128,7 @@ interface ActionBody {
   reason?: string;
   points?: PointIn[];
   reasons?: string[];
+  items?: string[];
 }
 
 export async function POST(req: Request, { params }: Params) {
@@ -193,13 +197,26 @@ export async function POST(req: Request, { params }: Params) {
       await notifyBoq(sb, info, "submitted");
       break;
     }
+    case "request_info": {
+      if (!caps.requestInfo) return forbid();
+      const items = [...new Set((b.items ?? []).map(String))].filter((k) => NEED_INFO_ITEMS[k]);
+      if (!text) return bad("กรุณาเขียนว่าขาดข้อมูลอะไร");
+      if (!(await move(["working", "revise"], { status: "need_info", need_info_at: now }))) return forbid();
+      const labels = items.map((k) => NEED_INFO_ITEMS[k]);
+      await addEvent(sb, id, ctx, name, "need_info", ["ขอข้อมูลเพิ่ม:", ...labels.map((l) => `• ${l}`), text].join("\n"), "warn", { items, prevStatus: r.status });
+      await notifyBoq(sb, info, "need_info", labels.length ? labels.join(", ") : text.slice(0, 80));
+      break;
+    }
     case "revise":
-    case "edit": {
+    case "edit":
+    case "provide_info": {
       // revise = แจ้งแก้หลังห้องแบบส่ง BOQ (ข้อความบังคับ + กำหนดส่งใหม่ตาม SLA เดิม)
       // edit   = พนักงานแก้คำขอเองก่อนห้องแบบรับงาน
       const isRevise = b.action === "revise";
-      if (isRevise ? !caps.review : !caps.edit) return forbid();
+      const isProvide = b.action === "provide_info";
+      if (isRevise ? !caps.review : isProvide ? !caps.provideInfo : !caps.edit) return forbid();
       if (isRevise && !text) return bad("กรุณาใส่รายละเอียดที่ต้องแก้");
+      if (isProvide && !text) return bad("กรุณาตอบห้องแบบว่าเติมข้อมูลอะไร");
       // จุดที่ทำ BOQ (ถ้าส่งมา = แทนชุดเดิม ; เก็บชุดเดิมไว้ใน event)
       let changes: string[] = [];
       let snapshot: { before: PointRow[]; after: PointRow[] } | null = null;
@@ -219,28 +236,33 @@ export async function POST(req: Request, { params }: Params) {
         if (error) return bad(`ไฟล์ ${f.name ?? ""} อัปโหลดไม่สำเร็จ ลองแนบใหม่`);
       }
       if (!isRevise && !text && !changes.length && !files.length) return bad("ยังไม่มีอะไรเปลี่ยน");
-      if (isRevise) {
+      if (isRevise || isProvide) {
+        // SLA ใหม่ นับจากตอนนี้ (เหมือนแจ้งครั้งแรก) ; เติมข้อมูลแล้วงานกลับไปที่ห้องแบบคนเดิม
         const due = dueAfterBusinessDays(new Date(), slaDays(r.need as string), await loadHolidays(sb));
-        if (!(await move(["submitted"], { status: "revise", due_at: due.toISOString() }))) return forbid();
+        const ok = isRevise
+          ? await move(["submitted"], { status: "revise", due_at: due.toISOString() })
+          : await move(["need_info"], { status: "working", due_at: due.toISOString(), need_info_at: null });
+        if (!ok) return forbid();
       } else if (!(await move(["waiting"], {}))) return forbid();
       if (snapshot) {
         await sb.from("boq_points").delete().eq("request_id", id);
         await sb.from("boq_points").insert(snapshot.after.map((p) => ({ ...p, request_id: id })));
       }
       const { data: last } = await sb.from("boq_versions").select("v").eq("request_id", id).order("v", { ascending: false }).limit(1);
-      const round = isRevise ? ((last?.[0]?.v as number | undefined) ?? 0) : 0;
+      const round = isRevise || isProvide ? ((last?.[0]?.v as number | undefined) ?? 0) : 0;
       if (files.length) {
         await sb.from("boq_files").insert(
           files.map((f) => ({ request_id: id, kind: "revise", version: round, path: f.path, name: String(f.name ?? "file").slice(0, 200), size: Number(f.size) || null, mime: f.mime ? String(f.mime).slice(0, 100) : null, uploaded_by: ctx.userId }))
         );
       }
       const lines = [
-        isRevise ? `ขอแก้ไข: ${text}` : `แก้ไขคำขอ${text ? `: ${text}` : ""}`,
+        isRevise ? `ขอแก้ไข: ${text}` : isProvide ? `เติมข้อมูลให้ห้องแบบ: ${text}` : `แก้ไขคำขอ${text ? `: ${text}` : ""}`,
         ...changes,
         ...(files.length ? [`แนบไฟล์เพิ่ม ${files.length} ไฟล์`] : []),
       ];
-      await addEvent(sb, id, ctx, name, isRevise ? "revise" : "edited", lines.join("\n"), "warn", { round, changes, files: files.map((f) => f.name), ...(snapshot ?? {}) });
+      await addEvent(sb, id, ctx, name, isRevise ? "revise" : isProvide ? "info_provided" : "edited", lines.join("\n"), isProvide ? "ok" : "warn", { round, changes, files: files.map((f) => f.name), ...(snapshot ?? {}) });
       if (isRevise) await notifyBoq(sb, info, "revise");
+      if (isProvide) await notifyBoq(sb, info, "info_provided");
       break;
     }
     case "approve": {
@@ -255,7 +277,7 @@ export async function POST(req: Request, { params }: Params) {
     }
     case "cancel": {
       if (!caps.cancel) return forbid();
-      if (!(await move(["waiting", "working", "revise", "submitted"], { status: "cancelled", closed_at: now }))) return forbid();
+      if (!(await move(["waiting", "working", "revise", "need_info", "submitted"], { status: "cancelled", closed_at: now }))) return forbid();
       await addEvent(sb, id, ctx, name, "cancelled", `ยกเลิกคำขอ${text ? `: ${text}` : ""}`, "bad");
       await notifyBoq(sb, info, "cancelled");
       break;

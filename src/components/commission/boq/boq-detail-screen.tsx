@@ -5,7 +5,7 @@ import { Icon } from "../icon";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/commission/session";
 import {
-  DESIGNER_PHASE, baht, boqAction, dateTh, fetchBoq, fetchBoqProducts, fileUrl, fmtNum, needLabel, pointText, slaBadge,
+  DESIGNER_PHASE, NEED_INFO_ITEMS, baht, boqAction, dateTh, fetchBoq, fetchBoqProducts, fileUrl, fmtNum, needLabel, pointText, slaBadge,
   type BoqCaps, type BoqDetail, type BoqFile, type BoqProduct, type BoqRole, type LossReason, type UploadedFile,
 } from "@/lib/commission/boq-store";
 import { BoqHeader, FileUploader, Row, StatusPill, Stepper, btn, card, inputCls, labelCls } from "./boq-shared";
@@ -18,7 +18,8 @@ const numOf = (s: string) => {
 };
 
 /** แจ้งแก้ / แก้คำขอ: ข้อความ + แนบไฟล์ + แก้จุดที่ทำ BOQ (ไม่บังคับ) */
-function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revise" | "edit"; onCancel: () => void; onDone: () => void }) {
+function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revise" | "edit" | "provide"; onCancel: () => void; onDone: () => void }) {
+  const needText = mode !== "edit";
   const [text, setText] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [busy, setBusy] = useState(0);
@@ -44,7 +45,7 @@ function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revi
     setErr("");
     try {
       await boqAction(j.id, {
-        action: mode,
+        action: mode === "provide" ? "provide_info" : mode,
         text,
         files,
         points: editPts ? points.map((p) => ({ productCode: p.code, length: numOf(p.length), width: unitOf(p.code) === "area" ? numOf(p.width) : undefined, detail: p.detail })) : undefined,
@@ -58,7 +59,7 @@ function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revi
   return (
     <div className="space-y-3">
       <div>
-        <label className={labelCls}>{mode === "revise" ? "รายละเอียดที่ต้องแก้" : "หมายเหตุการแก้ไข (ถ้ามี)"}</label>
+        <label className={labelCls}>{mode === "revise" ? "รายละเอียดที่ต้องแก้" : mode === "provide" ? "ตอบห้องแบบ (เติมข้อมูลอะไร)" : "หมายเหตุการแก้ไข (ถ้ามี)"}</label>
         <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder={mode === "revise" ? "เช่น จุดที่ 2 เปลี่ยนเป็นสีวอร์มเกรย์" : "เช่น ลูกค้าเปลี่ยนขนาดระเบียง"} className={inputCls} />
       </div>
       <div>
@@ -114,17 +115,17 @@ function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revi
           )}
         </div>
       )}
-      {mode === "revise" && <p className="text-[11px] text-slate-500">ส่งแล้วห้องแบบได้กำหนดส่งใหม่ {j.need === "boq_3d" ? 5 : 3} วันทำการ นับจากตอนนี้</p>}
+      {needText && <p className="text-[11px] text-slate-500">ส่งแล้วห้องแบบได้กำหนดส่งใหม่ {j.need === "boq_3d" ? 5 : 3} วันทำการ นับจากตอนนี้</p>}
       {err && <p className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{err}</p>}
       <div className="flex gap-2">
         <button type="button" onClick={onCancel} className={cn(btn, "bg-white border border-slate-200 text-slate-600")}>กลับ</button>
         <button
           type="button"
-          disabled={saving || busy > 0 || (mode === "revise" && !text.trim()) || badPoint || nothing}
+          disabled={saving || busy > 0 || (needText && !text.trim()) || badPoint || nothing}
           onClick={submit}
           className={cn(btn, "flex-1 text-white", mode === "revise" ? "bg-orange-600" : "bg-[#d32029]")}
         >
-          {saving ? "กำลังส่ง..." : busy > 0 ? "รออัปโหลดไฟล์..." : mode === "revise" ? "ส่งกลับให้ห้องแบบแก้" : "บันทึกการแก้ไข"}
+          {saving ? "กำลังส่ง..." : busy > 0 ? "รออัปโหลดไฟล์..." : mode === "revise" ? "ส่งกลับให้ห้องแบบแก้" : mode === "provide" ? "ส่งข้อมูลให้ห้องแบบ" : "บันทึกการแก้ไข"}
         </button>
       </div>
       {badPoint && <p className="text-[11px] text-red-600 text-center">กรุณาเลือกสินค้าและใส่ขนาดให้ครบทุกจุด</p>}
@@ -132,7 +133,7 @@ function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revi
   );
 }
 
-type Loaded = { role: BoqRole; caps: BoqCaps; lossReasons: LossReason[]; winReasons: LossReason[]; item: BoqDetail };
+type Loaded = { role: BoqRole; me: string; caps: BoqCaps; lossReasons: LossReason[]; winReasons: LossReason[]; item: BoqDetail };
 
 function FileLink({ f }: { f: BoqFile }) {
   const icon = f.mime === "application/pdf" ? "picture_as_pdf" : f.mime?.startsWith("image/") ? "image" : f.kind === "d3" ? "view_in_ar" : "description";
@@ -159,7 +160,9 @@ function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
   const { item: j, caps, lossReasons, winReasons, role } = d;
   const [wins, setWins] = useState<string[]>([]);
   const toggleWin = (c: string) => setWins((a) => (a.includes(c) ? a.filter((x) => x !== c) : a.length >= 3 ? a : [...a, c]));
-  const [mode, setMode] = useState<"" | "revise" | "edit" | "ok" | "win" | "loss" | "requote" | "release" | "cancel">("");
+  const [mode, setMode] = useState<"" | "revise" | "edit" | "provide" | "needinfo" | "ok" | "win" | "loss" | "requote" | "release" | "cancel">("");
+  const [infoItems, setInfoItems] = useState<string[]>([]);
+  const lastNeedInfo = [...j.events].reverse().find((e) => e.kind === "need_info");
   const [text, setText] = useState("");
   const [boqFiles, setBoqFiles] = useState<UploadedFile[]>([]);
   const [d3Files, setD3Files] = useState<UploadedFile[]>([]);
@@ -205,6 +208,42 @@ function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
       </button>
     </>);
   }
+  if (caps.requestInfo && mode === "needinfo") {
+    return box("ขอข้อมูลเพิ่มจากพนักงานขาย", <>
+      <p className="text-[12px] text-slate-600">งานยังเป็นของคุณ · ระหว่างรอไม่นับเวลาส่ง · พนักงานเติมแล้วได้กำหนดส่งใหม่ {j.need === "boq_3d" ? 5 : 3} วันทำการ</p>
+      <label className={labelCls}>ข้อมูลที่ขาด (เลือกได้หลายข้อ)</label>
+      <div className="space-y-1.5">
+        {NEED_INFO_ITEMS.map((o) => {
+          const on = infoItems.includes(o.key);
+          return (
+            <button key={o.key} type="button" onClick={() => setInfoItems((a) => (on ? a.filter((x) => x !== o.key) : [...a, o.key]))} className={cn("w-full text-left px-3 py-2 rounded-xl border text-[12px] flex items-center gap-2", on ? "border-rose-400 bg-rose-50 text-rose-900 font-semibold" : "border-slate-200 bg-white text-slate-600")}>
+              <Icon name={on ? "check_box" : "check_box_outline_blank"} style={{ fontSize: 17 }} />
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="บอกว่าขาดอะไร / ต้องการอะไรเพิ่ม เช่น ขอรูปผนังด้านซ้ายแบบเห็นทั้งแผง" className={inputCls} />
+      <div className="flex gap-2">{back}<button type="button" disabled={saving || !text.trim()} onClick={() => run({ action: "request_info", items: infoItems, text })} className={cn(btn, "flex-1 bg-rose-600 text-white")}>ส่งกลับให้พนักงานเติมข้อมูล</button></div>
+    </>, "border-rose-300");
+  }
+  if (role === "designer" && j.status === "need_info" && j.designerId === d.me) {
+    return box("รอพนักงานเติมข้อมูล", <>
+      {lastNeedInfo && <p className="rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-[12px] text-rose-800 whitespace-pre-line">{lastNeedInfo.text}</p>}
+      <p className="text-[11px] text-slate-500">ระบบแจ้งพนักงานแล้ว และเตือนซ้ำทุก 2 วันทำการ · ระหว่างนี้ไม่นับเวลาส่ง</p>
+    </>, "border-slate-200");
+  }
+  if (caps.provideInfo) {
+    return box("ห้องแบบขอข้อมูลเพิ่ม", <>
+      {lastNeedInfo && <p className="rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-[12px] text-rose-800 whitespace-pre-line">{lastNeedInfo.text}</p>}
+      {mode === "cancel" ? <CancelBox text={text} setText={setText} back={back} saving={saving} run={run} /> : (
+        <>
+          <ChangeEditor j={j} mode="provide" onCancel={() => setMode("")} onDone={onDone} />
+          <button type="button" onClick={() => setMode("cancel")} className="text-[12px] text-slate-500 underline">ยกเลิกคำขอ</button>
+        </>
+      )}
+    </>, "border-rose-400");
+  }
   if (caps.submit) {
     const lastRevise = [...j.events].reverse().find((e) => e.kind === "revise");
     if (mode === "release") {
@@ -236,6 +275,9 @@ function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
         </div>
       )}
       <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="หมายเหตุถึงพนักงานขาย (ถ้ามี)" className={inputCls} />
+      <button type="button" onClick={() => setMode("needinfo")} className="w-full py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-[12.5px] font-bold flex items-center justify-center gap-1.5">
+        <Icon name="help" style={{ fontSize: 17 }} /> ข้อมูลไม่ครบ? ขอข้อมูลเพิ่มจากพนักงานขาย
+      </button>
       <div className="flex gap-2">
         <button type="button" onClick={() => setMode("release")} className={cn(btn, "bg-white border border-slate-200 text-slate-600")}>ปล่อยงาน</button>
         <button

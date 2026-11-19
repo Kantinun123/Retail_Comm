@@ -5,7 +5,16 @@ import { fileToResizedBlob } from "./image";
 import type { BoqSummary } from "@/lib/server/boq-summary";
 export type { BoqSummary };
 
-export type BoqStatus = "waiting" | "working" | "submitted" | "revise" | "boq_ok" | "quoted" | "win" | "loss" | "cancelled";
+export type BoqStatus = "waiting" | "working" | "submitted" | "revise" | "need_info" | "boq_ok" | "quoted" | "win" | "loss" | "cancelled";
+
+/** ข้อมูลที่ห้องแบบขอเพิ่ม (ร่าง) — ต้องตรงกับ NEED_INFO_ITEMS ฝั่ง server */
+export const NEED_INFO_ITEMS: { key: string; label: string }[] = [
+  { key: "photo", label: "รูปจุดที่ใช้สินค้าไม่ชัด / ไม่ครบ" },
+  { key: "plan", label: "ไม่มีแบบแปลน / ขนาด" },
+  { key: "size_mismatch", label: "ขนาดพื้นที่ไม่ตรงกับรูป" },
+  { key: "spec", label: "ไม่ได้ระบุสี / รุ่นสินค้า" },
+  { key: "site_photo", label: "ไม่มีรูปหน้างานจริง" },
+];
 export type BoqRole = "sales" | "designer" | "marketing" | "admin" | "viewer";
 export type BoqFileKind = "photo" | "plan" | "old_design" | "boq" | "d3" | "revise";
 
@@ -14,6 +23,7 @@ export const STATUS_META: Record<BoqStatus, { label: string; cls: string }> = {
   working: { label: "ห้องแบบกำลังทำ", cls: "bg-sky-100 text-sky-800" },
   submitted: { label: "ส่ง BOQ แล้ว รอตรวจ", cls: "bg-violet-100 text-violet-800" },
   revise: { label: "ขอแก้ไข", cls: "bg-orange-100 text-orange-800" },
+  need_info: { label: "รอพนักงานเติมข้อมูล", cls: "bg-rose-100 text-rose-800" },
   boq_ok: { label: "BOQ ผ่าน รอใบเสนอราคา", cls: "bg-teal-100 text-teal-800" },
   quoted: { label: "เสนอราคาแล้ว รอผล", cls: "bg-indigo-100 text-indigo-800" },
   win: { label: "Win", cls: "bg-emerald-100 text-emerald-800" },
@@ -22,7 +32,7 @@ export const STATUS_META: Record<BoqStatus, { label: string; cls: string }> = {
 };
 export const STEPS: { label: string; match: BoqStatus[] }[] = [
   { label: "ส่งคำขอ", match: ["waiting"] },
-  { label: "ห้องแบบทำ", match: ["working", "revise"] },
+  { label: "ห้องแบบทำ", match: ["working", "revise", "need_info"] },
   { label: "ตรวจ BOQ", match: ["submitted"] },
   { label: "BOQ ผ่าน", match: ["boq_ok"] },
   { label: "เสนอราคา", match: ["quoted"] },
@@ -108,7 +118,7 @@ export interface BoqDetail {
   quotes: { no: string; amount: number; at: string }[];
   events: { at: string; actor_name: string | null; kind: string; text: string; tone: "warn" | "ok" | "bad" | null }[];
 }
-export interface BoqCaps { claim: boolean; release: boolean; submit: boolean; review: boolean; edit: boolean; quote: boolean; result: boolean; cancel: boolean }
+export interface BoqCaps { claim: boolean; release: boolean; submit: boolean; review: boolean; edit: boolean; requestInfo: boolean; provideInfo: boolean; quote: boolean; result: boolean; cancel: boolean }
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: "no-store", ...init });
@@ -122,7 +132,7 @@ export const fetchBoqProducts = () =>
   getJson<{ products: BoqProduct[]; lossReasons: LossReason[]; recorder: BoqRecorder | null }>("/api/boq/products");
 export const fetchBoqList = (dealerCode?: string | null) =>
   getJson<{ role: BoqRole; me: string; enabled: boolean; items: BoqListItem[] }>(`/api/boq${dealerCode ? `?dealerCode=${encodeURIComponent(dealerCode)}` : ""}`);
-export const fetchBoq = (id: number) => getJson<{ role: BoqRole; caps: BoqCaps; lossReasons: LossReason[]; winReasons: LossReason[]; item: BoqDetail }>(`/api/boq/${id}`);
+export const fetchBoq = (id: number) => getJson<{ role: BoqRole; me: string; caps: BoqCaps; lossReasons: LossReason[]; winReasons: LossReason[]; item: BoqDetail }>(`/api/boq/${id}`);
 export const boqAction = (id: number, body: Record<string, unknown>) =>
   getJson<{ ok: true }>(`/api/boq/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 export const createBoq = (body: Record<string, unknown>) =>

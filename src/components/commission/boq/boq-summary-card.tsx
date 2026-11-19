@@ -29,10 +29,11 @@ export function BoqSummaryCard({ dealer, title, sub, showAttention = false, rows
         <Icon name="design_services" style={{ fontSize: 16 }} />
         {title}
       </h3>
-      {showAttention && (a.overdue.n > 0 || a.staleOk.n > 0 || a.staleQuote.n > 0) && (
+      {showAttention && (a.overdue.n > 0 || a.staleOk.n > 0 || a.staleQuote.n > 0 || a.staleInfo.n > 0) && (
         <div className="rounded-2xl bg-white border border-amber-200 shadow-sm p-3 space-y-1.5 text-[11.5px]">
           <p className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5"><Icon name="notification_important" className="text-amber-600" style={{ fontSize: 17 }} />BOQ ที่ต้องตาม</p>
           {a.overdue.n > 0 && <p className="rounded-xl bg-red-50 text-red-700 px-3 py-1.5">ห้องแบบเกินกำหนด {a.overdue.n} งาน · {a.overdue.stores.join(", ")}</p>}
+          {a.staleInfo.n > 0 && <p className="rounded-xl bg-rose-50 text-rose-800 px-3 py-1.5">รอทีมขายเติมข้อมูลเกิน 2 วัน {a.staleInfo.n} งาน · {a.staleInfo.stores.join(", ")}</p>}
           {a.staleOk.n > 0 && <p className="rounded-xl bg-amber-50 text-amber-800 px-3 py-1.5">BOQ ผ่านเกิน 7 วัน ยังไม่เสนอราคา {a.staleOk.n} งาน · {a.staleOk.stores.join(", ")}</p>}
           {a.staleQuote.n > 0 && <p className="rounded-xl bg-amber-50 text-amber-800 px-3 py-1.5">เสนอราคาเกิน 30 วัน ยังไม่มีผล {a.staleQuote.n} งาน · {a.staleQuote.stores.join(", ")}</p>}
         </div>

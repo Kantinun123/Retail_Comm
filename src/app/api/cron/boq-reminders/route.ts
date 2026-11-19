@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { pushConfigError, pushConfigured, pushToUser } from "@/lib/server/push";
-import { designerIds, marketingIds, salesUserIds } from "@/lib/server/boq";
+import { designerIds, dueAfterBusinessDays, loadHolidays, marketingIds, salesUserIds } from "@/lib/server/boq";
 
 /**
  * เตือนงาน BOQ DECAAR ที่ค้าง — Vercel Cron 09:00 และ 13:00 (เวลาไทย)
@@ -9,6 +9,7 @@ import { designerIds, marketingIds, salesUserIds } from "@/lib/server/boq";
  * - ห้องแบบเกินกำหนดส่ง (SLA)          -> ห้องแบบที่รับงาน (ยังไม่มีคนรับ = ทุกคน) + Marketing (ครั้งเดียวต่องาน)
  * - BOQ ผ่านเกิน 7 วัน ไม่มีใบเสนอราคา -> พนักงานขาย (ทุก 7 วัน)
  * - เสนอราคาเกิน 30 วัน ไม่มีผล         -> พนักงานขาย (ทุก 30 วัน)
+ * - ห้องแบบขอข้อมูลเพิ่มเกิน 2 วันทำการ   -> พนักงานขาย (ทุก 2 วันทำการ)
  * - วันจันทร์รอบเช้า: สรุปรายสัปดาห์      -> Marketing
  * ป้องกันด้วย CRON_SECRET ; กันส่งซ้ำด้วย reminder_log (kind + user + ref) ; ?dry=1 = ดูแผนอย่างเดียว
  */
@@ -30,8 +31,9 @@ export async function GET(req: NextRequest) {
 
   const { data: reqs } = await sb
     .from("boq_requests")
-    .select("id, req_no, status, customer_name, rep_code, designer_id, created_at, due_at, boq_ok_at, is_test, dealer_code")
-    .in("status", ["waiting", "working", "revise", "boq_ok", "quoted"]);
+    .select("id, req_no, status, customer_name, rep_code, designer_id, created_at, due_at, boq_ok_at, need_info_at, is_test, dealer_code")
+    .in("status", ["waiting", "working", "revise", "need_info", "boq_ok", "quoted"]);
+  const holidays = await loadHolidays(sb);
   const rows = reqs ?? [];
   const quotedIds = rows.filter((r) => r.status === "quoted").map((r) => r.id as number);
   const { data: quotes } = quotedIds.length ? await sb.from("boq_quotes").select("request_id, created_at").in("request_id", quotedIds) : { data: [] };
@@ -64,6 +66,18 @@ export async function GET(req: NextRequest) {
     if (["waiting", "working", "revise"].includes(r.status as string) && new Date(r.due_at as string).getTime() < now) {
       const to = r.designer_id ? [r.designer_id as string] : await ds();
       add("boq-overdue", [...to, ...(await mk())], String(r.id), "BOQ เกินกำหนดส่ง", `${who} — เลยกำหนดส่งของห้องแบบแล้ว`, url);
+    }
+    if (r.status === "need_info" && r.need_info_at) {
+      // ทุก 2 วันทำการที่ยังไม่เติมข้อมูล
+      let k = 0;
+      let t = new Date(r.need_info_at as string);
+      while (k < 30) {
+        const next = dueAfterBusinessDays(t, 2, holidays);
+        if (next.getTime() > now) break;
+        t = next;
+        k++;
+      }
+      if (k > 0) add("boq-need-info", await se(), `${r.id}:${r.need_info_at}:${k}`, "ห้องแบบรอข้อมูลจากคุณ", `${who} — ยังไม่ได้เติมข้อมูลที่ห้องแบบขอ`, url);
     }
     if (r.status === "boq_ok" && r.boq_ok_at) {
       const d = Math.floor((now - new Date(r.boq_ok_at as string).getTime()) / DAY);
