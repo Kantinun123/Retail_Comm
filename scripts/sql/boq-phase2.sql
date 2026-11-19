@@ -193,3 +193,8 @@ on conflict (id) do update set public = false, file_size_limit = excluded.file_s
 alter table public.boq_files drop constraint boq_files_kind_check;
 alter table public.boq_files add constraint boq_files_kind_check check (kind in ('photo', 'plan', 'old_design', 'boq', 'd3', 'revise'));
 alter table public.boq_events add column if not exists data jsonb;
+-- (19 พ.ย. 69) เหตุผล Win (เลือกได้สูงสุด 3 ข้อ ไม่มี "อื่นๆ") + ความเห็นใช้ result_note
+create table if not exists public.boq_win_reasons (code text primary key, label text not null, sort int not null default 0, is_active boolean not null default true);
+alter table public.boq_win_reasons enable row level security;
+-- seed: price_value, quality_brand, boq_3d, service_speed, promotion, contractor, stock_ready (ดู migration boq_win_reasons)
+alter table public.boq_requests add column if not exists win_reasons text[];

@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     sb.from("profiles").select("id, full_name").in("id", [...new Set(rows.map((r) => r.designer_id).filter(Boolean) as string[])].concat("00000000-0000-0000-0000-000000000000")),
     sb.from("boq_loss_reasons").select("code, label"),
   ]);
+  const { data: wreasons } = await sb.from("boq_win_reasons").select("code, label");
+  const wName = new Map((wreasons ?? []).map((r) => [r.code as string, r.label as string]));
   const quotes: { request_id: number; quote_no: string; amount: number; created_at: string }[] = [];
   const points: { request_id: number; no: number; product_code: string; length: number | null; width: number | null; detail: string | null }[] = [];
   for (let i = 0; i < ids.length; i += 300) {
@@ -71,8 +73,9 @@ export async function GET(req: NextRequest) {
       "เลขใบเสนอราคา": q?.quote_no ?? "",
       "ยอดเสนอราคา": q ? Number(q.amount) : "",
       "ยอดปิดจริง": r.final_amount == null ? "" : Number(r.final_amount),
+      "เหตุผล Win": (r.win_reasons ?? []).map((c) => wName.get(c) ?? c).join(" ; "),
       "เหตุผล Loss": r.loss_reason ? lName.get(r.loss_reason) ?? r.loss_reason : "",
-      "หมายเหตุผล": r.result_note ?? "",
+      "ความเห็น": r.result_note ?? "",
       "ปิดงาน": bkk(r.closed_at),
       "เลข Opportunity": r.op_no ?? "",
     };

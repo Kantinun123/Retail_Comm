@@ -132,7 +132,7 @@ function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revi
   );
 }
 
-type Loaded = { role: BoqRole; caps: BoqCaps; lossReasons: LossReason[]; item: BoqDetail };
+type Loaded = { role: BoqRole; caps: BoqCaps; lossReasons: LossReason[]; winReasons: LossReason[]; item: BoqDetail };
 
 function FileLink({ f }: { f: BoqFile }) {
   const icon = f.mime === "application/pdf" ? "picture_as_pdf" : f.mime?.startsWith("image/") ? "image" : f.kind === "d3" ? "view_in_ar" : "description";
@@ -156,7 +156,9 @@ const money = (v: string) => {
 const toNum = (v: string) => Number(v.replace(/,/g, "")) || 0;
 
 function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
-  const { item: j, caps, lossReasons, role } = d;
+  const { item: j, caps, lossReasons, winReasons, role } = d;
+  const [wins, setWins] = useState<string[]>([]);
+  const toggleWin = (c: string) => setWins((a) => (a.includes(c) ? a.filter((x) => x !== c) : a.length >= 3 ? a : [...a, c]));
   const [mode, setMode] = useState<"" | "revise" | "edit" | "ok" | "win" | "loss" | "requote" | "release" | "cancel">("");
   const [text, setText] = useState("");
   const [boqFiles, setBoqFiles] = useState<UploadedFile[]>([]);
@@ -317,7 +319,21 @@ function ActionPanel({ d, onDone }: { d: Loaded; onDone: () => void }) {
       {mode === "win" && <>
         <div><label className={labelCls}>ยอดปิดจริง (บาท)</label><input inputMode="numeric" value={amount} onChange={(e) => setAmount(money(e.target.value))} placeholder={lastQuote ? lastQuote.amount.toLocaleString("th-TH") : ""} className={inputCls} /></div>
         <p className="text-[11px] text-slate-500">ยอดเสนอราคา {baht(lastQuote?.amount)} — ใส่ยอดที่ตกลงจริงหลังต่อรอง</p>
-        <div className="flex gap-2">{back}<button type="button" disabled={saving || !toNum(amount)} onClick={() => run({ action: "win", amount: toNum(amount) })} className={cn(btn, "flex-1 bg-emerald-600 text-white")}>บันทึก Win</button></div>
+        <label className={labelCls}>เหตุผลที่ได้งาน <span className="font-normal text-slate-400">(เลือกได้สูงสุด 3 ข้อ · เลือกแล้ว {wins.length})</span></label>
+        <div className="space-y-1.5">
+          {winReasons.map((o) => {
+            const on = wins.includes(o.code);
+            const full = !on && wins.length >= 3;
+            return (
+              <button key={o.code} type="button" disabled={full} onClick={() => toggleWin(o.code)} className={cn("w-full text-left px-3 py-2 rounded-xl border text-[12px] flex items-center gap-2 transition disabled:opacity-40", on ? "border-emerald-500 bg-emerald-50 text-emerald-900 font-semibold" : "border-slate-200 bg-white text-slate-600")}>
+                <Icon name={on ? "check_box" : "check_box_outline_blank"} style={{ fontSize: 17 }} />
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="ความเห็นเพิ่มเติม (ถ้ามี) เช่น ลูกค้าชอบสีจากแบบ 3D" className={inputCls} />
+        <div className="flex gap-2">{back}<button type="button" disabled={saving || !toNum(amount) || !wins.length} onClick={() => run({ action: "win", amount: toNum(amount), reasons: wins, text })} className={cn(btn, "flex-1 bg-emerald-600 text-white")}>บันทึก Win</button></div>
       </>}
       {mode === "loss" && <>
         <label className={labelCls}>เหตุผลที่ไม่ได้งาน</label>
@@ -465,6 +481,8 @@ export function BoqDetailScreen({ id }: { id: number }) {
             <h3 className="text-[13px] font-bold text-slate-800 mb-1">ใบเสนอราคา & ผล</h3>
             {j.quotes.map((q, i) => <Row key={i} k={`ใบเสนอราคา ${q.no}${i < j.quotes.length - 1 ? " (เดิม)" : ""}`} v={baht(q.amount)} />)}
             {j.status === "win" && <Row k="ยอดปิดจริง" v={<span className="text-emerald-700">{baht(j.finalAmount)}</span>} />}
+            {j.status === "win" && j.winReasons.length > 0 && <Row k="เหตุผลที่ได้งาน" v={<span className="whitespace-pre-line">{j.winReasons.map((c) => d.winReasons.find((r) => r.code === c)?.label ?? c).join("\n")}</span>} />}
+            {j.status === "win" && j.resultNote && <Row k="ความเห็น" v={j.resultNote} />}
             {j.status === "loss" && <Row k="เหตุผลที่ไม่ได้งาน" v={`${reason ?? j.lossReason}${j.resultNote ? ` — ${j.resultNote}` : ""}`} />}
           </section>
         )}

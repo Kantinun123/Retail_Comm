@@ -250,6 +250,16 @@ export function BoqOverviewScreen() {
               </section>
             )}
 
+            {s.winReasons.length > 0 && (
+              <section>
+                <H3 icon="thumb_up">เหตุผลที่ได้งาน</H3>
+                <div className={cn(card, "p-3.5 space-y-2")}>
+                  <p className="text-[10px] text-slate-400">Win {s.funnel.win} งาน · 1 งานเลือกได้สูงสุด 3 ข้อ</p>
+                  <Bars color="bg-emerald-500" rows={s.winReasons.map((r) => ({ label: r.label.replace(/^Win - /, ""), n: r.n }))} />
+                </div>
+              </section>
+            )}
+
             {s.lossReasons.length > 0 && (
               <section>
                 <H3 icon="thumb_down">เหตุผลที่ไม่ได้งาน</H3>

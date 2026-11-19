@@ -51,6 +51,7 @@ export async function GET(_req: Request, { params }: Params) {
     r.designer_id ? sb.from("profiles").select("full_name").eq("id", r.designer_id as string).maybeSingle() : Promise.resolve({ data: null }),
     sb.from("boq_loss_reasons").select("code, label").order("sort"),
   ]);
+  const { data: winReasons } = await sb.from("boq_win_reasons").select("code, label").eq("is_active", true).order("sort");
   const codes = (pts.data ?? []).map((p) => p.product_code as string);
   const { data: prods } = codes.length ? await sb.from("boq_products").select("code, name, grp, sub, size, unit").in("code", codes) : { data: [] };
   const prodBy = new Map((prods ?? []).map((p) => [p.code as string, p]));
@@ -63,6 +64,7 @@ export async function GET(_req: Request, { params }: Params) {
     role: boqRoleOf(ctx),
     caps: capsFor(ctx, r),
     lossReasons: reasons.data ?? [],
+    winReasons: winReasons ?? [],
     item: {
       id: r.id,
       reqNo: r.req_no,
@@ -94,6 +96,7 @@ export async function GET(_req: Request, { params }: Params) {
       boqOkAt: r.boq_ok_at,
       finalAmount: r.final_amount == null ? null : Number(r.final_amount),
       lossReason: r.loss_reason,
+      winReasons: (r.win_reasons as string[] | null) ?? [],
       resultNote: r.result_note,
       closedAt: r.closed_at,
       points: (pts.data ?? []).map((p) => ({
@@ -121,6 +124,7 @@ interface ActionBody {
   amount?: number;
   reason?: string;
   points?: PointIn[];
+  reasons?: string[];
 }
 
 export async function POST(req: Request, { params }: Params) {
@@ -272,8 +276,13 @@ export async function POST(req: Request, { params }: Params) {
       if (!caps.result) return forbid();
       const amount = Number(b.amount);
       if (!(amount > 0) || amount > 1e10) return bad("กรุณาใส่ยอดปิดจริง");
-      if (!(await move(["quoted"], { status: "win", final_amount: amount, closed_at: now, loss_reason: null, result_note: text || null }))) return forbid();
-      await addEvent(sb, id, ctx, name, "win", `Win ยอดปิดจริง ${baht(amount)}`, "ok");
+      const picked = [...new Set((b.reasons ?? []).map(String))];
+      const { data: wr } = picked.length ? await sb.from("boq_win_reasons").select("code, label").in("code", picked).eq("is_active", true) : { data: [] };
+      if (!wr?.length || wr.length !== picked.length) return bad("กรุณาเลือกเหตุผลที่ได้งาน");
+      if (picked.length > 3) return bad("เลือกเหตุผลได้ไม่เกิน 3 ข้อ");
+      if (!(await move(["quoted"], { status: "win", final_amount: amount, closed_at: now, loss_reason: null, win_reasons: picked, result_note: text || null }))) return forbid();
+      const labels = picked.map((c) => wr.find((x) => x.code === c)?.label ?? c);
+      await addEvent(sb, id, ctx, name, "win", [`Win ยอดปิดจริง ${baht(amount)}`, ...labels, ...(text ? [`ความเห็น: ${text}`] : [])].join("\n"), "ok");
       if (amount >= BIG_WIN) await notifyBoq(sb, info, "win_big", `ยอดปิดจริง ${baht(amount)}`);
       break;
     }
@@ -283,7 +292,7 @@ export async function POST(req: Request, { params }: Params) {
       const { data: lr } = await sb.from("boq_loss_reasons").select("code, label").eq("code", reason).maybeSingle();
       if (!lr) return bad("กรุณาเลือกเหตุผล");
       if (reason === "other" && !text) return bad("กรุณาระบุเหตุผล");
-      if (!(await move(["quoted"], { status: "loss", loss_reason: reason, result_note: text || null, closed_at: now, final_amount: null }))) return forbid();
+      if (!(await move(["quoted"], { status: "loss", loss_reason: reason, result_note: text || null, closed_at: now, final_amount: null, win_reasons: null }))) return forbid();
       await addEvent(sb, id, ctx, name, "loss", reason === "other" ? `Lost - ${text}` : `${lr.label}${text ? ` — ${text}` : ""}`, "bad");
       if (LOSS_TO_BRAND.includes(reason)) await notifyBoq(sb, info, "loss_brand", `${lr.label}${text ? ` (${text})` : ""}`);
       break;

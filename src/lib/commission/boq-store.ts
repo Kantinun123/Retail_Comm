@@ -99,6 +99,7 @@ export interface BoqDetail {
   boqOkAt: string | null;
   finalAmount: number | null;
   lossReason: string | null;
+  winReasons: string[];
   resultNote: string | null;
   closedAt: string | null;
   points: { no: number; code: string; length: number | null; width: number | null; detail: string | null; product: BoqProduct | null }[];
@@ -121,7 +122,7 @@ export const fetchBoqProducts = () =>
   getJson<{ products: BoqProduct[]; lossReasons: LossReason[]; recorder: BoqRecorder | null }>("/api/boq/products");
 export const fetchBoqList = (dealerCode?: string | null) =>
   getJson<{ role: BoqRole; me: string; enabled: boolean; items: BoqListItem[] }>(`/api/boq${dealerCode ? `?dealerCode=${encodeURIComponent(dealerCode)}` : ""}`);
-export const fetchBoq = (id: number) => getJson<{ role: BoqRole; caps: BoqCaps; lossReasons: LossReason[]; item: BoqDetail }>(`/api/boq/${id}`);
+export const fetchBoq = (id: number) => getJson<{ role: BoqRole; caps: BoqCaps; lossReasons: LossReason[]; winReasons: LossReason[]; item: BoqDetail }>(`/api/boq/${id}`);
 export const boqAction = (id: number, body: Record<string, unknown>) =>
   getJson<{ ok: true }>(`/api/boq/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 export const createBoq = (body: Record<string, unknown>) =>
