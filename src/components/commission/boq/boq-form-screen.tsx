@@ -43,22 +43,38 @@ function ExampleImage({ src, caption }: { src: string; caption: string }) {
   );
 }
 
+const OLD_MENU = "สินค้าเดิมของคำขอนี้ (เลิกแสดงแล้ว)";
+const menuOf = (p: BoqProduct) => p.menu ?? OLD_MENU;
+
+/** เลือกสินค้า 2 ขั้น: กลุ่มสินค้า (dropdown 18 กลุ่ม) -> รุ่น/สีในกลุ่ม (ค้นหาได้) */
 export function ProductPicker({ products, value, onPick }: { products: BoqProduct[]; value: string; onPick: (code: string) => void }) {
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(!value);
   const prod = products.find((p) => p.code === value);
+  const [open, setOpen] = useState(!value);
+  const [menu, setMenu] = useState(prod ? menuOf(prod) : "");
+  const [q, setQ] = useState("");
+  const menus = useMemo(() => {
+    const m = new Map<string, { label: string; sort: number; n: number }>();
+    for (const p of products) {
+      const label = menuOf(p);
+      const cur = m.get(label) ?? { label, sort: p.menu ? (p.menu_sort ?? 999) : 1000, n: 0 };
+      cur.n++;
+      m.set(label, cur);
+    }
+    return [...m.values()].sort((a, b) => a.sort - b.sort);
+  }, [products]);
   const hits = useMemo(() => {
     const k = q.trim().toLowerCase();
-    const list = k ? products.filter((p) => `${p.code} ${p.name} ${p.sub ?? ""} ${p.grp ?? ""}`.toLowerCase().includes(k)) : products;
-    return list.slice(0, 30);
-  }, [q, products]);
+    const inMenu = products.filter((p) => menuOf(p) === menu);
+    return k ? inMenu.filter((p) => `${p.code} ${p.name} ${p.sub ?? ""}`.toLowerCase().includes(k)) : inMenu;
+  }, [q, menu, products]);
   if (prod && !open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 p-3">
-        <p className="text-[13px] font-semibold text-slate-800">{prod.name}</p>
+      <button type="button" onClick={() => { setMenu(menuOf(prod)); setOpen(true); }} className="w-full text-left rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p className="text-[11px] font-semibold text-slate-500">{menuOf(prod)}</p>
+        <p className="text-[13px] font-semibold text-slate-800 mt-0.5">{prod.name}</p>
         <p className="text-[11px] text-slate-500 mt-0.5">
-          รหัส {prod.code} · {prod.grp} / {prod.sub}
-          {prod.size ? ` · ${prod.size} ซม.` : ""}
+          รหัส {prod.code}
+          {prod.size ? ` · ${prod.size} ซม.` : ""} · {prod.unit === "m" ? "ความยาว (ม.)" : "กว้าง × ยาว"}
         </p>
         <p className="text-[11px] text-[#d32029] mt-1 font-semibold">แตะเพื่อเปลี่ยนสินค้า</p>
       </button>
@@ -66,20 +82,39 @@ export function ProductPicker({ products, value, onPick }: { products: BoqProduc
   }
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <Icon name="search" className="absolute left-3 top-2.5 text-slate-400" style={{ fontSize: 18 }} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหารหัส / ชื่อสินค้า เช่น ซีชาแนล, NEX, T-Clip" className={cn(inputCls, "pl-9")} />
+      <div>
+        <p className="text-[11px] font-semibold text-slate-500 mb-1">1. กลุ่มสินค้า</p>
+        <select value={menu} onChange={(e) => { setMenu(e.target.value); setQ(""); }} className={cn(inputCls, "bg-white")}>
+          <option value="">— เลือกกลุ่มสินค้า —</option>
+          {menus.map((m) => (
+            <option key={m.label} value={m.label}>{m.label} ({m.n})</option>
+          ))}
+        </select>
       </div>
-      <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-64 overflow-y-auto bg-white">
-        {hits.map((p) => (
-          <button key={p.code} type="button" onClick={() => { onPick(p.code); setOpen(false); setQ(""); }} className="w-full text-left px-3 py-2 hover:bg-red-50">
-            <p className="text-[12px] font-medium text-slate-800">{p.name}</p>
-            <p className="text-[10px] text-slate-500">{p.code} · {p.sub} · {p.unit === "m" ? "เมตร (ความยาว)" : "กว้าง × ยาว"}</p>
-          </button>
-        ))}
-        {hits.length === 0 && <p className="text-[12px] text-slate-400 p-3 text-center">ไม่พบสินค้า</p>}
-      </div>
-      <p className="text-[10px] text-slate-400">ใบราคา DECAAR {products.length} รายการ · ไม่รวมอุปกรณ์ (ห้องแบบใส่ใน BOQ ให้)</p>
+      {menu && (
+        <div>
+          <p className="text-[11px] font-semibold text-slate-500 mb-1">2. รุ่น / สี</p>
+          {hits.length > 8 || q ? (
+            <div className="relative mb-2">
+              <Icon name="search" className="absolute left-3 top-2.5 text-slate-400" style={{ fontSize: 18 }} />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหารุ่น / สี / ขนาด / รหัส" className={cn(inputCls, "pl-9")} />
+            </div>
+          ) : null}
+          <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-64 overflow-y-auto bg-white">
+            {hits.map((p) => (
+              <button key={p.code} type="button" onClick={() => { onPick(p.code); setOpen(false); setQ(""); }} className={cn("w-full text-left px-3 py-2 hover:bg-red-50", p.code === value && "bg-red-50")}>
+                <p className="text-[12px] font-medium text-slate-800">{p.name}</p>
+                <p className="text-[10px] text-slate-500">{p.code}{p.sub ? ` · ${p.sub}` : ""} · {p.unit === "m" ? "ความยาว (ม.)" : "กว้าง × ยาว"}</p>
+              </button>
+            ))}
+            {hits.length === 0 && <p className="text-[12px] text-slate-400 p-3 text-center">ไม่พบสินค้า</p>}
+          </div>
+        </div>
+      )}
+      {prod && (
+        <button type="button" onClick={() => setOpen(false)} className="text-[11px] font-semibold text-slate-500 underline">ใช้สินค้าเดิม</button>
+      )}
+      <p className="text-[10px] text-slate-400">ไม่รวมอุปกรณ์ (คลิป กาว สกรู สี) ห้องแบบใส่ใน BOQ ให้</p>
     </div>
   );
 }

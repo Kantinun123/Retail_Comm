@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   const line = new URL(req.url).searchParams.get("line") || "decaar";
   const sb = createServiceClient();
   const [p, l] = await Promise.all([
-    sb.from("boq_products").select("code, name, grp, sub, size, unit").eq("line", line).eq("is_active", true).order("sort"),
+    sb.from("boq_products").select("code, name, grp, sub, size, unit, menu, menu_sort").eq("line", line).eq("is_active", true).order("sort"),
     sb.from("boq_loss_reasons").select("code, label").eq("is_active", true).order("sort"),
   ]);
   if (p.error || l.error) return NextResponse.json({ ok: false, error: (p.error ?? l.error)?.message }, { status: 500 });

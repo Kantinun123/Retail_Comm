@@ -161,13 +161,15 @@ export type PointIn = { productCode?: string; length?: number; width?: number; d
 export type PointRow = { no: number; product_code: string; length: number; width: number | null; detail: string | null };
 
 /** ตรวจจุดที่ส่งมา (สินค้าต้องมีอยู่ + ขนาดตามหน่วย) ; คืน error เป็นข้อความไทย */
-export async function validatePoints(sb: Sb, input: PointIn[] | undefined): Promise<{ ok: true; points: PointRow[] } | { ok: false; error: string }> {
+export async function validatePoints(sb: Sb, input: PointIn[] | undefined, keepCodes: string[] = []): Promise<{ ok: true; points: PointRow[] } | { ok: false; error: string }> {
   const pts = (input ?? []).slice(0, 50);
   if (!pts.length) return { ok: false, error: "กรุณาเพิ่มจุดที่ต้องการทำ BOQ อย่างน้อย 1 จุด" };
   const txt = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   const codes = [...new Set(pts.map((p) => txt(p.productCode, 30)))];
-  const { data: prods } = await sb.from("boq_products").select("code, unit").in("code", codes).eq("is_active", true);
-  const unitOf = new Map((prods ?? []).map((p) => [p.code as string, p.unit as string]));
+  // สินค้าที่ถูกซ่อน (is_active = false) ใช้ได้เฉพาะรหัสที่คำขอนี้มีอยู่เดิม (keepCodes)
+  const keep = new Set(keepCodes);
+  const { data: prods } = await sb.from("boq_products").select("code, unit, is_active").in("code", codes);
+  const unitOf = new Map((prods ?? []).filter((p) => p.is_active || keep.has(p.code as string)).map((p) => [p.code as string, p.unit as string]));
   const points: PointRow[] = [];
   for (const [i, p] of pts.entries()) {
     const code = txt(p.productCode, 30);

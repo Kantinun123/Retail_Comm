@@ -1,6 +1,6 @@
 "use client";
 /* รายละเอียดคำขอ BOQ DECAAR + ปุ่มตามบทบาท/สถานะ (server ตรวจสิทธิ์ซ้ำทุกครั้ง) */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "../icon";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/commission/session";
@@ -35,7 +35,13 @@ function ChangeEditor({ j, mode, onCancel, onDone }: { j: BoqDetail; mode: "revi
     setEditPts(true);
     if (!products) fetchBoqProducts().then((d) => setProducts(d.products)).catch(() => setErr("โหลดรายการสินค้าไม่สำเร็จ"));
   };
-  const list = products ?? [];
+  // รายการเลือก = สินค้าที่เปิดอยู่ + สินค้าเดิมของคำขอนี้ที่ถูกซ่อนแล้ว (แก้คำขอเก่าได้โดยไม่ต้องเปลี่ยนสินค้า)
+  const list = useMemo(() => {
+    const base = products ?? [];
+    const have = new Set(base.map((p) => p.code));
+    const old = j.points.flatMap((p) => (p.product && !have.has(p.product.code) ? [{ ...p.product, menu: null }] : []));
+    return [...base, ...old.filter((p, i, a) => a.findIndex((x) => x.code === p.code) === i)];
+  }, [products, j.points]);
   const unitOf = (code: string) => list.find((p) => p.code === code)?.unit ?? j.points.find((p) => p.code === code)?.product?.unit;
   const setPoint = (i: number, patch: Partial<EditPoint>) => setPoints((a) => a.map((x, k) => (k === i ? { ...x, ...patch } : x)));
   const badPoint = editPts && points.some((p) => !p.code || !(numOf(p.length) > 0) || (unitOf(p.code) === "area" && !(numOf(p.width) > 0)));

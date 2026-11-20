@@ -48,7 +48,8 @@ export const NEEDS: { key: "boq" | "boq_3d"; label: string }[] = [
 export const needLabel = (n: string) => NEEDS.find((x) => x.key === n)?.label ?? n;
 export const SLA_DAYS = (need: string) => (need === "boq_3d" ? 5 : 3);
 
-export interface BoqProduct { code: string; name: string; grp: string | null; sub: string | null; size: string | null; unit: "m" | "area" }
+/** menu = กลุ่มใน dropdown (เช่น "กรุผนัง – SCG DECAAR โมดิน่า") ; null = สินค้าที่ถูกซ่อนแล้วแต่คำขอเก่ายังอ้างอยู่ */
+export interface BoqProduct { code: string; name: string; grp: string | null; sub: string | null; size: string | null; unit: "m" | "area"; menu?: string | null; menu_sort?: number | null }
 export interface LossReason { code: string; label: string }
 
 export interface BoqListItem {

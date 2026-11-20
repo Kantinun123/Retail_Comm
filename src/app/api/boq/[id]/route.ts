@@ -55,7 +55,7 @@ export async function GET(_req: Request, { params }: Params) {
   ]);
   const { data: winReasons } = await sb.from("boq_win_reasons").select("code, label").eq("is_active", true).order("sort");
   const codes = (pts.data ?? []).map((p) => p.product_code as string);
-  const { data: prods } = codes.length ? await sb.from("boq_products").select("code, name, grp, sub, size, unit").in("code", codes) : { data: [] };
+  const { data: prods } = codes.length ? await sb.from("boq_products").select("code, name, grp, sub, size, unit, menu, menu_sort, is_active").in("code", codes) : { data: [] };
   const prodBy = new Map((prods ?? []).map((p) => [p.code as string, p]));
   const subIds = [...new Set((vers.data ?? []).map((v) => v.submitted_by as string))];
   const { data: subs } = subIds.length ? await sb.from("profiles").select("id, full_name").in("id", subIds) : { data: [] };
@@ -221,9 +221,10 @@ export async function POST(req: Request, { params }: Params) {
       let changes: string[] = [];
       let snapshot: { before: PointRow[]; after: PointRow[] } | null = null;
       if (b.points) {
-        const v = await validatePoints(sb, b.points);
-        if (!v.ok) return bad(v.error);
         const { data: old } = await sb.from("boq_points").select("no, product_code, length, width, detail").eq("request_id", id).order("no");
+        // สินค้าที่คำขอนี้ใช้อยู่แล้วยังคงไว้ได้ แม้ถูกซ่อนจากรายการเลือกแล้ว
+        const v = await validatePoints(sb, b.points, (old ?? []).map((p) => p.product_code as string));
+        if (!v.ok) return bad(v.error);
         const before = ((old ?? []) as PointRow[]).map((p) => ({ ...p, length: Number(p.length), width: p.width == null ? null : Number(p.width) }));
         changes = await diffPoints(sb, before, v.points);
         if (changes.length) snapshot = { before, after: v.points };
