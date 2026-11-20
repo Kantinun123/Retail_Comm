@@ -116,6 +116,7 @@ export const DAILY_JOBS: { job: string; label: string; group: "gsheet" | "sharep
   { job: "lhs-discount", label: "LHS Channel Discount", group: "sharepoint", unit: "PO", href: "/app/lhs-purchase-discount" },
   { job: "design-intake", label: "แบบรับเข้า (CRM)", group: "sharepoint", unit: "แบบ", href: "/app/design-intake" },
   { job: "line-groups", label: "กลุ่ม Line ลูกค้า", group: "sharepoint", unit: "ลูกค้า", href: "/app/line-groups" },
+  { job: "lhs-commission-he", label: "LHS Commission (HE)", group: "sharepoint", unit: "แถว", href: "/app/lhs-commission" },
 ];
 
 /** แหล่งข้อมูลรายเดือน (อัปโหลดเอง) */
@@ -124,7 +125,8 @@ export const MONTHLY_SOURCES: { source: string; label: string; href: string; upl
   { source: "profit-share-ba", label: "Profit Share BA", href: "/app/ba-profit-share", uploadable: false },
   { source: "product-commission", label: "Product Commission", href: "/app/commission-product", uploadable: false },
   { source: "ba-commission", label: "BA Commission", href: "/app/ba-incentive", uploadable: true },
-  { source: "lhs-commission", label: "LHS Commission", href: "/app/lhs-commission", uploadable: false },
+  // Housing Expert sync อัตโนมัติจาก SharePoint (RSS System - commission) ; SCG Home ยังนำเข้ามือ
+  { source: "lhs-commission", label: "LHS Commission", href: "/app/lhs-commission", uploadable: false, auto: true },
   // sync อัตโนมัติจาก SharePoint (win_contract_all.xlsx) — ไม่ต้องอัปโหลด
   { source: "lhs-discount", label: "LHS Channel Discount", href: "/app/lhs-purchase-discount", uploadable: false, auto: true },
 ];
