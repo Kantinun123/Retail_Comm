@@ -36,6 +36,7 @@ const F = {
   lhs: SP + "RSS  System - PRD_CSD/win_contract_all.xlsx",
   crm: SP + "RSS  System - PRD_CSD/crm_trn_opportunity.xlsx",
   lhsCommHe: SP + "RSS  System - commission/summaryData_HousingExpert_2026.xlsx",
+  lhsCommScg: SP + "RSS  System - commission/summaryData_SCGHome_2026.xlsx",
 };
 const JOBS = [
   { id: "ba", group: "gsheet", label: "ยอดขาย BA", args: ["scripts/sync-ba-service-sales-gsheet.mjs", "--apply"] },
@@ -50,8 +51,9 @@ const JOBS = [
   // ไฟล์เดียวกับ LHS/Rudy: อัปเดตลูกค้าของงาน + คำนวณสถานะกลุ่ม Line ใหม่ (ต้องอยู่หลังงาน "lhs")
   { id: "line-groups", group: "sharepoint", label: "กลุ่ม Line ลูกค้า", file: F.lhs, args: ["scripts/import-line-groups.mjs", "--apply", "--win", F.lhs] },
   { id: "design-intake", group: "sharepoint", label: "แบบรับเข้า (CRM)", file: F.crm, args: ["scripts/sync-design-intake.mjs", "--apply", "--file", F.crm] },
-  // ผลประโยชน์พนักงานร้าน (Housing Expert) — ไฟล์สะสมทั้งปี แทนที่ทั้งชุด
+  // ผลประโยชน์พนักงานร้าน (Housing Expert / SCG Home) — ไฟล์สะสมทั้งปี แทนที่ทั้งชุดต่อ kind
   { id: "lhs-commission-he", group: "sharepoint", label: "LHS Commission (HE)", file: F.lhsCommHe, args: ["scripts/sync-lhs-commission.mjs", "--kind", "he", "--apply", "--file", F.lhsCommHe] },
+  { id: "lhs-commission-scghome", group: "sharepoint", label: "LHS Commission (SCG Home)", file: F.lhsCommScg, args: ["scripts/sync-lhs-commission.mjs", "--kind", "scghome", "--apply", "--file", F.lhsCommScg] },
 ];
 
 /* ---------- log ---------- */
