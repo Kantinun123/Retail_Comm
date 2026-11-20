@@ -14,17 +14,18 @@ export async function GET(req: Request) {
   ]);
   if (p.error || l.error) return NextResponse.json({ ok: false, error: (p.error ?? l.error)?.message }, { status: 500 });
   // ผู้บันทึก (ข้อ 1-3 ของฟอร์ม): ร้าน + ชื่อ + อีเมลจากข้อมูลพนักงาน
-  let recorder: { name: string; email: string | null; dealerCode: string; dealerName: string } | null = null;
+  let recorder: { name: string; email: string | null; dealerCode: string; dealerName: string; province: string | null } | null = null;
   if (ctx.role === "sales" && ctx.repCode && ctx.dealerCode) {
     const [rep, dealer] = await Promise.all([
       sb.from("sale_reps").select("name, nickname, email").eq("rep_code", ctx.repCode).maybeSingle(),
-      sb.from("dealers").select("name").eq("code", ctx.dealerCode).maybeSingle(),
+      sb.from("dealers").select("name, province").eq("code", ctx.dealerCode).maybeSingle(),
     ]);
     recorder = {
       name: rep.data?.name ? (rep.data.nickname ? `${rep.data.name} (${rep.data.nickname})` : (rep.data.name as string)) : ctx.repCode,
       email: ((rep.data?.email as string | null) ?? "").trim() || null,
       dealerCode: ctx.dealerCode,
       dealerName: (dealer.data?.name as string | undefined) ?? ctx.dealerCode,
+      province: (dealer.data?.province as string | null | undefined) ?? null,
     };
   }
   return NextResponse.json({ ok: true, products: p.data, lossReasons: l.data, recorder });

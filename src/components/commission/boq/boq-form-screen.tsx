@@ -9,7 +9,8 @@ import {
   BUILDING_TYPES, CUST_TYPES, JOB_TYPES, NEEDS, SLA_DAYS, createBoq, fetchBoqProducts, fmtNum,
   type BoqProduct, type BoqRecorder, type UploadedFile,
 } from "@/lib/commission/boq-store";
-import { BoqHeader, Chips, FileUploader, Section, btn, inputCls, labelCls } from "./boq-shared";
+import { BoqHeader, Chips, FileUploader, Section, badCls, btn, inputCls, labelCls } from "./boq-shared";
+import { TH_PROVINCES, formatThaiPhone } from "@/lib/th-provinces";
 
 type Point = { key: number; code: string; length: string; width: string; detail: string };
 const opt = (l: string[]) => l.map((x) => ({ key: x, label: x }));
@@ -156,6 +157,9 @@ export function BoqFormScreen() {
         if (cancelled) return;
         setProducts(d.products);
         setRecorder(d.recorder);
+        // จังหวัดหน้างานเริ่มต้น = จังหวัดของร้าน (เปลี่ยนได้)
+        const pv = d.recorder?.province ?? "";
+        if ((TH_PROVINCES as readonly string[]).includes(pv)) setProvince((cur) => cur || pv);
       })
       .catch((e) => !cancelled && setLoadErr(e instanceof Error ? e.message : "โหลดไม่สำเร็จ"));
     return () => {
@@ -165,25 +169,51 @@ export function BoqFormScreen() {
 
   const unitOf = (code: string) => products.find((p) => p.code === code)?.unit;
   const budgetNum = num(budget);
+  const phoneDigits = phone.replace(/\D/g, "").length;
+  // ช่องที่ขาด (true = ขาด) ; ใช้ทั้งข้อความสรุปและกรอบแดงรายช่องหลังกดส่ง
+  const bad = {
+    email: !!recorder && !recorder.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
+    customer: !customer.trim(),
+    phone: phoneDigits > 0 && phoneDigits !== 10, // ไม่บังคับ แต่ถ้ากรอกต้องครบ 10 หลัก
+    custType: !custType,
+    custOther: custType === "อื่นๆ" && !custOther.trim(),
+    jobType: !jobType,
+    building: !building,
+    need: !need,
+    photos: photos.length === 0,
+    plans: plans.length === 0,
+    budget: !(budgetNum > 0),
+  };
+  const pointCodeBad = (p: Point) => !p.code;
+  const pointLenBad = (p: Point) => !!p.code && !(num(p.length) > 0);
+  const pointWidthBad = (p: Point) => !!p.code && unitOf(p.code) === "area" && !(num(p.width) > 0);
+  const pointsBad = points.some((p) => pointCodeBad(p) || pointLenBad(p) || pointWidthBad(p));
+  const show = (b: boolean) => tried && b;
   const missing = [
-    !customer.trim() && "ชื่อลูกค้า",
-    !custType && "ประเภทลูกค้า",
-    custType === "อื่นๆ" && !custOther.trim() && "ระบุประเภทลูกค้า",
-    !jobType && "ประเภทงาน",
-    !building && "ประเภทอาคาร",
-    !need && "ความต้องการ",
-    points.some((p) => !p.code) && "สินค้าทุกจุด",
-    points.some((p) => p.code && (!(num(p.length) > 0) || (unitOf(p.code) === "area" && !(num(p.width) > 0)))) && "พื้นที่ทุกจุด",
-    photos.length === 0 && "รูปจุดที่ใช้สินค้า",
-    plans.length === 0 && "แบบแปลน",
-    !(budgetNum > 0) && "งบประมาณ",
-    recorder && !recorder.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && "Email ผู้บันทึก",
+    bad.email && "Email ผู้บันทึก",
+    bad.customer && "ชื่อลูกค้า",
+    bad.phone && "เบอร์โทรให้ครบ 10 หลัก",
+    bad.custType && "ประเภทลูกค้า",
+    bad.custOther && "ระบุประเภทลูกค้า",
+    bad.jobType && "ประเภทงาน",
+    bad.building && "ประเภทอาคาร",
+    bad.need && "ความต้องการ",
+    bad.photos && "รูปจุดที่ใช้สินค้า",
+    points.some(pointCodeBad) && "สินค้าทุกจุด",
+    points.some((p) => pointLenBad(p) || pointWidthBad(p)) && "พื้นที่ทุกจุด",
+    bad.plans && "แบบแปลน",
+    bad.budget && "งบประมาณ",
   ].filter(Boolean) as string[];
 
   const submit = async () => {
     setTried(true);
     setSaveErr("");
-    if (missing.length || busy) return;
+    if (missing.length) {
+      // เลื่อนไปส่วนแรกที่ขาด (รอ render กรอบแดงก่อน)
+      setTimeout(() => document.querySelector("[data-invalid]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+      return;
+    }
+    if (busy) return;
     setSaving(true);
     try {
       const r = await createBoq({
@@ -237,45 +267,55 @@ export function BoqFormScreen() {
           ) : recorder ? (
             <div>
               <label className={labelCls}>Email ผู้บันทึก</label>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" placeholder="ยังไม่มีในระบบ — กรอกครั้งแรก ระบบจะจำไว้" className={inputCls} />
+              <input data-invalid={show(bad.email) ? "1" : undefined} value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" placeholder="ยังไม่มีในระบบ — กรอกครั้งแรก ระบบจะจำไว้" className={cn(inputCls, show(bad.email) && badCls)} />
             </div>
           ) : null}
         </Section>
 
-        <Section no="4" title="ข้อมูลลูกค้า">
+        <Section no="4" title="ข้อมูลลูกค้า" invalid={show(bad.customer || bad.phone)} invalidText={bad.customer ? "กรุณากรอกชื่อลูกค้า" : "เบอร์โทรต้องครบ 10 หลัก"}>
           <div>
-            <label className={labelCls}>ชื่อ-นามสกุลลูกค้า</label>
-            <input value={customer} onChange={(e) => setCustomer(e.target.value)} maxLength={120} className={inputCls} />
+            <label className={labelCls}>ชื่อ-นามสกุลลูกค้า *</label>
+            <input value={customer} onChange={(e) => setCustomer(e.target.value)} maxLength={120} className={cn(inputCls, show(bad.customer) && badCls)} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className={labelCls}>เบอร์โทร</label>
-              <input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} className={inputCls} />
+              <input inputMode="tel" value={phone} onChange={(e) => setPhone(formatThaiPhone(e.target.value))} maxLength={12} placeholder="08X-XXX-XXXX" className={cn(inputCls, "tabular-nums", show(bad.phone) && badCls)} />
             </div>
             <div>
               <label className={labelCls}>จังหวัดหน้างาน</label>
-              <input value={province} onChange={(e) => setProvince(e.target.value)} maxLength={60} className={inputCls} />
+              <select value={province} onChange={(e) => setProvince(e.target.value)} className={cn(inputCls, "bg-white", !province && "text-slate-400")}>
+                <option value="">— เลือกจังหวัด —</option>
+                {TH_PROVINCES.map((pv) => (
+                  <option key={pv} value={pv} className="text-slate-800">{pv}</option>
+                ))}
+              </select>
             </div>
           </div>
         </Section>
 
-        <Section no="5" title="ประเภทลูกค้า">
+        <Section no="5" title="ประเภทลูกค้า" invalid={show(bad.custType || bad.custOther)} invalidText={bad.custType ? "กรุณาเลือกประเภทลูกค้า" : "กรุณาระบุประเภทลูกค้า"}>
           <Chips options={opt(CUST_TYPES)} value={custType} onChange={setCustType} />
-          {custType === "อื่นๆ" && <input value={custOther} onChange={(e) => setCustOther(e.target.value)} placeholder="ระบุ" maxLength={100} className={inputCls} />}
+          {custType === "อื่นๆ" && <input value={custOther} onChange={(e) => setCustOther(e.target.value)} placeholder="ระบุ" maxLength={100} className={cn(inputCls, show(bad.custOther) && badCls)} />}
         </Section>
-        <Section no="6" title="ประเภทงาน"><Chips options={opt(JOB_TYPES)} value={jobType} onChange={setJobType} /></Section>
-        <Section no="7" title="ประเภทอาคาร"><Chips options={opt(BUILDING_TYPES)} value={building} onChange={setBuilding} /></Section>
-        <Section no="8" title="ความต้องการของลูกค้า">
+        <Section no="6" title="ประเภทงาน" invalid={show(bad.jobType)} invalidText="กรุณาเลือกประเภทงาน"><Chips options={opt(JOB_TYPES)} value={jobType} onChange={setJobType} /></Section>
+        <Section no="7" title="ประเภทอาคาร" invalid={show(bad.building)} invalidText="กรุณาเลือกประเภทอาคาร"><Chips options={opt(BUILDING_TYPES)} value={building} onChange={setBuilding} /></Section>
+        <Section no="8" title="ความต้องการของลูกค้า" invalid={show(bad.need)} invalidText="กรุณาเลือกความต้องการ">
           <Chips options={NEEDS} value={need} onChange={setNeed} />
           {need && <p className="text-[11px] text-slate-500">ห้องแบบต้องส่งภายใน <b>{SLA_DAYS(need)} วันทำการ</b> (ไม่นับเสาร์-อาทิตย์และวันหยุด)</p>}
         </Section>
 
-        <Section no="9" title={`จุดที่ต้องการทำ BOQ (${points.length} จุด)`} hint="เลขจุดให้ตรงกับเลขที่เขียนบนรูปข้อ 10">
+        <Section no="9" title="รูปจุดที่ใช้สินค้า" hint="เขียนเลขจุดบนรูป แล้วกรอกรายละเอียดแต่ละจุดในข้อ 10" invalid={show(bad.photos)} invalidText="กรุณาแนบรูปจุดที่ใช้สินค้าอย่างน้อย 1 รูป">
+          <ExampleImage src="/boq/example-photo.jpg" caption="เขียนเลขจุดบนรูป (1, 2, 3 …) พร้อมชื่อสินค้า / สี / หมายเหตุการติดตั้ง แล้วกรอกจุดเดียวกันในข้อ 10" />
+          <FileUploader kind="photo" label="แนบรูป / ถ่ายรูป" hint="หลายรูปได้ · ระบบย่อรูปก่อนส่ง" accept="image/*" files={photos} onChange={setPhotos} onBusy={onBusy} />
+        </Section>
+
+        <Section no="10" title={`จุดที่ต้องการทำ BOQ (${points.length} จุด)`} hint="เลขจุดให้ตรงกับเลขที่เขียนบนรูปข้อ 9" invalid={show(pointsBad)} invalidText="กรุณาเลือกสินค้าและกรอกพื้นที่ให้ครบทุกจุด">
           {points.map((p, i) => {
             const unit = unitOf(p.code);
             const qty = unit === "area" ? num(p.width) * num(p.length) : num(p.length);
             return (
-              <div key={p.key} className="rounded-2xl border-2 border-slate-200 p-3 space-y-3 bg-white">
+              <div key={p.key} className={cn("rounded-2xl border-2 p-3 space-y-3 bg-white", show(pointCodeBad(p) || pointLenBad(p) || pointWidthBad(p)) ? "border-red-300" : "border-slate-200")}>
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-slate-900 text-white text-[13px] font-bold grid place-items-center">{i + 1}</span>
                   <p className="text-[13px] font-bold text-slate-800">จุดที่ {i + 1}</p>
@@ -286,7 +326,7 @@ export function BoqFormScreen() {
                   )}
                 </div>
                 <div>
-                  <label className={labelCls}>สินค้า</label>
+                  <label className={cn(labelCls, show(pointCodeBad(p)) && "text-red-600")}>สินค้า *{show(pointCodeBad(p)) && " — กรุณาเลือกสินค้า"}</label>
                   <ProductPicker products={products} value={p.code} onPick={(code) => setPoint(i, { code, length: "", width: "" })} />
                 </div>
                 {unit && (
@@ -297,12 +337,12 @@ export function BoqFormScreen() {
                     </label>
                     {unit === "area" ? (
                       <div className="flex items-center gap-2">
-                        <input inputMode="decimal" value={p.width} onChange={(e) => setPoint(i, { width: e.target.value })} placeholder="กว้าง (ม.)" className={inputCls} />
+                        <input inputMode="decimal" value={p.width} onChange={(e) => setPoint(i, { width: e.target.value })} placeholder="กว้าง (ม.)" className={cn(inputCls, show(pointWidthBad(p)) && badCls)} />
                         <span className="text-slate-400">×</span>
-                        <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ยาว (ม.)" className={inputCls} />
+                        <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ยาว (ม.)" className={cn(inputCls, show(pointLenBad(p)) && badCls)} />
                       </div>
                     ) : (
-                      <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ความยาวรวม (ม.)" className={inputCls} />
+                      <input inputMode="decimal" value={p.length} onChange={(e) => setPoint(i, { length: e.target.value })} placeholder="ความยาวรวม (ม.)" className={cn(inputCls, show(pointLenBad(p)) && badCls)} />
                     )}
                     {qty > 0 && <p className="text-[12px] text-emerald-700 font-semibold mt-1.5">= {fmtNum(qty)} {unit === "area" ? "ตร.ม." : "ม."}</p>}
                   </div>
@@ -323,16 +363,12 @@ export function BoqFormScreen() {
           </button>
         </Section>
 
-        <Section no="10" title="รูปจุดที่ใช้สินค้า" hint="ใส่เลขจุดบนรูปให้ตรงกับข้อ 9">
-          <ExampleImage src="/boq/example-photo.jpg" caption="เขียนเลขจุดบนรูปให้ตรงกับข้อ 9 พร้อมชื่อสินค้า / สี / หมายเหตุการติดตั้ง" />
-          <FileUploader kind="photo" label="แนบรูป / ถ่ายรูป" hint="หลายรูปได้ · ระบบย่อรูปก่อนส่ง" accept="image/*" files={photos} onChange={setPhotos} onBusy={onBusy} />
-        </Section>
-        <Section no="11" title="แบบแปลนพื้นที่">
+        <Section no="11" title="แบบแปลนพื้นที่" invalid={show(bad.plans)} invalidText="กรุณาแนบแบบแปลน">
           <ExampleImage src="/boq/example-plan.jpg" caption="แบบแปลน / รูปด้าน ที่มีระยะกว้าง-ยาว-สูง กำกับชัดเจน" />
           <FileUploader kind="plan" label="แนบแบบแปลน" hint="รูปหรือ PDF" accept="image/*,application/pdf" files={plans} onChange={setPlans} onBusy={onBusy} />
         </Section>
         {/* "แบบเดิมจากลูกค้า (ถ้ามี)" ซ่อนไว้ตามที่ผู้ใช้ขอ (API ยังรองรับ kind old_design) */}
-        <Section no="12" title="งบประมาณของลูกค้า (บาท)">
+        <Section no="12" title="งบประมาณของลูกค้า (บาท)" invalid={show(bad.budget)} invalidText="กรุณากรอกงบประมาณ">
           <input
             inputMode="numeric"
             value={budget}
@@ -341,7 +377,7 @@ export function BoqFormScreen() {
               setBudget(n ? Number(n).toLocaleString("th-TH") : "");
             }}
             placeholder="เช่น 150,000"
-            className={cn(inputCls, "text-[16px] font-semibold")}
+            className={cn(inputCls, "text-[16px] font-semibold", show(bad.budget) && badCls)}
           />
         </Section>
 

@@ -39,20 +39,24 @@ export function Chips({ options, value, onChange }: { options: { key: string; la
   );
 }
 
-export function Section({ no, title, children, hint }: { no?: string; title: string; children: React.ReactNode; hint?: string }) {
+/** invalid = กรอบแดง + ข้อความ "กรุณากรอก…" (ใช้หลังกดส่งแล้วยังขาดข้อมูล) ; data-invalid ไว้เลื่อนไปจุดแรกที่ขาด */
+export function Section({ no, title, children, hint, invalid, invalidText }: { no?: string; title: string; children: React.ReactNode; hint?: string; invalid?: boolean; invalidText?: string }) {
   return (
-    <section className={cn(card, "p-4 space-y-3")}>
+    <section data-invalid={invalid ? "1" : undefined} className={cn(card, "p-4 space-y-3 transition-colors", invalid && "border-red-400 ring-2 ring-red-100")}>
       <div>
         <h2 className="text-[13px] font-bold text-slate-800 flex items-center gap-2">
           {no && <span className="min-w-6 h-6 px-1 rounded-full bg-[#d32029] text-white text-[11px] grid place-items-center">{no}</span>}
           {title}
         </h2>
         {hint && <p className="text-[11px] text-slate-500 mt-1">{hint}</p>}
+        {invalid && <p className="text-[11px] font-semibold text-red-600 mt-1">{invalidText ?? "กรุณากรอกข้อมูลในส่วนนี้"}</p>}
       </div>
       {children}
     </section>
   );
 }
+/** class เพิ่มให้ช่อง input ที่ขาดข้อมูล */
+export const badCls = "border-red-400 bg-red-50/40 ring-2 ring-red-100";
 
 export function Stepper({ status }: { status: BoqStatus }) {
   const done = status === "win" || status === "loss";

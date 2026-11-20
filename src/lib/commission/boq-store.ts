@@ -128,7 +128,7 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   return j;
 }
 
-export interface BoqRecorder { name: string; email: string | null; dealerCode: string; dealerName: string }
+export interface BoqRecorder { name: string; email: string | null; dealerCode: string; dealerName: string; province?: string | null }
 export const fetchBoqProducts = () =>
   getJson<{ products: BoqProduct[]; lossReasons: LossReason[]; recorder: BoqRecorder | null }>("/api/boq/products");
 export const fetchBoqList = (dealerCode?: string | null) =>
