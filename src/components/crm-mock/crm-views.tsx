@@ -33,7 +33,7 @@ export function LeadsView({ c }: { c: Ctx }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-bold tracking-tight text-slate-900">ลูกค้ามุ่งหวัง (Leads)</h1>
-          <p className="text-[12.5px] text-slate-500">Lead จากเว็บฟอร์มเข้ามาที่นี่อัตโนมัติ · เป้าติดต่อครั้งแรกภายใน 4 ชั่วโมง</p>
+          <p className="text-[12.5px] text-slate-500">Lead จากเว็บฟอร์มเข้ามาที่นี่อัตโนมัติ · SLA ติดต่อครั้งแรกตามช่องทาง (Walk-in 2 ชม. · Contact Center / LINE OA 4 ชม. · Home Online / Dealer Referral 24 ชม.)</p>
         </div>
         {breach > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1.5 text-[12px] font-bold text-rose-700"><Icon name="alarm" style={{ fontSize: 16 }} />เกิน SLA {breach} ราย</span>}
       </div>

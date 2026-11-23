@@ -66,7 +66,7 @@ export function CrmMockScreen() {
     const now = NOW.toISOString();
     const created: Job = {
       id, opsId: id.replace("J-", "OP-"), leadId: i.leadId, customer: i.customer, phone: i.phone, province: i.province, segment: i.segment, work: i.work,
-      value: i.value, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, lastTouchAt: now,
+      value: i.value, model: i.model, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, lastTouchAt: now,
       log: [{ at: now, text: i.leadId ? `เปิด Opp จาก Lead ${i.leadId} และรับแบบจากลูกค้า` : "เปิด Opp และรับแบบจากลูกค้า" }],
     };
     setJobs((all) => [created, ...all]);
@@ -145,6 +145,7 @@ export function CrmMockScreen() {
         onConvert={(l) => setNewJob({ open: true, lead: l })} />
       <JobDrawer job={job} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
         onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))}
+        onRevise={(id, cats) => patchJob(id, (j) => ({ ...j, revise: cats, log: [...j.log, { at: NOW.toISOString(), text: "ทีมขายปรับหมวดที่ต้องถอดแบบใหม่หลังสำรวจ (Revise)" }] }))}
         onScm={(id, ev: ScmEvent) => patchJob(id, (j) => {
           const now = NOW.toISOString();
           return ev === "ordered"
