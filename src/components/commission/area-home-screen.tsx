@@ -14,6 +14,7 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { BoqSummaryCard } from "./boq/boq-summary-card";
 import { RefundHomeCard } from "./refund/refund-home-card";
+import { ExamHomeCard } from "./exam/exam-home-card";
 import { SearchableSelect, type ComboOption } from "./searchable-select";
 import { doLogout, setAreaStaff, setAreaStore, useSession } from "@/lib/commission/session";
 import { fetchStores, type StoreInfo } from "@/lib/commission/employee-store";
@@ -368,6 +369,7 @@ export function AreaHomeScreen() {
         </Link>
 
         <RefundHomeCard variant="approver" />
+        <ExamHomeCard variant="viewer" />
 
         <p className="text-[13.5px] font-bold text-[#231313] px-1">เลือกเรื่องที่ต้องการดู</p>
 

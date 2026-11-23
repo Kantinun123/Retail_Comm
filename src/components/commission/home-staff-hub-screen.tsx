@@ -1,6 +1,7 @@
 "use client";
 import { BoqStaffCard } from "./boq/boq-staff-card";
 import { RefundHomeCard } from "./refund/refund-home-card";
+import { ExamHomeCard } from "./exam/exam-home-card";
 
 /* =============================================================
    หน้าหลัก (Hub) พนักงานขาย — เห็นเฉพาะผลประโยชน์/ยอดขายของตัวเอง (scope ด้วย repCode)
@@ -270,6 +271,7 @@ export function HomeStaffHubScreen() {
         {/* BOQ DECAAR: เฉพาะพนักงานที่ login เอง (ไม่แสดงในมุมมองพนักงานของ admin/Area) */}
         {session.isSales && <BoqStaffCard />}
         {session.isSales && <RefundHomeCard variant="sales" />}
+        {session.isSales && <ExamHomeCard variant="sales" />}
 
         <PeriodBar pick={pick} onChange={setPick} years={years} completeness={completeness} />
 

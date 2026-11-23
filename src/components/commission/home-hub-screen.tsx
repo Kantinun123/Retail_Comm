@@ -32,6 +32,7 @@ import { pctLabel, tgTone } from "@/lib/commission/targets-store";
 import { yearsOf } from "./year-filter";
 import { ViewModeBar } from "./view-mode-bar";
 import { BoqSummaryCard } from "./boq/boq-summary-card";
+import { ExamHomeCard } from "./exam/exam-home-card";
 import { EmployeeRequestCard } from "./employee-request-card";
 import { AttentionList, MonthOverview, PerformanceCards, buildAttention, perfStatus, useLatestEvalFails } from "./home-performance";
 import { PeriodBar, defaultPick, toView, type PeriodPick } from "./hub-period";
@@ -725,6 +726,7 @@ export function HomeHubScreen() {
           <BoqSummaryCard dealer={dealerCode} title="BOQ DECAAR ของร้าน" sub="งานที่พนักงานในร้านขอ (ดูอย่างเดียว) · แตะเพื่อดูรายละเอียด" rowsBy="reps" />
         )}
 
+        {!session.isAdmin && !session.isArea && !session.isSales && <ExamHomeCard variant="viewer" />}
         <p className="text-[11px] text-slate-400 text-center">
           ทุกการ์ดแสดงตามช่วงเวลาด้านบน ({viewTitle}) · &quot;รอข้อมูล&quot; = ไฟล์ของช่วงนี้ยังไม่มา
         </p>

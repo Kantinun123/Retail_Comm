@@ -971,3 +971,190 @@ export const dynamic = "force-dynamic";
 - ตัวเลขจริง: ต.ค. 69 chronic 3 ร้าน (2 ร้านไม่เคยตรวจ, 5100289 ตรวจล่าสุด เม.ย.) ; พ.ย. 69 (กลางเดือน) ค้างจากเดือนก่อน 20 ร้าน
 - cron: Area ได้เตือนตั้งแต่วันที่ 15 ถ้ามีร้านค้างจากเดือนก่อน (ไม่งั้น 5 วันสุดท้าย) ; profile role `area_head` ไม่อยู่ในรายชื่อรับเตือน (ไม่มี rep_code ของ Area)
 - PowerShell: คำสั่งหลายบรรทัดที่มี `*>` redirect บางครั้งบรรทัดถัดไปไม่ถูกรัน/ไม่มี output → แยกเป็นคำสั่งเดียวต่อ tool call เมื่อต้องอ่านผล
+## 🧭 หน้าหลัก Area / Coach แบบการ์ดเลือกเรื่อง + มุมมองพนักงาน (`/app/area-home`)
+
+- หน้าหลักกลุ่ม Area = `/app/area-home` (`AREA_HOME` ใน session.ts) — login/bridge/AppGuard/`useHomeHref` พามาที่นี่แทน `/app/stores` ; `/app/home` ยังเป็นหน้าข้อมูลร้าน (ต้องเลือกร้านก่อน) ; เมนูล่าง key ใหม่ `areaHome` แยกจาก `home` (หน้า hub ส่ง active="home" อยู่แล้ว)
+- มุมมองพนักงานของ Area: `setAreaStaff(dealer, rep, name)` -> `areaViewRep` ; ฟิลด์รวม `session.viewRep/viewRepName` (admin staff view หรือ Area) — หน้า commission-product / ba-incentive / lhs-commission / product-sales / service-sales / home-staff ใช้ `viewRep` (เดิมหน้า Product/BA/LHS Commission ของ admin มุมมองพนักงานแสดงยอดทั้งร้าน เพราะอ่านแค่ `isSales ? repCode : null`)
+- ❌ **ช่องโหว่ที่เจอ**: `resolveScope` ตรวจแค่ dealerCode — ส่ง `dealerCode=<ร้านที่ดูแล>&repCode=<พนักงานร้านอื่น>` ผ่าน และ `commission_product_summary` เมื่อมี `p_rep` **ไม่สนใจ `p_dealer`** -> เห็นยอดพนักงานร้านอื่นได้ → ✅ `repDealerIfAllowed()` (auth-context) ตรวจว่า `sale_reps.dealer_code` ของพนักงานอยู่ในร้านที่เข้าถึงได้ (และตรง dealerCode ถ้าส่งมา) ใช้ใน resolveScope(perRep) + product-sales + service-sales ; ผ่านแล้วส่ง dealer = null ให้เห็นเหมือนพนักงานดูเอง
+- ทดสอบ: Area (SR0225) + Coach (SR0235) บัญชีจริง 38/38 — พนักงานร้านที่ดูแล 200 ทั้ง 5 API, พนักงานร้านอื่น 403 (ทั้งส่ง/ไม่ส่ง dealerCode), ร้านค้าดูพนักงานร้านตัวเองได้ / ร้านอื่น 403
+- หน้ารายชื่อร้าน (Area): ป้ายสถานะตรวจเดือนนี้บนการ์ดร้าน, กล่อง "ปิด/ยกเลิก" -> "ตรวจแล้วเดือนนี้", ซ่อนข้อความท้ายหน้าของ Admin ; การ์ดตรวจ/แจ้งพนักงานย้ายไปหน้าหลัก (`eval-progress-card.tsx` ไม่มีใครใช้แล้ว)
+- PowerShell: `Select-String -Pattern "...\"..."` (escape `\"` ใน double quote) ทำให้ Kiro parse คำสั่งไม่ได้ -> ใช้ single quote
+### Production: cron ตอบ 500 (body ว่าง) หลังตั้งค่า VAPID บน Vercel
+- อาการ: `/api/cron/eval-reminders?dry=1` ด้วยรหัสลับที่ถูก = 500 ไม่มี body ; บนเครื่องได้ 200 — ผ่านการตรวจ CRON_SECRET แล้ว (ถ้าผิดจะเป็น 401)
+- สาเหตุ (น่าจะเป็น): `webpush.setVapidDetails()` **throw** เมื่อคีย์/subject ผิดรูปแบบ — ทดลองแล้ว: คีย์มีช่องว่างท้าย/เครื่องหมายคำพูด -> "must be a URL safe Base 64", subject ไม่มี `mailto:` -> "not a valid URL", สลับ public/private -> "should be 65 bytes" ; ค่าที่วางใน Vercel ติดช่องว่างได้ง่าย ; dry-run เรียก `pushConfigured()` จึงพังทั้ง route
+- แก้: ตัดช่องว่าง/คำพูดของค่าคีย์ (server + client), เติม `mailto:` ถ้า subject เป็นแค่อีเมล, `try/catch` แล้วคืน `pushError` (ข้อความจาก web-push ไม่มีค่าคีย์) ใน dry-run แทนการ 500
+- Vercel: env ใหม่ที่ขึ้นต้น `NEXT_PUBLIC_` แต่ตั้งเป็น Secret จะมีคำเตือน -> กด "Change to Config" (public key เปิดเผยได้) ; ห้ามตัด prefix
+- deploy บน Vercel ครั้งนี้ใช้เวลา >10 นาที (หน้าใหม่ 404 นานกว่าปกติ) — รอและเช็ค route ใหม่ซ้ำก่อนสรุปว่า build พัง ; build บนเครื่องผ่าน- ✅ ยืนยันบน production: `pushError` = "Vapid subject is not a valid URL. ... (ขึ้นต้นด้วย mailto:)" — ผู้ใช้วางข้อความ **คอลัมน์ "ค่าหน้าตาประมาณนี้"** จากตารางคำอธิบายของผมลง Vercel ; แก้ใน Vercel + Redeploy แล้วยังเป็นค่าเดิม (แก้ผิดแถว/ยังไม่ save) → ทำให้ subject ไม่ใช่ตัวขวางการส่ง: ค่าไม่ใช่อีเมล/https -> ใช้ `https://retail-comm.vercel.app`
+- **บทเรียนการเขียนคำแนะนำ**: ตารางที่มีคอลัมน์ "ตัวอย่างค่า" ถูกคัดลอกไปใช้ตรง ๆ ได้ — ให้ใส่ค่าจริง (ถ้าไม่ใช่ความลับ) หรือบอกชัดว่า "อย่าคัดลอกคอลัมน์นี้"
+## 🔕 เปิด/ปิดการตรวจประเมินรายร้าน (แบบ ข: มีผลตั้งแต่เดือนที่ตั้ง)
+- ตาราง `store_eval_requirements` (dealer_code, effective_period YYYY-MM, required, reason, changed_by) unique (dealer, period) ; RLS เปิดไม่มี policy (service role) ; ไม่มีแถว = ต้องตรวจ ; สถานะเดือน P = แถวล่าสุดที่ effective_period <= P
+- API `/api/store-eval/requirement` (admin เท่านั้น) GET/POST — มีผลตั้งแต่เดือนปัจจุบัน (เวลาไทย) ; เปลี่ยนกลับเป็นค่าเดียวกับเดือนก่อน = ลบแถวของเดือนนี้ (ไม่เก็บแถวที่ไม่มีผล)
+- `buildTracking`: ร้านที่ไม่ต้องตรวจไม่นับใน totals / Coach.total / chronic / cron (Area loop ต้องเช็ค `s.required` เอง) แต่ยังแสดงท้ายรายการ ; `missedStreak` นับเฉพาะเดือนที่ต้องตรวจ (ปิด ต.ค. เปิด พ.ย. -> พ.ย. streak 1 ไม่ใช่ 2) ; Coach ที่ทุกร้านปิด total 0 -> pct 100
+- UI: ปุ่มปิด/เปิดในแถวร้านของหน้าติดตาม (admin + เดือนปัจจุบันเท่านั้น เพราะมีผลตั้งแต่เดือนนี้) + การ์ดในหน้ารายละเอียดร้าน (`eval-required-card.tsx`)
+- ทดสอบ 14/14 (admin/area_head/coach จริง): non-admin 403, เดือนก่อนตัวเลขไม่เปลี่ยน, cron ไม่ใส่ร้านที่ปิด ; ลบแถวทดสอบหมดแล้ว
+- dev server (control_pwsh_process) หยุดเองระหว่างทาง -> fetch ECONNREFUSED ; เช็ค list_processes แล้ว start ใหม่ก่อนรันเทส
+## 🏪 เพิ่มร้านค้าใหม่จากแอป + โมเดล GT / XP
+- `src/lib/commission/store-models.ts` = ที่เดียวที่กำหนดโมเดล (HE / SCG Home / GT / XP) + ผลประโยชน์ต่อโมเดล (`modelFeatures()`) + ค่าเริ่มต้นการตรวจประเมิน ; GT/XP (พ.ย. 69) มีแค่ LHS Discount และยังไม่ตรวจ ; โมเดลไม่รู้จัก = พฤติกรรมเดิมของร้านที่ไม่ใช่ HE
+- เดิมเช็ค `model === "Housing Expert"` กระจายหลายไฟล์ -> home-hub / benefit-rollup / back-margin / lhs-purchase-discount ใช้ `modelFeatures` แล้ว ; ยังไม่ได้ทำ: หน้า product-sales (แยกแค่ HE/SCG Home), RPC sales_targets_compare / design_intake + sync scripts (กรอง HE/SCG Home), home-staff-hub (พนักงาน GT/XP)
+- `POST /api/stores/admin` สร้างร้าน + ผูก Area/Coach + โมเดลที่ไม่ตรวจ -> แถว `store_eval_requirements` required=false ตั้งแต่เดือนนี้ ; UI `store-create-modal.tsx` ปุ่มในหน้า `/app/stores` (admin)
+- ❌ **ช่องโหว่ที่เจอระหว่างทดสอบ**: `verifyAdmin()` ใน `/api/stores/admin*` คืน ok ทันทีเมื่อไม่ได้ตั้ง `NEXT_PUBLIC_REAL_AUTH` -> บนเครื่อง dev Coach ที่ล็อกอินจริงสร้างร้านได้ (production ตั้ง REAL_AUTH=1 จึงไม่โดน) → ✅ มี session จริงต้องเป็น admin เสมอ ไม่ผูกกับ flag ; ไม่มี session = REAL_AUTH ? 401 : เดโม
+- ⚠ PowerShell: แทรก import ด้วย regex "บรรทัดแรกที่ขึ้นต้น import" ไปตกกลาง import หลายบรรทัด -> TS1003 ; ต้องข้ามบล็อก `import {\n ... \n} from` ก่อนแทรก
+- ร้านใหม่ยังไม่ผูกกับข้อมูลยอดขาย/ผลประโยชน์อัตโนมัติ — สคริปต์ sync จับคู่ร้านด้วยรหัสในไฟล์หรือ `master_aliases`
+## 🧪 บัญชีทดสอบที่ผูกกับคนจริง (profiles.is_test) — scripts/provision-test-accounts.mjs
+- test.area -> Area แดง SR0229 (9 ร้าน) ; test.coach -> Coach เนม SR0239 (9 ร้าน) ; test.areahead -> area_head (ทุกร้าน) ; รหัสชั่วคราวใน `commission-app/accounts-YYYYMMDD/Test_Accounts.xlsx` (gitignored) ; รันซ้ำ = รีเซ็ตรหัส
+- กันผลข้างเคียง: `/api/me/profile` PATCH + `/api/me/photo` POST ตอบ 403 เมื่อ is_test (ไม่งั้นแก้ sale_reps ของคนจริง) ; `/api/me` ติด "[ทดสอบ]" หน้าชื่อ ; คำขอพนักงานใหม่ requester_name ติด "[ทดสอบ]" ; แถบ "บัญชีทดสอบ" ใน AppGuard (แคช sessionStorage `isTestAccount` ล้างตอน login/logout) ; cron จะส่งเตือนของคนจริงไปที่บัญชีทดสอบด้วย (ถ้าเปิดแจ้งเตือน) — ตั้งใจ
+- ❌ **พลาด**: `create or replace function protect_profile_privileged_columns()` โดยใส่ `security definer` ตามแบบฟังก์ชันอื่น → ใน definer `current_user` = owner ทำให้เงื่อน `current_user in ('authenticated','anon')` เป็นเท็จเสมอ = **trigger ไม่บล็อกอะไรเลย** (ผู้ใช้ยกสิทธิ์ตัวเองเป็น admin ได้) ; แก้ทันทีด้วย `alter function ... security invoker` แล้วพิสูจน์ด้วย DO block (role + is_test BLOCKED, secdef=f) ; เปิดอยู่ประมาณ 1–2 นาที
+- **บทเรียน**: ก่อน `create or replace` ฟังก์ชันเดิม ให้ดู `prosecdef/proconfig` (หรือไฟล์ใน scripts/sql) แล้วคงคุณสมบัติเดิม — อย่าเติม security definer ตามความเคยชิน ; ฟังก์ชันที่ตรวจ `current_user` ต้องเป็น invoker
+## 🔑 ลืมรหัสผ่าน: Area / Coach / หัวหน้า Area ส่งคำขอเองได้ (ทาง ก)
+- ตาราง `password_reset_requests` เพิ่ม `kind` ('dealer'|'staff'), `profile_id`, `requested_login` ; dealer_code nullable + check ตาม kind ; unique pending ต่อ profile (staff) — dealer เดิมยังใช้ unique pending ต่อร้าน (NULL ไม่ชนกัน)
+- `/auth/forgot` มีแท็บ "ร้านค้า / Area–Coach" ; staff กรอกอีเมล @scg.com หรือชื่อผู้ใช้ (`usernameToEmail` lowercase) ; API ตอบ ok เหมือนกันทุกกรณี (ไม่บอกว่ามีบัญชีไหม) ; จับคู่เฉพาะ role area/coach/re/area_head ที่ approved (admin รีเซ็ตทางนี้ไม่ได้)
+- Admin เห็นคำขอในหน้า "อนุมัติผู้ใช้" พร้อมป้ายบทบาท ; กดรีเซ็ต -> รหัสชั่วคราว + must_change_password ; ตรวจบทบาทซ้ำตอนรีเซ็ต
+- ทดสอบ: ส่งซ้ำ/ตัวพิมพ์ต่างกันได้ 1 แถว, อีเมลไม่มีจริงไม่สร้างแถว, admin รีเซ็ตแล้วรหัสใหม่ใช้ได้/รหัสเก่าใช้ไม่ได้, Coach เรียก API admin = 403, คำขอของร้านค้ายังใช้ได้ ; ลบแถวทดสอบแล้ว
+- เทสรีเซ็ตรหัสของ test.coach จริง -> ต้องออกรหัสใหม่ให้ผู้ใช้ (`provision-test-accounts.mjs --apply --only test.coach`, เพิ่ม flag `--only` รอบนี้)- (เพิ่ม) บัญชีร้านแบบทดสอบ: test.he -> 5100895 (HE) / test.scg -> 5102653 (SCG Home) ; unique index `profiles_one_dealer_account_per_store` ยกเว้น `is_test` -> ร้านยังมีบัญชีจริงได้ 1 บัญชี ; ทุก query "บัญชีของร้าน" (`/api/admin/users` 3 จุด, `/api/admin/reset-requests` 2 จุด) ต้อง `.eq("is_test", false)` ไม่งั้น `maybeSingle()` เจอ 2 แถวแล้วพัง (รีเซ็ตรหัสร้านไม่ได้) ; `provision-accounts.mjs` กรอง is_test ออก (สคริปต์นี้ระงับบัญชีร้านเก่าอัตโนมัติ — กันไม่ให้ไประงับบัญชีทดสอบ/สับสน)
+## 💬 ติดตามกลุ่ม Line ลูกค้า (`/app/line-groups`) — งาน ROOF SERVICE HE + SCG Home นับต่อลูกค้า
+- แหล่ง: งาน = service_sales_lines (ROOF SERVICE, OB/NONRES) ; ลูกค้า/OP = win_contract_all.xlsx (`customer_first/last_name`, `ref_opp`) + CRM `design_intake_lines` (`rudy_id`, `home_id`) ; สถานะกลุ่ม = `*group_register*.xlsx` (job_number RD/OP คั่นจุลภาค) + `เทียบ add bot*.xlsx` (ชีต "ลงทะเบียนกลุ่ม" + "Data")
+- `*group_not_register*.xlsx` ใช้จับคู่ไม่ได้ (ไม่มีเลขงาน/ร้าน — ชื่อกลุ่มอิสระ จับชื่อลูกค้าเต็มได้แค่ 4%) ; เลขใบเสนอราคา Q… ไม่มีในระบบไหน -> ไม่นับ (220 แถวในชีต Data)
+- ลูกค้าเดียวกัน = union-find ด้วย `H:<home_id>` หรือ `N:<ร้าน>:<ชื่อ normalize>` (ตัดคำนำหน้า/วงเล็บ) ; สถานะลูกค้า = ดีสุดของทุกงาน ; เดือน = งานแรก ; 454 งาน -> 317 ลูกค้า (ต.ค. 69: 41 ราย ลงทะเบียน 19)
+- สคริปต์ `scripts/import-line-groups.mjs` (dry-run ค่าเริ่มต้น, `--apply`) คำนวณล่วงหน้าลง `line_tracking_jobs` แบบ batch (insert batch ใหม่แล้วลบ batch เก่า ; insert พัง -> ลบ batch ใหม่ทิ้ง ข้อมูลเดิมอยู่ครบ) ; API อ่าน batch ล่าสุด ; ยังไม่อยู่ใน sync-runner -> งาน Rudy ใหม่ของวันจะขึ้นหลังรันสคริปต์ครั้งถัดไป
+- API `/api/line-groups?period=` ขอบเขต: admin/area_head ทุกร้าน, area/coach ร้านที่ดูแล (ตาม customer_dealer) ; ร้านค้า 403 ; ทดสอบ 9/9 (ไม่มีบัญชี Coach ที่ใช้รหัสชั่วคราวได้แล้ว — coach ใช้เส้นทางเดียวกับ area)
+- PowerShell: `*> file` ตามด้วยคำสั่งอื่นในบรรทัดเดียวกันบางครั้งไม่รอ process จบ -> "file is being used by another process" ; ใช้ `cmd /c "... > log 2>&1 & echo X=%ERRORLEVEL% >> log"` แทน- (ปรับ พ.ย. 69) ผู้ใช้ยืนยัน: นับเฉพาะ `H7 = B2C` (คอลัมน์ `B2BB2C` ใช้ไม่ได้ — ค่าเป็น None/ว่างทั้งหมด ; B2B ที่ตัด = METAL ROOF B2B 14 งาน) ; กติกาชื่อ `norm()` = ตัดวงเล็บ + คำบอกประเภทงาน (รอบบน/ล่าง, หลังที่ N, แปลง…, Truss, ค่าแรงมุง, โรงจอดรถ ฯลฯ) + คำนำหน้า แล้วต่อท้ายด้วย "ชื่อต้นเจ้าของบ้าน" จาก "คุณ…" ในวงเล็บ -> บริษัทเดียวกันหลายแปลง = รวม, บริษัทเดียวกันแต่คนละเจ้าของบ้าน = แยก ; เดิม (ตัดวงเล็บอย่างเดียว) ทั้งรวมคนละบ้านเข้ากัน และแยกบ้านเดียวกันที่มีคำต่อท้าย ; ผล 440 งาน -> 304 ลูกค้า ; `--debug` พิมพ์ชื่อที่ถูกรวมไว้ตรวจ
+- ตาราง `line_tracking_jobs` ถูก production อ่านตรง -> รัน `--apply` แล้วผลขึ้นแอปทันที ไม่ต้อง deploy
+### กลุ่ม Line: อัปโหลดในศูนย์ข้อมูล + คำนวณบนเซิร์ฟเวอร์ (ไม่พึ่งไฟล์ในเครื่อง)
+- ย้ายตรรกะไป `src/lib/server/line-groups-compute.ts` (ไม่มี import `@/`) ใช้ทั้ง API และสคริปต์ — สคริปต์ .mjs import ไฟล์ .ts ตรง ๆ ได้ (`../src/lib/server/line-groups-compute.ts`, Node 24 strip types)
+- ข้อมูลต้นทางเก็บใน DB: `rudy_job_customers` (ชื่อลูกค้า/ประเภท/จังหวัด/ref_opp/H7 ของงานกลุ่มหลังคา H3 ROOF SYSTEM/METAL ROOF ~20k งาน, sync แบบ diff + guard 30%) และ `line_group_entries` (แถวจากไฟล์กลุ่ม Line ; ชื่อไฟล์เดิม = แทนที่: insert ใหม่ก่อน แล้วลบแถวเดิมที่ id <= max ก่อน insert)
+- ตรวจไฟล์จาก "หัวคอลัมน์" ไม่ใช่ชื่อไฟล์: group_name+job_number (มี Register = ชีตลงทะเบียนกลุ่ม, ไม่มี = ลงทะเบียนทั้งหมด) / Job+Add Bot+Register (Data) ; ไฟล์ที่ job_number ว่างทั้งชีต (group_not_register) = error
+- API `/api/admin/uploads/line-groups` (admin): GET / preview / apply / remove / recompute ; preview คำนวณด้วยชุดใหม่ในหน่วยความจำโดยไม่เขียน ; apply เขียนผลคำนวณก่อนแล้วค่อยแทนที่แถวไฟล์ ; หน้า UI = แท็บ "กลุ่ม Line" ในศูนย์ข้อมูล
+- sync-runner job `line-groups` (sharepoint, ไฟล์ win_contract_all เดียวกับ lhs, อยู่หลัง lhs) = `import-line-groups.mjs --apply --win` -> งาน Rudy ใหม่ขึ้นหน้า "ติดตามกลุ่ม Line" อัตโนมัติ ; `data_center_summary` เพิ่มแหล่ง line-groups (คงคุณสมบัติ definer/search_path/สิทธิ์ service_role เดิม — ตรวจ prosecdef ก่อนและหลัง)
+- ❌ เกณฑ์ความยาวชื่อตอนเขียนใหม่ใช้ "ชื่อไม่รวมเจ้าของบ้าน ≥ 3" -> ชื่อสั้น เช่น "ธน (บ้านคุณสันติสุข)" ไม่ถูกรวม (ลูกค้า 304 -> 307) ; ✅ กลับไปใช้ "key ทั้งหมด ≥ 4" ตามเดิม (306 = +1 งานใหม่ + 1 รายที่เดิมรวมผ่าน ref_opp ของงานกลุ่มอื่น) — เวลาย้ายโค้ดให้เทียบผลลัพธ์กับของเดิมก่อนบันทึก
+- ❌ `data_uploads.status` มี check (applied/cancelled/failed) — insert 'removed' ล้มเงียบ (supabase-js คืน error ไม่ throw) ; ✅ ใช้ applied + message
+- ทดสอบ 11/11: preview ไม่เขียน, apply ทำให้งานเป็นลงทะเบียน, อัปโหลดชื่อซ้ำ = แทนที่, ไฟล์ not_register ถูกปฏิเสธ, ลบไฟล์แล้วกลับเป็นเดิม, recompute ได้ผลเท่าเดิม, Area 403 ; ลบ log ทดสอบใน data_uploads แล้ว
+### กลุ่ม Line: เพิ่มงาน BA เป็นฐาน (พ.ย. 69)
+- เลขใบเสนอราคา Q… ในไฟล์กลุ่ม Line = `ba_service_sales_lines.job_code` (236 เลข เจอใน BA 227) — ก่อนหน้านี้คิดว่า "จับคู่ไม่ได้" เพราะไม่ได้เทียบกับ BA ; บทเรียน: เลขที่ "ไม่มีในระบบ" ให้ลองเทียบทุกตารางที่มีเลขงานก่อนสรุป
+- ผู้ใช้ยืนยัน: BA เฉพาะ group3 ROOF SERVICE (Roofing B2C / Roof Truss B2C / Metal Roof) + เฉพาะงานติดตั้ง `type_of_job = I` (S = สำรวจ ไม่นับ) ; ลูกค้าซ้ำ BA กับ Rudy รวมด้วยร้าน + ชื่อ ; แสดงปนกันพร้อมป้าย BA / Rudy (`line_tracking_jobs.source`)
+- งานหลังคาใน BA เกือบหายไปตั้งแต่ ส.ค. 69 (ย้ายไป Rudy) -> BA ช่วยเติม มี.ค.–ก.ค.
+- `normName`: ร้านมักใส่ชื่อร้านตัวเองแล้วใส่ลูกค้าจริงในวงเล็บ ("พัฒนาดีโฮมมาร์ท (บจก.ทูพีเฮ้า)") -> ถ้าวงเล็บมี บจก/บริษัท/หจก ใช้ข้อความในวงเล็บเป็นชื่อลูกค้า (ไม่งั้นงานคนละลูกค้าของร้านเดียวกันถูกรวม)
+- ผล: 713 งาน (Rudy 441 + BA 272) -> 510 ลูกค้า ลงทะเบียน 110 ; ต.ค. 69 จาก 41/19 เป็น 38/17 เพราะลูกค้าที่มีงาน BA เดือนก่อนหน้าถูกนับในเดือนของงานแรก
+---
+
+## ⏱ ศูนย์ข้อมูล "statement timeout" + KPI refresh พังเงียบตั้งแต่ 12 พ.ย. 69
+
+**อาการ**: หน้า `/app/data-center` ขึ้น "โหลดข้อมูลไม่สำเร็จ: canceling statement due to statement timeout"
+**สาเหตุ**: `data_center_summary()` ใช้ 12.7s (นับ product_sales_lines ~250k แถว + heap fetch เพราะ visibility map ไม่สด) เกิน `statement_timeout` 8s ของ role authenticator (PostgREST)
+**แก้**:
+1. `vacuum (analyze)` ตารางใหญ่ + ตั้ง autovacuum scale factor 0.02 ; นับ DI/Odoo จาก `product_sales_monthly` ; max วันที่ใช้ `order by ... desc limit 1`
+2. ตาราง `data_center_cache` (id=1) + pg_cron `refresh-data-center-cache` ทุก 5 นาที ; API อ่าน cache (~0.3s) ; `?live=1` (ปุ่มโหลดใหม่) ลองสดก่อน (~7.5s) พังแล้วใช้ cache ; ตอบ `cachedAt`
+3. ไม่เพิ่ม statement_timeout (เป็นค่าระดับ role กระทบทุก request)
+
+**บั๊กที่เจอระหว่างทาง**: `refresh_kpi_actuals` มี `delete from product_sales_monthly;` (ไม่มี WHERE) → ผ่าน PostgREST โดน pg-safeupdate "DELETE requires a WHERE clause" → ตารางสรุปยอดขายสินค้า/KPI ค้างตั้งแต่ ~12 พ.ย. (พ.ย. แสดง 60.2M จริง 98.2M) ; log sync เขียน "refresh kpi ไม่สำเร็จ" แต่ไม่มีใครเห็น → แก้เป็น `delete ... where true` + pg_cron `refresh-kpi-when-changed` ทุก 5 นาที (รันเฉพาะเมื่อ n_tup_ins+upd+del ของตารางต้นทางเปลี่ยน) เพราะเรียกผ่าน PostgREST ยังเกิน 8s
+
+**บทเรียน**: (1) ฟังก์ชันที่เรียกผ่าน PostgREST ห้าม `DELETE`/`UPDATE` ทั้งตารางแบบไม่มี WHERE ; (2) งานหนัก (>2-3s) ให้ไปรันใน pg_cron แล้วให้ API อ่านผลที่เก็บไว้ ; (3) error ใน summary ของ sync ที่ไม่ทำให้ exit ≠ 0 ต้องมีคนเห็น — ตรวจ sync_runs เป็นระยะ ; (4) ทดสอบหน้า admin ต้องหาบัญชีที่ role = admin จริง (บัญชีแรกในไฟล์ Admin Team ได้ 403)
+---
+
+## 👤 บัญชีพนักงานขาย SE รายคน (BOQ เฟส 1, 18 พ.ย. 69)
+
+- 61 SE (position se, active, ร้าน active 40 ร้าน) ; ชื่อผู้ใช้ = รหัสพนักงาน (SR0067 -> sr0067@retail-comm.local) ; สคริปต์ `scripts/provision-se-accounts.mjs` (ข้ามคนที่มีบัญชีแล้ว, `--reset` = ออกรหัสใหม่) ; ไฟล์แจก `commission-app/accounts-20261118/SE/Area_<ชื่อ>/<ร้าน>.xlsx`
+- **ร้านของพนักงานมาจาก `sale_reps` ตอน login** (auth-context role sales) ไม่ใช่ profiles.dealer_code -> ย้ายร้านแล้วตามทันที ; พักงาน (is_active=false) = เข้าไม่ได้
+- session เดิม `isSales` ต้องมี `empId` (employees เดโม) -> บัญชีจริงมีแค่ repCode ต้องรับทั้งสองแบบ ; loginWithEmail / restoreSession / bridge ต้องมีทาง sales (เรียก /api/me เอา repCode + dealerCode)
+- ลืมรหัส: แท็บ "พนักงาน / Area / Coach" ใช้ชื่อผู้ใช้ SR#### ; API public/admin reset + admin users ต้องเพิ่ม "sales" ในชุด role รายคนทุกจุด
+- ทดสอบด้วย `test.se` (is_test, ผูก SR0067): /api/me ได้ร้าน 5100895 ; ขอ repCode คนอื่น/ร้านอื่น ถูกบังคับเป็นของตัวเอง ; product-sales รายคนช้า 3.8-6.8 วินาที (เดิม ยังไม่แก้)
+- ⚠️ ต้อง deploy โค้ดก่อนแจกรหัส — production เดิมไม่รู้จัก login พนักงานจริง
+---
+
+## 📐 BOQ DECAAR เฟส 2-3 (ฟอร์ม + Flow ห้องแบบ + ใบเสนอราคา/Win-Loss) — 18 พ.ย. 69
+
+- ตาราง `boq_*` + `business_holidays` (SQL: `scripts/sql/boq-phase2.sql`) RLS เปิดไม่มี policy = ผ่าน API service-role เท่านั้น ; เลขที่ `boq_next_no()` = BOQ-YYMM-NNNN (atomic ด้วย counter table)
+- รับงาน "คนแรกได้": `update ... where status='waiting' and designer_id is null` คำสั่งเดียว — ทดสอบกด 2 คนพร้อมกันได้ 200 + 409
+- ไฟล์: bucket private `boq-files` 50MB ; client ขอ signed upload URL จาก `/api/boq/upload` แล้ว `uploadToSignedUrl` ตรงเข้า Storage (ไม่ผ่าน Vercel 4.5MB) ; ไฟล์ตอนสร้างคำขออยู่ `tmp/<userId>/` แล้ว API `move` ไป `req/<id>/<kind>/` (ย้ายไม่ได้ = ไม่ได้อัปโหลดจริง) ; เปิดไฟล์ผ่าน `/api/boq/file?id=` -> signed URL 5 นาที
+- **Storage key ใช้ ASCII เท่านั้น** (ชื่อไทยเก็บใน `boq_files.name`)
+- **บัญชีทดสอบแยกข้อมูล**: `boq_requests.is_test` ; ทุกบทบาทยกเว้น admin เห็นเฉพาะ is_test ตรงกับตัวเอง + แจ้งเตือนห้องแบบเฉพาะกลุ่มเดียวกัน — กันห้องแบบทดสอบรับงานจริง
+- เปิดใช้: env `BOQ_ENABLED=1` (server) ; ก่อนเปิดพนักงานจริงสร้างคำขอไม่ได้/ไม่เห็นการ์ด แต่บัญชีทดสอบใช้ได้
+- SLA = 17:00 ของวันทำการที่ 3/5 (BOQ / BOQ+3D) ข้ามเสาร์-อาทิตย์ + `business_holidays` (ยังว่าง รอปฏิทินวันหยุดจากผู้ใช้)
+- ถ่ายภาพหน้าจอจริงด้วยบัญชีทดสอบ: Edge headless + CDP (`Network.setCookie` sb-<ref>-auth-token แล้วเปิด `/auth/bridge`) — ต้องตั้ง must_change_password=false ให้บัญชีทดสอบก่อน ไม่งั้นติดหน้าเปลี่ยนรหัส ; PowerShell ตัดเครื่องหมายคำพูดใน JSON argument -> ส่งผ่านไฟล์
+- ⚠️ ก่อนเปิดจริง: ลบคำขอทดสอบ/ไฟล์ใน `req/<id>` + รีเซ็ต `boq_counters` (ทดสอบใช้เลข 0001-0003 ไปแล้ว)
+### BOQ DECAAR — สถานะ go-live (18 พ.ย. 69)
+- ขึ้น production แล้ว (`c690d0b`) ; ลบงานทดสอบ 3 งาน + ไฟล์ใน bucket + รีเซ็ต `boq_counters` -> คำขอจริงเริ่ม BOQ-2611-0001
+- เปิดใช้ = ตั้ง `BOQ_ENABLED=1` ใน Vercel แล้ว Redeploy (ผู้ใช้ทำเอง) ; ไฟล์แจกรหัส `commission-app/accounts-20261118/SE/Area_*/` (61 SE) + `BOQ_Team.xlsx` (ห้องแบบ 3 + Marketing 1)
+- รู้แล้ว: ส่ง BOQ ไม่ผ่าน validation (เช่น ไม่แนบ 3D) ทิ้งไฟล์ที่อัปโหลดแล้วค้างใน `req/<id>/` (ไม่มีแถวใน boq_files) — ควรทำงานล้างไฟล์กำพร้าภายหลัง ; ไฟล์ใน `tmp/` ที่ไม่ได้ส่งคำขอก็ค้างเช่นกัน
+---
+
+## 🔑 เปลี่ยนรหัสผ่านครั้งแรกแล้ว "ล็อกอินอยู่แต่ข้อมูลว่าง" (Area แดงเห็น "ดูแล 0 ร้าน") — 19 พ.ย. 69
+
+**อาการ**: หลังตั้งรหัสใหม่ หน้าแรก Area ขึ้น "ดูแล 0 ร้าน" ทั้งที่ DB มี assignment 9 ร้าน
+**สาเหตุ**: `/api/account/password` ใช้ `auth.admin.updateUserById(password)` -> Supabase **ยกเลิกทุก session ของผู้ใช้ (รวมเครื่องที่กำลังใช้)** ; refresh token ใช้ไม่ได้ ("Refresh Token Not Found") -> ทุก API ได้ 401 แต่ sessionStorage ยังบอกว่าล็อกอิน -> หน้าจอ render ได้ แต่ fetch ร้าน error แล้ว `catch -> setStores([])` เลยโชว์ 0 (ซ่อน error)
+**แก้**: หลังเปลี่ยนรหัส server เรียก `signInWithPassword` ด้วยรหัสใหม่ทันที (cookie session ใหม่ไปกับ response) + หน้าเปลี่ยนรหัสโหลดหน้าใหม่ทั้งหน้า (`window.location.replace`) ให้ browser client อ่าน cookie ใหม่ ; ถ้า re-login ไม่ได้ -> logout ให้เข้าใหม่ ; area-home error = ไม่โชว์ 0 (ใช้จำนวนจาก session)
+**กระทบ**: ทุกคนที่เปลี่ยนรหัสครั้งแรก (ร้าน/Area/Coach/SE/ห้องแบบ/Marketing) จนกว่าจะ logout แล้ว login ใหม่
+**บทเรียน**: (1) admin API เปลี่ยนรหัส = logout ทุกเครื่อง ต้องออก session ใหม่ให้เครื่องปัจจุบันเสมอ ; (2) อย่า `catch -> []` เงียบ ๆ กับข้อมูลที่ใช้แสดงตัวเลข — ผู้ใช้เห็น 0 แทนที่จะรู้ว่าโหลดไม่ได้ ; (3) ทดสอบ flow เปลี่ยนรหัสด้วยการเรียก API ต่อ "ด้วย cookie เดิม" ไม่ใช่ login ใหม่
+---
+
+## 🏪 Area เลือกร้านได้ แต่หน้ารายละเอียดว่าง — RLS ของ dealers (19 พ.ย. 69)
+
+**อาการ**: Area แดงเห็นรายชื่อร้านให้เลือก (มาจาก `/api/employees` ผ่าน service role) แต่เข้าไปดูหน้าในของร้านแล้วไม่มีข้อมูล
+**สาเหตุ**: `session.dealer` สร้างจาก `dealerByCode()` ซึ่งอ่านตาราง `dealers` ที่โหลดฝั่งเบราว์เซอร์ (`dataset.ts`) — policy เดิม `is_anon_demo() or is_admin() or code = my_dealer_code()` -> บัญชี Area จริงอ่านได้ 0 ร้าน (my_dealer_code ของ Area = null) -> `session.dealer = EMPTY_DEALER` -> หน้าย่อยส่ง dealerCode ว่าง (API ตอบ 403 เพราะ Area มีหลายร้าน) และ model ว่างทำให้บางหน้า (Back Margin) เด้งกลับ ; ตอนเดโมไม่เจอเพราะใช้ session anonymous (`is_anon_demo`)
+**แก้**: helper `my_area_dealer_codes()` (security definer, grant authenticated — เป็น helper ของ RLS) + เพิ่มใน policy: Area/Coach/RE = ร้านใน assignment, หัวหน้า Area = ทุกร้านที่มี Area, พนักงานขาย = ร้านจาก sale_reps (SQL `scripts/sql/dealers-read-scope.sql`) — แก้ที่ DB อย่างเดียว ไม่ต้อง deploy
+**ตรวจ**: test.area อ่านได้ 9 ร้าน, test.se 1 ร้าน, designer/ไม่ login 0 ; เปิดหน้าหลัก/LHS Discount/Back Margin/ยอดขายงานบริการ ของร้าน 5100014 บน production ข้อมูลขึ้นครบ ไม่มี API error
+**บทเรียน**: API ผ่าน service role ทำงานถูก แต่หน้าจอยังพึ่งตารางที่อ่านด้วย RLS ฝั่งเบราว์เซอร์ — ทดสอบบทบาทใหม่ต้องเปิดหน้าจอจริงด้วย session จริง (ไม่ใช่แค่ยิง API) และเช็ค RLS ของตารางที่ dataset.ts โหลด
+
+---
+
+## 💸 LHS Commission -> sync อัตโนมัติจาก SharePoint (`RSS  System - commission`) (20 พ.ย. 69)
+
+- สคริปต์ใหม่ `scripts/sync-lhs-commission.mjs --kind he|scghome` (dry-run ค่าเริ่มต้น) แทน import-lhs-commission/import-lhs-scghome ; ไฟล์สะสมทั้งปี -> แทนที่ทั้งชุดของ kind นั้น (insert ใหม่ก่อน แล้วลบชุดเดิม) + guard ลด >30% exit 2 ; เติม rep_code ในตัว (vendor_code -> sale_reps.netsuite_id) ไม่ต้องรัน backfill
+- HE (`summaryData_HousingExpert_2026.xlsx` ชีต summarry_HEcommission) ตรงกับข้อมูลเดิม 149/149 -> เพิ่มเป็น job `lhs-commission-he` ในกลุ่ม sharepoint
+- SCG Home (`summaryData_SCGHome_2026.xlsx` ชีต rawData) โครงสร้างใหม่ ก.พ.-ต.ค. 179 แถว (เดิม 20 แถว) ; **W/H Tax / Payment ในไฟล์เป็นยอดรวมต่อใบสำคัญจ่าย ซ้ำทุกแถวของคนเดียวกัน ห้าม sum** -> คำนวณ 3%/97% รายแถว ; 112 แถว (ก.พ.-เม.ย., ก.ค.-ส.ค.) ไม่มี Vendor Code -> ผู้ใช้เลือกให้นับทั้งหมด (ร้านเห็นยอด, พนักงานรายคนไม่เห็น) ; เปิด job `lhs-commission-scghome` แล้ว (179 แถว ฿169,609.18) ; SO No ซ้ำได้ (คนละ Document Number = งวดต่างกัน) ไม่ใช่ข้อมูลซ้ำ
+- ❌ `sale_reps` ไม่มีคอลัมน์ `id` (PK = rep_code) -> pageAll ต้อง order ด้วย rep_code
+
+---
+
+## 🧱 BOQ DECAAR: dropdown 18 กลุ่ม (boq_products.menu) — 20 พ.ย. 69
+
+- Marketing ส่งรายการกลุ่มสินค้าใหม่ 18 กลุ่ม -> `boq_products.menu` + `menu_sort` ; `import-boq-products.mjs` อ่าน**ทุก sheet** (เดิมเฉพาะชื่อมี DECAAR ทำให้ไม้ผนัง NEX / เคมิว / ไม้เชิงชาย / MTO ตกหล่น) แล้วจัดกลุ่มด้วย MENUS ในสคริปต์ ; อุปกรณ์/สี และสินค้านอก 18 กลุ่ม -> is_active=false
+- ผล: 276 SKU ใน 18 กลุ่ม (เพิ่มใหม่ 83 รวม MTO 25), ซ่อน 97 (Fret Work, Fence, ผนังตกแต่ง, บังใบรุ่นอื่น ฯลฯ) ; backup `bk_20261120_boq_products`
+- ⚠️ ซ่อนสินค้าที่คำขอเก่าใช้อยู่ -> `validatePoints` เดิมรับเฉพาะ is_active ทำให้แก้คำขอเก่าไม่ได้ ; แก้ให้รับรหัสที่คำขอนั้นมีอยู่เดิม (keepCodes) และ picker ในหน้าแก้ไขรวมสินค้าเดิมไว้ในกลุ่ม "สินค้าเดิมของคำขอนี้"
+- picker ใหม่ 2 ขั้น: เลือกกลุ่ม (select) -> เลือกรุ่น/สีในกลุ่ม (ค้นหาโผล่เมื่อ >8 รายการ)
+- ไฟล์ตรวจ mapping ทุก SKU: `commission-app/แบบฟอร์มonline/Maketing/น้องเมย์ 11.2026/BOQ_Dropdown_Mapping.xlsx` (สร้างซ้ำได้ด้วย `--report <file>`)
+
+---
+
+## 🖥️ หน้าจอกว้าง (โน้ตบุ๊ก) — เริ่มที่ BOQ (23 พ.ย. 69)
+
+- `src/components/commission/app-main.tsx`: `WIDE_PREFIXES` (ตอนนี้ `/app/boq`) -> จอ lg ขยายถึง 1280px + `DesktopSidebar` (fixed ซ้าย w-60) ; หน้าอื่นยัง max-w-md ; `BottomNav` ซ่อน `lg:hidden` เฉพาะหน้ากว้าง ; เพิ่มหน้าใหม่ = เพิ่ม prefix หลังปรับ layout หน้านั้นแล้ว
+- รายละเอียด 2 คอลัมน์โดยไม่ทำลายลำดับบนมือถือ: parent `flex flex-col lg:grid`, คอลัมน์ซ้าย/ขวาเป็น `contents lg:flex` แล้วให้ลูกแต่ละกล่องมี `order-N lg:order-none`
+- จับภาพหน้าจอแบบ login จริง: signInWithPassword (anon key) -> cookie `sb-<ref>-auth-token` = `base64-` + base64url(session) (แบ่ง `.0/.1` ถ้า >3180 ตัว) -> Edge `--remote-debugging-port` + CDP `Network.setCookie` -> `/auth/bridge` แล้วค่อยไปหน้าเป้าหมาย ; ❌ รันผ่าน `cmd /c` แล้วค้างจน timeout เพราะ Edge ลูกยังถือ stdio -> ปิดเฉพาะ process ที่ CommandLine มี `edge-shot-` ; ❌ อย่า dump แถวไฟล์บัญชีทดสอบทั้งแถว (รหัสผ่านโผล่ใน log) ให้ mask ทุกคอลัมน์ที่ไม่ใช่หัวตาราง
+---
+
+## 🧪 Mock CRM (`/mock/crm`) — สคริปต์แก้ไฟล์ด้วย PowerShell ทำไฟล์เสีย + dev server 500 (24 พ.ย. 69)
+
+- ❌ ใช้ `[IO.File]::ReadAllText` + `.Replace("`n...", ...)` ผ่านฟังก์ชัน `Fix` เพื่อตัดบรรทัด `export` ที่เกิน -> ไฟล์ 2 ไฟล์ (`crm-views.tsx`, `crm-mock-screen.tsx`) ขึ้นบรรทัดใหม่ทั้งไฟล์ถูกแทนด้วยตัว `e` (เหลือ 1 บรรทัด) -> Turbopack `Parsing ecmascript source code failed` ทุกหน้า /mock/* ตอบ 500 ; ผล `tsc`/`eslint` ที่ "ว่างเปล่า" ก่อนหน้านั้นไม่ได้แปลว่าผ่าน (ไม่มี exit code ให้ดู)
+- ✅ แก้ไฟล์ด้วย `str_replace` ทีละจุดเสมอ ห้ามใช้ string replace ที่มี backtick-n ใน PowerShell ; ถ้าเสียแล้วเขียนไฟล์ใหม่ด้วย `fs_write`
+- ✅ ตรวจ tsc/eslint ต้องดู exit code จริง: `$o = & node node_modules/typescript/bin/tsc --noEmit 2>&1 | Out-String; "exit=$LASTEXITCODE"` (`cmd /c "... & echo %ERRORLEVEL% >> log"` ไม่ได้ผลในเครื่องนี้)
+- ✅ ดู log dev server ด้วย `get_process_output` เมื่อหน้าตอบ 500 ; รีสตาร์ต dev ต้องหยุด process เดิม -> ลบ `.next` -> start ใหม่ผ่าน `control_pwsh_process`
+- ถ่ายภาพหน้า mock (ไม่ต้อง login): `msedge --headless=new --screenshot=... --virtual-time-budget=6000` ทีละภาพ ใช้ `--user-data-dir` แยกต่อภาพ ; ภาพบางรอบไม่ออกในรอบแรก ให้รันซ้ำเฉพาะที่ขาด
+### กลุ่ม Line (bot sentiment) จาก Google Drive -> sync อัตโนมัติ (23 พ.ย. 69)
+- โฟลเดอร์ Drive แชร์แบบทุกคนที่มีลิงก์ -> อ่านรายชื่อไฟล์จาก `https://drive.google.com/embeddedfolderview?id=<folder>` (regex `file/d/<id>` + `flip-entry-title`) แล้วโหลดด้วย `uc?export=download&id=` (ไฟล์เล็ก ไม่มีหน้ายืนยัน) ; ตรวจ 2 ไบต์แรก `PK` ว่าเป็น xlsx จริง ; หน้า embeddedfolderview ไม่ใช่ API ทางการ ถ้า Google เปลี่ยนหน้าเว็บสคริปต์จะหยุดพร้อมข้อความ (ไม่ลบข้อมูล)
+- ชื่อไฟล์ใน Drive เปลี่ยนตามช่วงวันที่ -> บันทึกเป็นชื่อคงที่ `gdrive_group_<kind>.xlsx` เพราะ `line_group_entries` แทนที่ตามชื่อไฟล์ (ใช้ชื่อเดิมจาก Drive = ชุดซ้ำสะสมทุกครั้งที่อัปเดต)
+- ❌ ไฟล์ใหม่มีวันที่ `2026-11-20 04:13:46` แต่ `mdy()` อ่านแค่ `m/d/yy` -> group_created เป็น null, "ข้อมูลกลุ่มล่าสุด" ค้างที่ 14 พ.ย. -> ✅ รองรับ ISO ด้วย
+- สคริปต์ `scripts/sync-line-groups-gdrive.mjs` (job `line-groups-gdrive` กลุ่ม gsheet) เทียบ sha256 เอง ไม่เปลี่ยน = ไม่นำเข้า ; env `LINE_GROUPS_GDRIVE_FOLDER_ID` ใน .env เครื่องที่รัน sync
+- ⚠ ชื่อกลุ่มมีชื่อลูกค้า + โฟลเดอร์เปิดแบบลิงก์สาธารณะ -> ควรเปลี่ยนเป็น Google service account ภายหลัง (เหมือนข้อสังเกตของ Google Sheet BA)
+
+## 🧪 Mock CRM v3 — ปรับตามโค้ดต้นแบบทีม JV + คำชี้แจงทีมขาย (24 พ.ย. 69)
+
+- ✅ มัดจำมี 2 แบบตามโมเดล: SCG Home = คงที่ 30,000 บาท (ตรงกับ `prepDiscount` ในโค้ดต้นแบบ = ส่วนลดค่าเตรียมการในใบเสนอราคาละเอียด) ; Housing Expert = 30% ของราคา ; ลูกค้า HBD ไม่มีมัดจำ ; ค่า `depositTotal: 10000` ในโค้ดต้นแบบไม่ใช่มัดจำของสองโมเดลนี้
+- ✅ SLA ติดต่อ Lead ตามช่องทาง (Walk-in 2 / Contact Center, LINE OA 4 / Home Online, Dealer Referral 24 ชม.) และกฎติดต่อไม่ได้ 3 ครั้ง = Loss ตามต้นแบบ
+- ❌ **เข้าใจผิด**: เคยตีความว่า "ทีมถอดแบบ" ในต้นแบบ = ห้องแบบ แล้วสร้างการ์ดถอดแบบรายหมวดให้ห้องแบบ → ✅ ผู้ใช้แก้: ถอดแบบงาน Roof Installation เป็นงานของ **ทีมขาย** ; ห้องแบบทำเฉพาะขีดแนวอะเส + แบบทรัส + Cutting List แล้วส่งผลให้ทีมขายใช้ถอดแบบต่อ → ก่อนสร้างฟีเจอร์ตามคำตอบ "ใช่" ให้ทวนคำถามสั้น ๆ ว่าเข้าใจตรงกันหรือไม่ (คำตอบ "ใช่" กับคำถามที่มีหลายนัยอาจหมายคนละอย่าง)
+- ✅ แก้ไฟล์หลายจุดด้วยสคริปต์ node ที่ตรวจ "ต้องเจอข้อความเดิมพอดี 1 จุด" ก่อนแทนที่ (และแปลง CRLF↔LF) — สคริปต์ที่ตรวจไม่ผ่านจะหยุดก่อนเขียนไฟล์ ไม่ทำให้ไฟล์เสียเหมือนการ replace ด้วย PowerShell ; ไฟล์ที่ `fs_write` สร้างบน Windows เป็น CRLF- (23 พ.ย. 69) ติดตามกลุ่ม Line เพิ่ม Roof Reno **เฉพาะงานเปลี่ยนหลังคา**: Rudy group3 Qchang + H5 `REROOF` / BA group3 Qchang + service_group `Re-Roof` (ค่าคงที่ RUDY_REROOF / BA_REROOF ใน line-groups-compute.ts) ; Roof Repair/Repaint/Top up/Renew ไม่นับ ; `import-line-groups.mjs --win` ต้องดึงลูกค้าของงาน H5 REROOF ด้วย (H3 เป็น HOME RENOVATION SYSTEM ไม่ใช่ ROOF SYSTEM) ไม่งั้นขึ้น 'ยังไม่มีข้อมูลลูกค้า' ; หน้าจอ/CSV แสดงกลุ่ม Solution ผ่าน `jobTypeText()` / `solutionLabel()`
+
+---
+
+## 📝 ข้อสอบ Competency SE (`/app/exam`) — นำเข้าจาก Excel + ระบบสอบ (23 พ.ย. 69)
+
+- ไฟล์ `commission-app/ข้อสอบ Com/ชุดข้อสอบ SE New Comer_Up Level.xlsx` 18 ชีต ~240 ข้อ แต่ **แต่ละชีตจัดรูปแบบคนละแบบ** (ข้อ+ตัวเลือกบรรทัดละข้อ / ตัวเลข+ข้อความ / ก.ข.ค.ง. / A: B: C: / ตาราง 4 คอลัมน์) -> ตัวอ่าน `scripts/lib/exam-parse.mjs` แยกกลยุทธ์ตามชีต ; **เฉลย = สีพื้นเซลล์** (เขียว 70AD47 / เหลือง) ที่แถวเดียวกับตัวเลือกที่ถูก (เซลล์สีมักว่าง ต้องอ่านด้วย `cellStyles:true` และนับเซลล์ที่ไม่มีค่าด้วย) ; ชีต Proactive ไม่มีสี แต่ซ้ำข้อความตัวเลือกที่ถูกไว้ท้ายข้อ ; ชีต safety ไม่มีเฉลยเลย
+- ผลนำเข้า: 240 ข้อ ใช้ได้ 220 ข้อ ; ที่ปิดไว้ (`exam_questions.is_active=false` + `problem`): Metal ข้อ 3 ไม่มีสีเฉลย, Product roof ข้อ 5-7 มีแค่ตัวเลือกที่ถูก, Roof Smart ข้อ 1-6 ตัวเลือกเป็นรูปไอคอน, safety ทั้ง 10 ข้อไม่มีเฉลย -> หัวข้อ Safety ยังไม่ถูกนับเป็นหัวข้อสอบ (ผ่านครบ = 17 หัวข้อ) ; แก้ไฟล์แล้วรัน `node scripts/import-exam-questions.mjs --apply` ใหม่ได้ **ก่อนมีคนสอบ** (มี attempt แล้วสคริปต์ปฏิเสธ เพราะคำตอบอ้าง id ตัวเลือก)
+- รูปในข้อ: ผูกกับข้อด้วยแถวที่ `xdr:pic` วางอยู่ (anchor) ต้อง parse ทีละ `<xdr:twoCellAnchor>` — regex ข้าม anchor จะผูกรูปผิดแถวเมื่อมี shape ว่างปน ; อัปโหลดเข้า bucket public `exam-images` (emf แสดงบนเบราว์เซอร์ไม่ได้ ข้าม)
+- ชีต "บ้านใหม่" คอลัมน์เลื่อน: แถวคำถาม = A เลขข้อ, B ข้อความ ; แถวตัวเลือก = B เลขข้อ, C ข้อความ — เลขข้อในไฟล์ซ้ำ/ข้าม (มี "8" สองครั้ง) ใช้ลำดับของเราเอง ; ครั้งแรกอ่านผิดคอลัมน์ได้ 10/25 ข้อและเฉลย "ไม่ตรงกัน" ทั้งที่ข้อมูลถูก (ตรวจ conflict ระหว่างสีกับบรรทัด "ตอบ n" ช่วยจับได้)
+- แยกตัวเลือกจากข้อความ "1. xxx 2. yyy" (Roof Smart) ต้องหาตามลำดับ 1 -> 2 -> 3 และไม่ให้ชนทศนิยม (`(?<![\d.])2\.(?!\d)`) ไม่งั้น "1.50 ม." ถูกตัดเป็นข้อ
+- **ห้ามส่งเฉลยไปเบราว์เซอร์**: API start ส่งเฉพาะ id/ข้อความตัวเลือก ลำดับสุ่มต่อการสอบ (เก็บใน `option_order`) ; ตรวจคะแนนที่ server (ข้อ multi ต้องเลือกครบชุดที่ถูกพอดี) ; ผลสอบส่งแค่ คะแนน/%/ผ่าน ไม่มีเฉลย (ผู้ใช้สั่ง "ไม่เห็น")
+- กติกาที่ผู้ใช้กำหนด: SE ทุกคนทุกโมเดล, สอบทุกข้อ, เดดไลน์ระดับรอบ, ผ่าน 80% ต่อหัวข้อ สอบซ้ำไม่จำกัด, สรุป "จำนวนครั้งที่สอบ / จำนวนครั้งที่สอบผ่าน / ผ่านครั้งแรกที่ครั้งที่" (RPC `exam_progress` คืน jsonb ก้อนเดียว หลบลิมิต 1,000 แถวของ PostgREST) ; หลังเลยเดดไลน์ยังสอบได้จนกว่า admin ปิดรอบ (ติดป้าย "เลยกำหนด") ; หัวข้อที่ผ่านแล้วสอบซ้ำไม่ได้ (409)
+- บัญชีทดสอบ: attempt ติด `is_test` และรายงานของ admin/Area ไม่นับ (ดูได้ด้วย `?includeTest=1` เฉพาะ admin) ; ก่อนตั้ง `EXAM_ENABLED=1` พนักงานขายจริงยังไม่เห็นการ์ด/ใช้ API ไม่ได้ (บัญชีทดสอบ/ผู้ดูแลใช้ได้) ; cron `/api/cron/exam-reminders` เตือน 7/3/1/0 วัน + ทุกวันจันทร์หลังเลยกำหนด ส่งเมื่อ EXAM_ENABLED=1 เท่านั้น
+- ❌ `route.ts` ห้าม export ฟังก์ชันอื่นนอกจาก handler (`export async function buildAttemptView` ใน route ทำให้ Next ไม่ยอม) -> ย้ายไป `src/lib/server/exam.ts`
+- ❌ แก้หลายไฟล์ด้วยฟังก์ชัน PowerShell ที่รับ array-of-pairs: `@(,@(a,b),@(c,d))` แบนเป็นคู่เดียวทำให้ pattern ผิด และบางไฟล์ "ok" แต่ไม่ถูกเขียนจริง ; ✅ ใช้ `str_replace` ทีละจุด แล้ว `Select-String` ยืนยันว่ามีบรรทัดที่เพิ่มจริงก่อนไปต่อ (และอย่าเขียน replacement ที่ตัดเนื้อหาท้ายทิ้งโดยไม่ตั้งใจ — ครั้งนี้ทำให้ JSX ใน home-hub-screen พัง ตรวจพบด้วย tsc)
+- ทดสอบ API ของบัญชีทดสอบโดยไม่แตะรหัสผ่าน: `auth.admin.generateLink({type:"magiclink"})` -> `verifyOtp({token_hash})` -> cookie `sb-<ref>-auth-token=base64-<b64url(session)>` (ทดสอบ 36 กรณีผ่าน แล้วลบรอบทดสอบ)
