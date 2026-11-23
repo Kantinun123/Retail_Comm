@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { LEAD_STATUS, LOST_REASONS, NOW, agoText, dtTh, type Lead, type Task } from "./crm-mock-data";
+import { LEAD_STATUS, LOST_REASONS, MAX_CONTACT_TRIES, NOW, agoText, dtTh, slaHoursOf, type Lead, type Task } from "./crm-mock-data";
 import { Avatar, Drawer, Field, KV, SlaBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 /* ---------------- Lead ---------------- */
@@ -22,6 +22,17 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
   const [reason, setReason] = useState(LOST_REASONS[0]);
   const allOk = checks.budget && checks.area && checks.ready;
   const open = lead.status === "waiting" || lead.status === "contacting" || lead.status === "qualified";
+  const tries = lead.tries ?? 0;
+  const failContact = () => {
+    const n = tries + 1;
+    const lose = n >= MAX_CONTACT_TRIES;
+    onPatch(lead.id, {
+      tries: n, firstContactAt: lead.firstContactAt ?? NOW.toISOString(), note,
+      status: lose ? "lost" : lead.status === "waiting" ? "contacting" : lead.status,
+      lostReason: lose ? `ติดต่อไม่ได้ครบ ${MAX_CONTACT_TRIES} ครั้ง` : lead.lostReason,
+    });
+    toast(lose ? `ติดต่อไม่ได้ครบ ${MAX_CONTACT_TRIES} ครั้ง ปิดเป็น Loss` : `บันทึกติดต่อไม่ได้ครั้งที่ ${n}/${MAX_CONTACT_TRIES}`);
+  };
   const logContact = () => {
     onPatch(lead.id, { firstContactAt: lead.firstContactAt ?? NOW.toISOString(), status: lead.status === "waiting" ? "contacting" : lead.status, note });
     toast("บันทึกการติดต่อแล้ว");
@@ -51,7 +62,7 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
         <KV k="ช่องทาง" v={lead.channel} />
         <KV k="เข้ามาเมื่อ" v={`${dtTh(lead.createdAt)} (${agoText(lead.createdAt)})`} />
         <KV k="ติดต่อครั้งแรก" v={lead.firstContactAt ? dtTh(lead.firstContactAt) : "ยังไม่ติดต่อ"} />
-        <KV k="SLA" v={<SlaBadge lead={lead} />} />
+        <KV k="SLA" v={<span className="flex items-center justify-end gap-2"><span className="text-[11px] text-slate-400">เป้า {slaHoursOf(lead.channel)} ชม.</span><SlaBadge lead={lead} /></span>} />
         {lead.interest && <KV k="ความต้องการ" v={lead.interest} />}
         {lead.lostReason && <KV k="เหตุผล Loss" v={lead.lostReason} />}
       </div>
@@ -76,6 +87,7 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
 
       {open && (
         <div className="flex flex-wrap gap-2 pb-2">
+          <button onClick={failContact} className={btnGhost}><Icon name="phone_missed" style={{ fontSize: 18 }} />ติดต่อไม่ได้ ({tries}/{MAX_CONTACT_TRIES})</button>
           <button onClick={logContact} className={btnGhost}><Icon name="edit_note" style={{ fontSize: 18 }} />บันทึกการติดต่อ</button>
           {allOk && lead.status !== "qualified" && <button onClick={() => { onPatch(lead.id, { status: "qualified", note, firstContactAt: lead.firstContactAt ?? NOW.toISOString() }); toast("ผ่านการสกรีน รอเปิด Ops"); }} className={btnGhost}>ผ่านเงื่อนไข</button>}
           <button onClick={() => onConvert({ ...lead, note })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Ops</button>

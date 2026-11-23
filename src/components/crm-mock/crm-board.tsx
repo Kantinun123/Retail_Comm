@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  COLS, PARTY, SEGMENT_LABEL, WORK_LABEL, baht, colOf, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
+  COLS, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, baht, colOf, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
   type Job, type Packet, type Party,
 } from "./crm-mock-data";
 import { Avatar, PartyBadge, btnPrimary, glass, inputCls } from "./crm-ui";
@@ -137,7 +137,7 @@ function JobCard({ j, onOpen }: { j: Job; onOpen: () => void }) {
         </div>
         <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-bold", j.segment === "hbd" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500")}>{j.segment === "hbd" ? "HBD" : "ทั่วไป"}</span>
       </div>
-      <div className="mt-2 text-[11.5px] text-slate-600">{WORK_SHORT[j.work]}</div>
+      <div className="mt-2 text-[11.5px] text-slate-600">{WORK_SHORT[j.work]} · {MODEL_LABEL[j.model]}</div>
       <div className="mt-1 text-[13px] font-bold text-indigo-700">{baht(j.value)}</div>
       {i && (
         <div className={cn("mt-2 rounded-lg px-2 py-1.5", i.late > 0 ? "bg-rose-50" : "bg-slate-50")}>

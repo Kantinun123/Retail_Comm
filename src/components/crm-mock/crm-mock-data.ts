@@ -4,8 +4,14 @@
 
 /** เวลา "ตอนนี้" ของ Mock (คงที่ เพื่อให้ SLA/งานค้างแสดงผลเหมือนเดิมทุกครั้ง) — วันอังคาร */
 export const NOW = new Date("2026-11-24T10:30:00+07:00");
-export const SLA_HOURS = 4;
+/** SLA ติดต่อลูกค้าครั้งแรก (ชั่วโมง) ตามช่องทาง — ตามต้นแบบของทีม JV */
+export const SLA_BY_CHANNEL: Record<string, number> = { "Home Online": 24, "Contact Center": 4, "Walk-in": 2, "LINE OA": 4, "Dealer Referral": 24 };
+export const slaHoursOf = (channel: string) => SLA_BY_CHANNEL[channel] ?? 24;
+/** ติดต่อไม่ได้ครบกี่ครั้งถึงนับเป็น Loss */
+export const MAX_CONTACT_TRIES = 3;
 export const DEPOSIT_PCT = 30;
+/** มัดจำคงที่ของโมเดล SCG Home (ร้าน Housing Expert ใช้ 30% ของราคา) */
+export const DEPOSIT_SCG = 30000;
 const TZ = "Asia/Bangkok";
 const BKK = 7 * 3600e3;
 
@@ -54,7 +60,7 @@ const subWd = (n: number, hour = 9) => {
 export type LeadStatus = "waiting" | "contacting" | "qualified" | "converted" | "lost";
 export interface Lead {
   id: string; name: string; phone: string; product: string; channel: string; province: string;
-  createdAt: string; firstContactAt?: string; status: LeadStatus; note?: string; lostReason?: string; interest?: string;
+  createdAt: string; firstContactAt?: string; status: LeadStatus; note?: string; lostReason?: string; interest?: string; tries?: number;
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
 export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral"];
@@ -123,10 +129,10 @@ function meta(key: StepKey, seg: Segment, work: Work): Omit<StepDef, "day" | "po
       return seg === "hbd"
         ? { label: "ขีดแนวอะเส + ทำแบบทรัส + Cutting List", owner: "ROOM", hint: "ลูกค้า HBD ส่งแบบมา ห้องแบบทำแบบทรัสทันที ไม่ต้องรอสำรวจ", sends: [{ party: "ROOM", title: "แบบแปลน ขอขีดแนวอะเส + ทำแบบทรัส", at: "start" }], result: "แบบทรัส + Cutting List (ไฟล์)" }
         : { label: "ทำแบบทรัส + Cutting List", owner: "ROOM", hint: "ส่งรายงานสำรวจจาก KIM ให้ห้องแบบทำแบบทรัสและ Cutting List", sends: [{ party: "ROOM", title: "รายงานสำรวจ + แบบ ขอทำแบบทรัส/Cutting List", at: "start" }], result: "แบบทรัส + Cutting List (ไฟล์)" };
-    case "quote1": return { label: "เสนอราคาจากแบบ", owner: "SE", hint: work === "roof" ? "ทำประมาณการจากแบบและส่งใบเสนอราคาให้ลูกค้า" : "นำผลจากห้องแบบมาทำประมาณการ แล้วส่งใบเสนอราคาให้ลูกค้า", sends: [] };
+    case "quote1": return { label: "เสนอราคาจากแบบ", owner: "SE", hint: work === "roof" ? "ทีมขายถอดแบบรายหมวด ทำประมาณการ และส่งใบเสนอราคาให้ลูกค้า" : "ทีมขายถอดแบบรายหมวดโดยใช้ผลขีดแนวอะเสจากห้องแบบ ทำประมาณการ แล้วส่งใบเสนอราคาให้ลูกค้า", sends: [] };
     case "deposit": return { label: "ปิดมัดจำ + ล็อกคิวสำรวจ", owner: "SE", hint: "ลูกค้าจ่ายมัดจำบนแอป ล็อกวันเข้าสำรวจ แล้วส่งข้อมูลให้ KIM และรายการจองสินค้าให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลงานสำรวจ + วันนัดสำรวจที่ล็อกคิวแล้ว", at: "done" }, { party: "SCM", title: "รายการสินค้าที่ขอจอง (กันสินค้า)", at: "done" }] };
     case "survey": return { label: "สำรวจหน้างาน + รายงานสำรวจ", owner: "KIM", hint: "KIM เข้าสำรวจตามวันนัด และส่งไฟล์รายงานสำรวจกลับมา", sends: [], result: "รายงานสำรวจ (ไฟล์)" };
-    case "quote2": return { label: "เสนอราคาหลังสำรวจ", owner: "SE", hint: work === "roof" ? "ปรับใบเสนอราคาตามรายงานสำรวจ แล้วเสนอราคาใหม่" : "เช็ครายงานสำรวจ + แบบทรัส/Cutting List แล้วทำใบเสนอราคาฉบับหลังสำรวจ", sends: [] };
+    case "quote2": return { label: "เสนอราคาหลังสำรวจ", owner: "SE", hint: work === "roof" ? "ทีมขายถอดแบบละเอียดตามรายงานสำรวจ (Confirm/Revise รายหมวด) แล้วเสนอราคาใหม่" : "ทีมขายถอดแบบละเอียด เช็ครายงานสำรวจ + แบบทรัส/Cutting List จากห้องแบบ แล้วทำใบเสนอราคาฉบับหลังสำรวจ", sends: [] };
     case "close": return { label: "ปิดขาย (ลูกค้าจ่ายครบ 100%)", owner: "SE", hint: "เก็บเงินครบ แล้วส่งข้อมูลปิดขายให้ KIM และใบเสนอราคาฉบับแก้ไขให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "ใบเสนอราคาฉบับแก้ไข (Map สินค้า + สั่งโรงงาน)", at: "done" }] };
     case "install_plan": return { label: "แจ้งแผนติดตั้งลูกค้า", owner: "KIM", hint: "KIM วางแผนติดตั้งจากวันที่สินค้าครบ แล้วแจ้งลูกค้าใน Line กลุ่ม", sends: [], result: "แผนติดตั้ง (วันเริ่ม-วันจบ)" };
     case "deliver": return { label: DELIVER_LABEL[work], owner: "SCM", hint: "SCM สั่งโรงงานและขนส่งสินค้าเข้าหน้างาน", sends: [], result: "สถานะจัดส่งสินค้า" };
@@ -144,17 +150,28 @@ export const planTotals = (steps: StepDef[]) => {
 };
 
 /* ---------- Job ---------- */
+/** โมเดลธุรกิจ: Housing Expert (ร้านตัวแทน มัดจำ 30%) / SCG Home (มัดจำคงที่ 30,000 บาท) */
+export type Model = "he" | "scg";
+export const MODEL_LABEL: Record<Model, string> = { he: "Housing Expert", scg: "SCG Home" };
+/** หมวดงานที่ห้องแบบถอดแบบ */
+export type Cat = "ase" | "truss" | "tile" | "fascia";
+export const CAT_LABEL: Record<Cat, string> = { ase: "อะเส (ขีดแนวอะเส)", truss: "โครงทรัส", tile: "กระเบื้อง", fascia: "เชิงชาย" };
+export const catsOf = (w: Work): Cat[] => (w === "roof" ? ["tile", "fascia"] : w === "truss" ? ["truss", "tile", "fascia"] : ["ase", "truss", "tile", "fascia"]);
 export interface JobLog { at: string; text: string }
 export interface Job {
   id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; segment: Segment; work: Work;
-  value: number; quote1Value?: number; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
+  value: number; quote1Value?: number; model: Model; revise?: Cat[]; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string;
 }
 export const stepsOf = (j: Job) => template(j.segment, j.work);
 export const currentStep = (j: Job): StepDef | null => (j.cancelReason ? null : stepsOf(j).find((s) => !j.done[s.key]) ?? null);
 export const isFinished = (j: Job) => !j.cancelReason && stepsOf(j).every((s) => j.done[s.key]);
 export const hasDeposit = (j: Job) => j.segment === "general";
-export const depositOf = (j: Job) => (hasDeposit(j) ? Math.round(((j.quote1Value ?? j.value) * DEPOSIT_PCT) / 100) : 0);
+export const depositOf = (j: Job) => (!hasDeposit(j) ? 0 : j.model === "scg" ? DEPOSIT_SCG : Math.round(((j.quote1Value ?? j.value) * DEPOSIT_PCT) / 100));
+export const depositLabel = (j: Job) => (j.model === "scg" ? "มัดจำคงที่ ฿30,000 (SCG Home)" : "มัดจำ 30% (Housing Expert)");
+/** ทีมขายเป็นผู้ถอดแบบรายหมวด หลังสำรวจเลือก Confirm (ใช้ผลเดิม) หรือ Revise (ถอดใหม่) — โครงทรัส/อะเสต้อง Revise เสมอ เพราะใช้แบบทรัส + Cutting List ใหม่จากห้องแบบ */
+export const lockedOf = (j: Job): Cat[] => (j.segment !== "general" ? [] : j.work === "ase" ? ["ase", "truss"] : j.work === "truss" ? ["truss"] : []);
+export const reviseOf = (j: Job): Cat[] => (j.segment !== "general" ? [] : catsOf(j.work).filter((c) => lockedOf(j).includes(c) || (j.revise ?? []).includes(c)));
 
 /** กำหนดเสร็จของขั้นตอน: ขั้นหลังปิดขายนับจากวันปิดขาย (คำมั่นกับลูกค้า) ขั้นอื่นนับต่อจากวันที่ขั้นก่อนหน้าเสร็จ */
 export function dueOf(j: Job, s: StepDef): string {
@@ -246,11 +263,12 @@ export function leadSla(l: Lead): { state: "ok" | "warn" | "breach" | "met" | "n
   if (l.status === "lost" && !l.firstContactAt) return { state: "na", text: "-" };
   if (l.firstContactAt) {
     const took = (new Date(l.firstContactAt).getTime() - new Date(l.createdAt).getTime()) / 3600e3;
-    return took <= SLA_HOURS ? { state: "met", text: `ทัน SLA · ${durText(took)}` } : { state: "breach", text: `เกิน SLA · ${durText(took)}` };
+    return took <= slaHoursOf(l.channel) ? { state: "met", text: `ทัน SLA · ${durText(took)}` } : { state: "breach", text: `เกิน SLA · ${durText(took)}` };
   }
-  const left = SLA_HOURS - hoursSince(l.createdAt);
+  const target = slaHoursOf(l.channel);
+  const left = target - hoursSince(l.createdAt);
   if (left < 0) return { state: "breach", text: `เกิน SLA ${durText(left)}` };
-  return { state: left < 1.5 ? "warn" : "ok", text: `เหลือ ${durText(left)}` };
+  return { state: left < Math.min(1.5, target * 0.25) ? "warn" : "ok", text: `เหลือ ${durText(left)}` };
 }
 
 /* ---------- ข้อมูลตั้งต้น ---------- */
@@ -271,12 +289,12 @@ export function seedLeads(): Lead[] {
 
 interface Spec {
   id: string; customer: string; phone: string; province: string; segment: Segment; work: Work; value: number; quote1Value?: number;
-  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string;
+  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string; model?: Model;
 }
 function mk(sp: Spec): Job {
   const job: Job = {
     id: sp.id, opsId: sp.id.replace("J-", "OP-"), customer: sp.customer, phone: sp.phone, province: sp.province, segment: sp.segment, work: sp.work,
-    value: sp.value, quote1Value: sp.quote1Value, owner: sp.owner ?? "ฝน", startedAt: subWd(sp.daysIn), done: {}, scm: sp.scm ?? {},
+    value: sp.value, quote1Value: sp.quote1Value, model: sp.model ?? "he", owner: sp.owner ?? "ฝน", startedAt: subWd(sp.daysIn), done: {}, scm: sp.scm ?? {},
     lastTouchAt: hAgo(sp.touchH ?? 6), log: [],
   };
   if (sp.cancel) { job.cancelReason = sp.cancel; }
@@ -299,10 +317,10 @@ export function seedJobs(): Job[] {
   return [
     mk({ id: "J-2611-0113", customer: "คุณสมศักดิ์ ใจเย็น", phone: "081-555-0113", province: "สงขลา", segment: "general", work: "truss", value: 486000, at: "ase_mark", daysIn: 4, touchH: 30 }),
     mk({ id: "J-2611-0101", customer: "คุณจันทร์เพ็ญ สายสุด", phone: "089-555-0101", province: "ขอนแก่น", segment: "general", work: "roof", value: 168000, at: "quote1", daysIn: 2, touchH: 20 }),
-    mk({ id: "J-2611-0102", customer: "คุณรัตนา พรหมมา", phone: "062-555-0102", province: "สงขลา", segment: "general", work: "roof", value: 245000, quote1Value: 245000, at: "deposit", daysIn: 6, touchH: 100 }),
+    mk({ id: "J-2611-0102", customer: "คุณรัตนา พรหมมา", phone: "062-555-0102", province: "สงขลา", segment: "general", work: "roof", value: 245000, quote1Value: 245000, at: "deposit", daysIn: 6, touchH: 100, model: "scg" }),
     mk({ id: "J-2611-0114", customer: "คุณธีรพงษ์ มั่นคง", phone: "085-555-0114", province: "นครปฐม", segment: "hbd", work: "roof", value: 212000, at: "quote1", daysIn: 1, touchH: 20 }),
     mk({ id: "J-2611-0103", customer: "คุณชนิดา วงศ์ใหญ่", phone: "087-555-0103", province: "สงขลา", segment: "general", work: "ase", value: 355000, quote1Value: 355000, at: "deposit", daysIn: 6, touchH: 60 }),
-    mk({ id: "J-2611-0104", customer: "คุณเอกชัย ธรรมดี", phone: "086-555-0104", province: "ขอนแก่น", segment: "general", work: "roof", value: 186500, quote1Value: 186500, at: "survey", daysIn: 7, surveyOffset: 0, touchH: 26 }),
+    mk({ id: "J-2611-0104", customer: "คุณเอกชัย ธรรมดี", phone: "086-555-0104", province: "ขอนแก่น", segment: "general", work: "roof", value: 186500, quote1Value: 186500, at: "survey", daysIn: 7, surveyOffset: 0, touchH: 26, model: "scg" }),
     mk({ id: "J-2611-0105", customer: "คุณวรรณา เพชรดี", phone: "064-555-0105", province: "กรุงเทพมหานคร", segment: "general", work: "roof", value: 122000, quote1Value: 122000, at: "survey", daysIn: 10, surveyOffset: -3, touchH: 80 }),
     mk({ id: "J-2611-0115", customer: "คุณสมพร บุญรอด", phone: "081-555-0115", province: "ภูเก็ต", segment: "general", work: "truss", value: 398000, quote1Value: 398000, at: "survey", daysIn: 9, surveyOffset: 2, touchH: 40 }),
     mk({ id: "J-2611-0116", customer: "คุณวิชัย รุ่งเรือง", phone: "089-555-0116", province: "เชียงใหม่", segment: "general", work: "truss", value: 276000, quote1Value: 276000, at: "truss_design", daysIn: 17, surveyOffset: -6, touchH: 70 }),
