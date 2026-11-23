@@ -43,6 +43,8 @@ const JOBS = [
   { id: "cust-sat", group: "gsheet", label: "ความพึงพอใจ (บริการ)", args: ["scripts/sync-cust-sat-gsheet.mjs", "--apply"] },
   { id: "scghome-sat", group: "gsheet", label: "ความพึงพอใจ SCG Home", args: ["scripts/sync-scghome-sat-gsheet.mjs", "--apply"] },
   { id: "store-eval", group: "gsheet", label: "ผลตรวจประเมินร้าน", args: ["scripts/sync-store-eval-gsheet.mjs", "--apply"] },
+  // ไฟล์ใน Google Drive (bot sentiment) — สคริปต์เทียบ sha256 เอง ไม่เปลี่ยน = ไม่นำเข้า
+  { id: "line-groups-gdrive", group: "gsheet", label: "กลุ่ม Line (Google Drive)", args: ["scripts/sync-line-groups-gdrive.mjs", "--apply"] },
   { id: "product-di", group: "sharepoint", label: "ยอดขายสินค้า DI", file: F.di, args: ["scripts/sync-product-sales.mjs", "--apply", "--source", "di"] },
   { id: "product-odoo", group: "sharepoint", label: "ยอดขายสินค้า Odoo", file: F.odoo, args: ["scripts/sync-product-sales.mjs", "--apply", "--source", "odoo"] },
   { id: "lhs", group: "sharepoint", label: "ยอดขาย LHS/Rudy", file: F.lhs, args: ["scripts/import-service-sales.mjs", "--apply", "--file", F.lhs] },

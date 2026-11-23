@@ -34,9 +34,12 @@ export interface ParsedLineFile {
 export const FROM_PERIOD = "2026-01";
 const RANK: Record<LineStatusKey, number> = { register: 3, not_register: 2, no_bot: 1 };
 
-/** "10/24/26" (m/d/yy) -> "2026-10-24" */
+/** "10/24/26" (m/d/yy) หรือ "2026-10-24 04:13:46" (ไฟล์จาก Google Drive) -> "2026-10-24" */
 function mdy(s: unknown): string | null {
-  const p = String(s ?? "").trim().split("/");
+  const raw = String(s ?? "").trim();
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const p = raw.split(" ")[0].split("/");
   if (p.length !== 3) return null;
   const y = Number(p[2]) < 100 ? 2000 + Number(p[2]) : Number(p[2]);
   const m = Number(p[0]), d = Number(p[1]);
