@@ -1,74 +1,227 @@
-/* Mock: CRM ลูกค้า (Lead -> Ops/Job -> ปิดขาย -> หลังปิดขาย) + "น้องเลขา"
-   ข้อมูลสมมติในหน่วยความจำ — ชื่อลูกค้าเป็นชื่อสมมติทั้งหมด */
+/* Mock: CRM (Lead -> Opp -> ปิดขาย -> ติดตามหน่วยงานอื่น) ตาม Project Timeline งาน Roof Installation (01/08/2026)
+   ข้อมูลสมมติในหน่วยความจำ — ชื่อลูกค้าเป็นชื่อสมมติทั้งหมด
+   หน่วยงานปลายทาง (KIM / SCM / ห้องแบบ) เป็นแอปอื่น: CRM จ่ายข้อมูลออก และรับสถานะ/ไฟล์กลับเข้ามา */
 
-/** เวลา "ตอนนี้" ของ Mock (คงที่ เพื่อให้ SLA/งานค้างแสดงผลเหมือนเดิมทุกครั้ง) */
+/** เวลา "ตอนนี้" ของ Mock (คงที่ เพื่อให้ SLA/งานค้างแสดงผลเหมือนเดิมทุกครั้ง) — วันอังคาร */
 export const NOW = new Date("2026-11-24T10:30:00+07:00");
 export const SLA_HOURS = 4;
 export const DEPOSIT_PCT = 30;
+const TZ = "Asia/Bangkok";
+const BKK = 7 * 3600e3;
 
 const hAgo = (h: number) => new Date(NOW.getTime() - h * 3600e3).toISOString();
-const dFromNow = (d: number, hour = 10) => {
-  const t = new Date(NOW.getTime() + d * 86400e3);
-  const ymd = t.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
-  return new Date(`${ymd}T${String(hour).padStart(2, "0")}:00:00+07:00`).toISOString();
+export const dayKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: TZ });
+const atHour = (ymd: string, hour: number) => new Date(`${ymd}T${String(hour).padStart(2, "0")}:00:00+07:00`).toISOString();
+const dFromNow = (d: number, hour = 10) => atHour(dayKey(new Date(NOW.getTime() + d * 86400e3).toISOString()), hour);
+
+/** บวกวันทำการ (ไม่นับเสาร์-อาทิตย์ ; Mock ไม่นับวันหยุดนักขัตฤกษ์) ผลลัพธ์ = 17:00 ของวันนั้น */
+export function addWd(iso: string, n: number): string {
+  let t = new Date(iso).getTime();
+  let left = n;
+  while (left > 0) {
+    t += 86400e3;
+    const dow = new Date(t + BKK).getUTCDay();
+    if (dow !== 0 && dow !== 6) left--;
+  }
+  return atHour(dayKey(new Date(t).toISOString()), 17);
+}
+/** จำนวนวันทำการจาก a ไปถึง b (บวก = b อยู่หลัง a) นับระดับวัน */
+export function wdBetween(a: string, b: string): number {
+  const sign = new Date(b).getTime() >= new Date(a).getTime() ? 1 : -1;
+  const [from, to] = sign > 0 ? [a, b] : [b, a];
+  let cur = new Date(from).getTime();
+  const end = dayKey(to);
+  let n = 0;
+  while (dayKey(new Date(cur).toISOString()) < end) {
+    cur += 86400e3;
+    const dow = new Date(cur + BKK).getUTCDay();
+    if (dow !== 0 && dow !== 6) n++;
+  }
+  return sign * n;
+}
+const subWd = (n: number, hour = 9) => {
+  let t = NOW.getTime();
+  let left = n;
+  while (left > 0) {
+    t -= 86400e3;
+    const dow = new Date(t + BKK).getUTCDay();
+    if (dow !== 0 && dow !== 6) left--;
+  }
+  return atHour(dayKey(new Date(t).toISOString()), hour);
 };
 
-/* ---------- ชนิดข้อมูล ---------- */
+/* ---------- Lead ---------- */
 export type LeadStatus = "waiting" | "contacting" | "qualified" | "converted" | "lost";
 export interface Lead {
   id: string; name: string; phone: string; product: string; channel: string; province: string;
   createdAt: string; firstContactAt?: string; status: LeadStatus; note?: string; lostReason?: string; interest?: string;
 }
-export type Stage = "design" | "quote" | "deposit" | "survey" | "final" | "collect" | "aftersale" | "done" | "cancelled";
-export type AfterKey = "prep" | "ship" | "install" | "handover" | "warranty";
-export interface JobLog { at: string; text: string }
-export interface Job {
-  id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; product: string; pkg: string;
-  value: number; stage: Stage; owner: string; createdAt: string; lastTouchAt: string; surveyAt?: string;
-  depositPaidAt?: string; paidAt?: string; after: Partial<Record<AfterKey, string>>; afterEta: Partial<Record<AfterKey, string>>;
-  log: JobLog[]; cancelReason?: string;
-}
-
-/* ---------- ค่าคงที่ ---------- */
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
 export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral"];
-export const PACKAGES = ["Total Roof – Complete Roof", "Standard Roof – โครงหลังคา", "Standard Roof – กระเบื้อง", "Solar Roof – 5 kWp", "Solar Roof – 10 kWp"];
 export const OWNERS = ["ฝน", "บอส", "มิ้น"];
-
 export const LEAD_STATUS: Record<LeadStatus, { label: string; cls: string }> = {
   waiting: { label: "รอติดต่อ", cls: "bg-amber-100 text-amber-800" },
   contacting: { label: "กำลังสกรีน", cls: "bg-sky-100 text-sky-800" },
-  qualified: { label: "รอเปิด Ops", cls: "bg-violet-100 text-violet-800" },
-  converted: { label: "เปิด Ops แล้ว", cls: "bg-emerald-100 text-emerald-800" },
+  qualified: { label: "รอเปิด Opp", cls: "bg-violet-100 text-violet-800" },
+  converted: { label: "เปิด Opp แล้ว", cls: "bg-emerald-100 text-emerald-800" },
   lost: { label: "Loss", cls: "bg-rose-100 text-rose-700" },
 };
 export const LOST_REASONS = ["งบประมาณไม่ถึง", "ยังไม่พร้อมต่อเติม", "อยู่นอกพื้นที่บริการ", "ติดต่อไม่ได้", "เลือกผู้ให้บริการอื่น"];
 
-export interface StageMeta { key: Stage; label: string; hint: string; icon: string; tone: string }
-export const STAGES: StageMeta[] = [
-  { key: "design", label: "ออกแบบ + ประมาณการ", hint: "ถอดแบบและทำราคาเบื้องต้น", icon: "draw", tone: "#6366f1" },
-  { key: "quote", label: "เสนอราคา", hint: "รอลูกค้าตอบรับราคา", icon: "request_quote", tone: "#8b5cf6" },
-  { key: "deposit", label: "รอมัดจำ", hint: `เก็บมัดจำ ${DEPOSIT_PCT}%`, icon: "payments", tone: "#d97706" },
-  { key: "survey", label: "สำรวจหน้างาน", hint: "นัดและเข้าสำรวจ", icon: "pin_drop", tone: "#0891b2" },
-  { key: "final", label: "ราคา Final", hint: "ปรับใบเสนอราคาหลังสำรวจ", icon: "edit_note", tone: "#7c3aed" },
-  { key: "collect", label: "รอเก็บเงิน 100%", hint: "เก็บส่วนที่เหลือก่อนติดตั้ง", icon: "account_balance_wallet", tone: "#ea580c" },
-  { key: "aftersale", label: "หลังปิดขาย", hint: "เตรียมของ จัดส่ง ติดตั้ง ส่งมอบ", icon: "local_shipping", tone: "#059669" },
+/* ---------- หน่วยงาน ---------- */
+export type Party = "SE" | "KIM" | "SCM" | "ROOM";
+export const PARTY: Record<Party, { label: string; sub: string; cls: string; icon: string }> = {
+  SE: { label: "ทีมขาย", sub: "Lead · Opp · ใบเสนอราคา · ปิดขาย", cls: "bg-indigo-100 text-indigo-700", icon: "badge" },
+  KIM: { label: "KIM", sub: "สำรวจ · แผนติดตั้ง · ควบคุมงาน · ส่งมอบ", cls: "bg-cyan-100 text-cyan-800", icon: "engineering" },
+  SCM: { label: "SCM", sub: "เตรียมสินค้า · สั่งโรงงาน · ขนส่ง", cls: "bg-amber-100 text-amber-800", icon: "inventory_2" },
+  ROOM: { label: "ห้องแบบ", sub: "ขีดแนวอะเส · แบบทรัส · Cutting List", cls: "bg-fuchsia-100 text-fuchsia-800", icon: "architecture" },
+};
+
+/* ---------- Project Timeline (แม่แบบตามไฟล์ PT) ---------- */
+export type Segment = "general" | "hbd";
+export type Work = "roof" | "truss" | "ase";
+export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "quote1" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver" | "install" | "handover";
+export interface Send { party: Party; title: string; at: "start" | "done" }
+export interface StepDef { key: StepKey; label: string; owner: Party; day: number; post: boolean; hint: string; sends: Send[]; result?: string }
+
+export const SEGMENT_LABEL: Record<Segment, string> = { general: "ลูกค้าทั่วไป", hbd: "HBD Focus (ปิดขายจากแบบ)" };
+export const WORK_LABEL: Record<Work, string> = { roof: "มุงหลังคาอย่างเดียว", truss: "โครงทรัส + มุงหลังคา", ase: "อะเส + โครงทรัส + มุงหลังคา" };
+
+const DAYS: Record<Segment, Record<Work, Partial<Record<StepKey, number>>>> = {
+  general: {
+    roof: { plan_in: 1, quote1: 3, deposit: 4, survey: 9, quote2: 11, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
+    truss: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 35, install: 42, handover: 43 },
+    ase: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 37, install: 44, handover: 45 },
+  },
+  hbd: {
+    roof: { plan_in: 1, quote1: 3, close: 4, install_plan: 7, deliver: 15, install: 22, handover: 23 },
+    truss: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 24, install: 31, handover: 32 },
+    ase: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 26, install: 33, handover: 34 },
+  },
+};
+const ORDER: Record<Segment, Record<Work, StepKey[]>> = {
+  general: {
+    roof: ["plan_in", "quote1", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
+    truss: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
+    ase: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
+  },
+  hbd: {
+    roof: ["plan_in", "quote1", "close", "install_plan", "deliver", "install", "handover"],
+    truss: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
+    ase: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
+  },
+};
+const POST: StepKey[] = ["install_plan", "deliver", "install", "handover"];
+const DELIVER_LABEL: Record<Work, string> = { roof: "ส่งกระเบื้อง", truss: "ส่งทรัส & กระเบื้อง", ase: "ส่งอะเส + ทรัส & กระเบื้อง" };
+const INSTALL_LABEL: Record<Work, string> = { roof: "ติดตั้งกระเบื้อง", truss: "ติดตั้งทรัส & กระเบื้อง", ase: "ติดตั้งอะเส & ทรัส & กระเบื้อง" };
+
+function meta(key: StepKey, seg: Segment, work: Work): Omit<StepDef, "day" | "post" | "key"> {
+  switch (key) {
+    case "plan_in": return { label: "รับแบบ", owner: "SE", hint: "ทีมขายรับแบบจากลูกค้า และเปิด Opp", sends: [] };
+    case "ase_mark": return { label: "ขีดแนวอะเส", owner: "ROOM", hint: "ห้องแบบขีดแนวอะเส ส่งผลกลับมาให้ทีมขายใช้ทำประมาณการ", sends: [{ party: "ROOM", title: "ข้อมูลลูกค้า + แบบแปลน ขอขีดแนวอะเส", at: "start" }], result: "ผลขีดแนวอะเส (ไฟล์)" };
+    case "truss_design":
+      return seg === "hbd"
+        ? { label: "ขีดแนวอะเส + ทำแบบทรัส + Cutting List", owner: "ROOM", hint: "ลูกค้า HBD ส่งแบบมา ห้องแบบทำแบบทรัสทันที ไม่ต้องรอสำรวจ", sends: [{ party: "ROOM", title: "แบบแปลน ขอขีดแนวอะเส + ทำแบบทรัส", at: "start" }], result: "แบบทรัส + Cutting List (ไฟล์)" }
+        : { label: "ทำแบบทรัส + Cutting List", owner: "ROOM", hint: "ส่งรายงานสำรวจจาก KIM ให้ห้องแบบทำแบบทรัสและ Cutting List", sends: [{ party: "ROOM", title: "รายงานสำรวจ + แบบ ขอทำแบบทรัส/Cutting List", at: "start" }], result: "แบบทรัส + Cutting List (ไฟล์)" };
+    case "quote1": return { label: "เสนอราคาจากแบบ", owner: "SE", hint: work === "roof" ? "ทำประมาณการจากแบบและส่งใบเสนอราคาให้ลูกค้า" : "นำผลจากห้องแบบมาทำประมาณการ แล้วส่งใบเสนอราคาให้ลูกค้า", sends: [] };
+    case "deposit": return { label: "ปิดมัดจำ + ล็อกคิวสำรวจ", owner: "SE", hint: "ลูกค้าจ่ายมัดจำบนแอป ล็อกวันเข้าสำรวจ แล้วส่งข้อมูลให้ KIM และรายการจองสินค้าให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลงานสำรวจ + วันนัดสำรวจที่ล็อกคิวแล้ว", at: "done" }, { party: "SCM", title: "รายการสินค้าที่ขอจอง (กันสินค้า)", at: "done" }] };
+    case "survey": return { label: "สำรวจหน้างาน + รายงานสำรวจ", owner: "KIM", hint: "KIM เข้าสำรวจตามวันนัด และส่งไฟล์รายงานสำรวจกลับมา", sends: [], result: "รายงานสำรวจ (ไฟล์)" };
+    case "quote2": return { label: "เสนอราคาหลังสำรวจ", owner: "SE", hint: work === "roof" ? "ปรับใบเสนอราคาตามรายงานสำรวจ แล้วเสนอราคาใหม่" : "เช็ครายงานสำรวจ + แบบทรัส/Cutting List แล้วทำใบเสนอราคาฉบับหลังสำรวจ", sends: [] };
+    case "close": return { label: "ปิดขาย (ลูกค้าจ่ายครบ 100%)", owner: "SE", hint: "เก็บเงินครบ แล้วส่งข้อมูลปิดขายให้ KIM และใบเสนอราคาฉบับแก้ไขให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "ใบเสนอราคาฉบับแก้ไข (Map สินค้า + สั่งโรงงาน)", at: "done" }] };
+    case "install_plan": return { label: "แจ้งแผนติดตั้งลูกค้า", owner: "KIM", hint: "KIM วางแผนติดตั้งจากวันที่สินค้าครบ แล้วแจ้งลูกค้าใน Line กลุ่ม", sends: [], result: "แผนติดตั้ง (วันเริ่ม-วันจบ)" };
+    case "deliver": return { label: DELIVER_LABEL[work], owner: "SCM", hint: "SCM สั่งโรงงานและขนส่งสินค้าเข้าหน้างาน", sends: [], result: "สถานะจัดส่งสินค้า" };
+    case "install": return { label: INSTALL_LABEL[work], owner: "KIM", hint: "ช่างเข้าติดตั้ง และ KIM เข้าตรวจงาน", sends: [], result: "ความคืบหน้าติดตั้ง / ผลตรวจงาน" };
+    case "handover": return { label: "ส่งมอบงาน + ใบรับประกัน", owner: "KIM", hint: "KIM ส่งมอบงานกับลูกค้า และออกใบรับประกัน", sends: [], result: "ใบส่งมอบงาน + ใบรับประกัน" };
+  }
+}
+export function template(seg: Segment, work: Work): StepDef[] {
+  return ORDER[seg][work].map((key) => ({ key, day: DAYS[seg][work][key] ?? 0, post: POST.includes(key), ...meta(key, seg, work) }));
+}
+export const planTotals = (steps: StepDef[]) => {
+  const close = steps.find((s) => s.key === "close")?.day ?? 0;
+  const last = steps[steps.length - 1].day;
+  return { total: last, afterClose: last - close };
+};
+
+/* ---------- Job ---------- */
+export interface JobLog { at: string; text: string }
+export interface Job {
+  id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; segment: Segment; work: Work;
+  value: number; quote1Value?: number; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
+  scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string;
+}
+export const stepsOf = (j: Job) => template(j.segment, j.work);
+export const currentStep = (j: Job): StepDef | null => (j.cancelReason ? null : stepsOf(j).find((s) => !j.done[s.key]) ?? null);
+export const isFinished = (j: Job) => !j.cancelReason && stepsOf(j).every((s) => j.done[s.key]);
+export const hasDeposit = (j: Job) => j.segment === "general";
+export const depositOf = (j: Job) => (hasDeposit(j) ? Math.round(((j.quote1Value ?? j.value) * DEPOSIT_PCT) / 100) : 0);
+
+/** กำหนดเสร็จของขั้นตอน: ขั้นหลังปิดขายนับจากวันปิดขาย (คำมั่นกับลูกค้า) ขั้นอื่นนับต่อจากวันที่ขั้นก่อนหน้าเสร็จ */
+export function dueOf(j: Job, s: StepDef): string {
+  const steps = stepsOf(j);
+  const closeDef = steps.find((x) => x.key === "close")!;
+  if (s.post && j.done.close) return addWd(j.done.close, s.day - closeDef.day);
+  const prev = steps[steps.indexOf(s) - 1];
+  if (prev && j.done[prev.key]) return addWd(j.done[prev.key]!, s.day - prev.day);
+  return addWd(j.startedAt, s.day - 1);
+}
+export const lateWd = (iso: string) => wdBetween(iso, NOW.toISOString());
+
+export type ColKey = "intake" | "quote1" | "deposit" | "survey" | "post_survey" | "close" | "prep" | "install" | "done";
+export const COLS: { key: ColKey; label: string; hint: string; icon: string; tone: string }[] = [
+  { key: "intake", label: "รับแบบ / ห้องแบบ", hint: "ขีดแนวอะเส · แบบทรัส (HBD)", icon: "architecture", tone: "#a855f7" },
+  { key: "quote1", label: "เสนอราคาจากแบบ", hint: "ประมาณการ + ใบเสนอราคา", icon: "request_quote", tone: "#6366f1" },
+  { key: "deposit", label: "รอมัดจำ", hint: `ปิดมัดจำ ${DEPOSIT_PCT}% + ล็อกคิวสำรวจ`, icon: "payments", tone: "#d97706" },
+  { key: "survey", label: "รอสำรวจ / รายงาน", hint: "KIM สำรวจและส่งรายงาน", icon: "pin_drop", tone: "#0891b2" },
+  { key: "post_survey", label: "หลังสำรวจ", hint: "แบบทรัส + ราคาหลังสำรวจ", icon: "edit_note", tone: "#7c3aed" },
+  { key: "close", label: "รอปิดขาย", hint: "รอลูกค้าจ่ายครบ 100%", icon: "account_balance_wallet", tone: "#ea580c" },
+  { key: "prep", label: "เตรียมสินค้า + แผนติดตั้ง", hint: "SCM สั่งของ · KIM วางแผน", icon: "local_shipping", tone: "#0d9488" },
+  { key: "install", label: "ติดตั้ง / ส่งมอบ", hint: "KIM + ช่าง", icon: "construction", tone: "#059669" },
   { key: "done", label: "จบงาน", hint: "ส่งมอบและออกใบรับประกันแล้ว", icon: "verified", tone: "#475569" },
 ];
-export const STAGE_ORDER: Stage[] = STAGES.map((s) => s.key);
-export const stageMeta = (k: Stage) => STAGES.find((s) => s.key === k) ?? { key: k, label: "ยกเลิกงาน", hint: "", icon: "block", tone: "#e11d48" };
+export function colOf(j: Job): ColKey | null {
+  if (j.cancelReason) return null;
+  const c = currentStep(j);
+  if (!c) return "done";
+  switch (c.key) {
+    case "plan_in": case "ase_mark": return "intake";
+    case "truss_design": return j.segment === "hbd" ? "intake" : "post_survey";
+    case "quote1": return "quote1";
+    case "deposit": return "deposit";
+    case "survey": return "survey";
+    case "quote2": return "post_survey";
+    case "close": return "close";
+    case "install_plan": case "deliver": return "prep";
+    default: return "install";
+  }
+}
 
-export const AFTER_STEPS: { key: AfterKey; label: string; icon: string; team: string }[] = [
-  { key: "prep", label: "เตรียมสินค้า", icon: "inventory_2", team: "ทีมคลัง" },
-  { key: "ship", label: "จัดส่งสินค้า", icon: "local_shipping", team: "ทีมส่งสินค้า" },
-  { key: "install", label: "เริ่มติดตั้ง", icon: "construction", team: "ทีมติดตั้ง" },
-  { key: "handover", label: "ส่งมอบงาน", icon: "handshake", team: "ทีมติดตั้ง" },
-  { key: "warranty", label: "ออกใบรับประกัน", icon: "workspace_premium", team: "ฝ่ายขาย" },
-];
+/* ---------- ข้อมูลที่แลกกับแอปปลายทาง (คำนวณจากสถานะงาน) ---------- */
+export interface Packet {
+  id: string; jobId: string; customer: string; party: Party; dir: "out" | "in"; title: string; stepKey: StepKey;
+  state: "sent" | "received" | "waiting"; at?: string; due?: string;
+}
+export function packetsOf(j: Job): Packet[] {
+  const steps = stepsOf(j);
+  const out: Packet[] = [];
+  steps.forEach((s, i) => {
+    const prev = steps[i - 1];
+    const startAt = i === 0 ? j.startedAt : prev ? j.done[prev.key] : undefined;
+    s.sends.forEach((sd, k) => {
+      const at = sd.at === "done" ? j.done[s.key] : startAt;
+      if (at) out.push({ id: `${j.id}-${s.key}-o${k}`, jobId: j.id, customer: j.customer, party: sd.party, dir: "out", title: sd.title, stepKey: s.key, state: "sent", at });
+    });
+    if (s.result && s.owner !== "SE") {
+      const done = j.done[s.key];
+      if (done) out.push({ id: `${j.id}-${s.key}-i`, jobId: j.id, customer: j.customer, party: s.owner, dir: "in", title: s.result, stepKey: s.key, state: "received", at: done });
+      else if (startAt && !j.cancelReason) out.push({ id: `${j.id}-${s.key}-i`, jobId: j.id, customer: j.customer, party: s.owner, dir: "in", title: s.result, stepKey: s.key, state: "waiting", due: dueOf(j, s) });
+    }
+  });
+  return out;
+}
 
 /* ---------- ตัวช่วยแสดงผล ---------- */
 export const baht = (n: number) => `฿${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-const TZ = "Asia/Bangkok";
 export const dateTh = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: TZ }) : "-");
 export const timeTh = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: TZ }) : "-");
 export const dtTh = (iso?: string) => (iso ? `${dateTh(iso)} ${timeTh(iso)}` : "-");
@@ -82,9 +235,11 @@ export function durText(hours: number) {
   return r ? `${d} วัน ${r} ชม.` : `${d} วัน`;
 }
 export const agoText = (iso: string) => `${durText(hoursSince(iso))}ที่แล้ว`;
-const isSameDay = (a: string, b: Date) => new Date(a).toLocaleDateString("en-CA", { timeZone: TZ }) === b.toLocaleDateString("en-CA", { timeZone: TZ });
-export const isToday = (iso?: string) => !!iso && isSameDay(iso, NOW);
-export const depositOf = (j: Job) => Math.round((j.value * DEPOSIT_PCT) / 100);
+export const isToday = (iso?: string) => !!iso && dayKey(iso) === dayKey(NOW.toISOString());
+export const dueLabel = (due: string) => {
+  const l = lateWd(due);
+  return l > 0 ? `เลยกำหนด ${l} วันทำการ` : l === 0 ? "ครบกำหนดวันนี้" : `อีก ${-l} วันทำการ`;
+};
 
 /** SLA ติดต่อครั้งแรกของ Lead */
 export function leadSla(l: Lead): { state: "ok" | "warn" | "breach" | "met" | "na"; text: string } {
@@ -99,55 +254,81 @@ export function leadSla(l: Lead): { state: "ok" | "warn" | "breach" | "met" | "n
 }
 
 /* ---------- ข้อมูลตั้งต้น ---------- */
-const mkJob = (p: Partial<Job> & Pick<Job, "id" | "customer" | "phone" | "province" | "product" | "pkg" | "value" | "stage">): Job => ({
-  opsId: p.id.replace("J-", "OP-"), owner: "ฝน", createdAt: hAgo(240), lastTouchAt: hAgo(6), after: {}, afterEta: {}, log: [], ...p,
-});
-
 export function seedLeads(): Lead[] {
   return [
     { id: "L-2611-009", name: "คุณนภา ใจงาม", phone: "081-555-0931", product: "Roof Install", channel: "Home Online", province: "อุดรธานี", createdAt: hAgo(1.2), status: "waiting", interest: "ต้องการเปลี่ยนหลังคาบ้านชั้นเดียว ประมาณ 180 ตร.ม." },
-    { id: "L-2611-001", name: "คุณวิภา ศรีสุข", phone: "062-555-1204", product: "Solar Roof", channel: "Home Online", province: "สงขลา", createdAt: hAgo(2.8), status: "waiting", interest: "สนใจโซลาร์รูฟ ค่าไฟเดือนละ 6,000 บาท" },
+    { id: "L-2611-001", name: "คุณวิภา ศรีสุข", phone: "062-555-1204", product: "Roof Install", channel: "Home Online", province: "สงขลา", createdAt: hAgo(2.8), status: "waiting", interest: "สร้างบ้านใหม่ ต้องการโครงทรัสพร้อมมุงกระเบื้อง" },
     { id: "L-2611-002", name: "คุณธนากร ใจดี", phone: "085-555-1822", product: "Roof Install", channel: "Contact Center", province: "ขอนแก่น", createdAt: hAgo(6), status: "waiting", interest: "หลังคารั่ว อยากเปลี่ยนทั้งหลัง" },
     { id: "L-2611-003", name: "คุณมนัสนันท์ วงศ์ดี", phone: "089-555-4410", product: "Roof Repair", channel: "LINE OA", province: "เชียงใหม่", createdAt: hAgo(27), status: "waiting", interest: "ซ่อมหลังคารั่วบริเวณระเบียง" },
     { id: "L-2611-010", name: "คุณกิตติ ประเสริฐ", phone: "086-555-7712", product: "Solar Roof", channel: "Walk-in", province: "ระยอง", createdAt: hAgo(20), firstContactAt: hAgo(19), status: "contacting", note: "โทรแล้ว ลูกค้าขอเทียบกับอีก 2 เจ้า นัดโทรกลับพรุ่งนี้", interest: "บ้านสองชั้น ติดโซลาร์ 10 kWp" },
     { id: "L-2611-004", name: "คุณปรีชา แก้วใส", phone: "087-555-3305", product: "Ceiling & Insulation", channel: "Walk-in", province: "นครราชสีมา", createdAt: hAgo(30), firstContactAt: hAgo(28), status: "contacting", note: "ส่งรูปหน้างานแล้ว รอตอบเรื่องงบ", interest: "ฝ้าเพดาน + ฉนวนกันความร้อน" },
     { id: "L-2611-005", name: "คุณสุดา มีสุข", phone: "064-555-9018", product: "Roof Install", channel: "Dealer Referral", province: "ภูเก็ต", createdAt: hAgo(50), firstContactAt: hAgo(49), status: "contacting", note: "ร้านตัวแทนแนะนำมา พื้นที่อยู่ในขอบเขต", interest: "บ้านใหม่ ต้องการหลังคาพร้อมโครง" },
-    { id: "L-2611-006", name: "คุณอนันต์ ทองดี", phone: "083-555-6620", product: "Solar Roof", channel: "Home Online", province: "กรุงเทพมหานคร", createdAt: hAgo(72), firstContactAt: hAgo(71), status: "qualified", note: "ผ่านเงื่อนไขรับงาน พร้อมให้สำรวจ", interest: "ติดโซลาร์ 5 kWp" },
-    { id: "L-2611-007", name: "คุณพิมพ์ใจ รักไทย", phone: "082-555-2231", product: "Roof Install", channel: "Contact Center", province: "สงขลา", createdAt: hAgo(100), firstContactAt: hAgo(98), status: "qualified", note: "งบ 3-4 แสน ต้องการเริ่มก่อนสิ้นปี", interest: "เปลี่ยนหลังคาโรงจอดรถ + ตัวบ้าน" },
+    { id: "L-2611-006", name: "คุณอนันต์ ทองดี", phone: "083-555-6620", product: "Roof Install", channel: "Home Online", province: "กรุงเทพมหานคร", createdAt: hAgo(72), firstContactAt: hAgo(71), status: "qualified", note: "ผ่านเงื่อนไขรับงาน พร้อมให้สำรวจ", interest: "เปลี่ยนกระเบื้องหลังคา" },
+    { id: "L-2611-007", name: "คุณพิมพ์ใจ รักไทย", phone: "082-555-2231", product: "Roof Install", channel: "Contact Center", province: "สงขลา", createdAt: hAgo(100), firstContactAt: hAgo(98), status: "qualified", note: "งบ 3-4 แสน ต้องการเริ่มก่อนสิ้นปี", interest: "โรงจอดรถ + ตัวบ้าน ต้องมีอะเสและทรัส" },
     { id: "L-2611-008", name: "คุณวีระ สุขสบาย", phone: "080-555-1177", product: "Home Automation", channel: "LINE OA", province: "ชลบุรี", createdAt: hAgo(120), firstContactAt: hAgo(118), status: "lost", lostReason: "งบประมาณไม่ถึง", interest: "ระบบบ้านอัจฉริยะ" },
   ];
 }
 
+interface Spec {
+  id: string; customer: string; phone: string; province: string; segment: Segment; work: Work; value: number; quote1Value?: number;
+  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string;
+}
+function mk(sp: Spec): Job {
+  const job: Job = {
+    id: sp.id, opsId: sp.id.replace("J-", "OP-"), customer: sp.customer, phone: sp.phone, province: sp.province, segment: sp.segment, work: sp.work,
+    value: sp.value, quote1Value: sp.quote1Value, owner: sp.owner ?? "ฝน", startedAt: subWd(sp.daysIn), done: {}, scm: sp.scm ?? {},
+    lastTouchAt: hAgo(sp.touchH ?? 6), log: [],
+  };
+  if (sp.cancel) { job.cancelReason = sp.cancel; }
+  const steps = stepsOf(job);
+  for (const s of steps) {
+    if (s.key === sp.at) break;
+    if (sp.cancel && s.key === "quote1") break;
+    const d = s.key === "plan_in" ? job.startedAt : dueOf(job, s);
+    const at = new Date(d).getTime() > NOW.getTime() - 2 * 3600e3 ? hAgo(2) : d;
+    job.done[s.key] = at;
+    job.log.push({ at, text: s.key === "plan_in" ? "เปิด Opp และรับแบบจากลูกค้า" : `${s.label} เสร็จ` });
+  }
+  if (sp.surveyOffset !== undefined) job.surveyAt = dFromNow(sp.surveyOffset, 14);
+  if (sp.cancel) job.log.push({ at: hAgo(300), text: `ยกเลิกงาน: ${sp.cancel}` });
+  if (sp.at !== "done" && job.log.length === 0) job.log.push({ at: job.startedAt, text: "เปิด Opp" });
+  return job;
+}
+
 export function seedJobs(): Job[] {
   return [
-    mkJob({ id: "J-2611-0113", leadId: "L-2610-088", customer: "คุณสมศักดิ์ ใจเย็น", phone: "081-555-0113", province: "สงขลา", product: "Roof Install", pkg: "Total Roof – Complete Roof", value: 486000, stage: "design", lastTouchAt: hAgo(5), log: [{ at: hAgo(5), text: "เปิด Ops จาก Lead และแนบแบบแปลน" }] }),
-    mkJob({ id: "J-2611-0101", customer: "คุณจันทร์เพ็ญ สายสุด", phone: "089-555-0101", province: "ขอนแก่น", product: "Roof Install", pkg: "Standard Roof – กระเบื้อง", value: 168000, stage: "design", lastTouchAt: hAgo(30), log: [{ at: hAgo(30), text: "รับข้อมูลหน้างานจากลูกค้า รอถอดแบบ" }] }),
-    mkJob({ id: "J-2611-0102", customer: "คุณรัตนา พรหมมา", phone: "062-555-0102", province: "สงขลา", product: "Solar Roof", pkg: "Solar Roof – 5 kWp", value: 245000, stage: "quote", lastTouchAt: hAgo(100), log: [{ at: hAgo(100), text: "ส่งใบเสนอราคาเบื้องต้นทาง LINE" }] }),
-    mkJob({ id: "J-2611-0114", customer: "คุณธีรพงษ์ มั่นคง", phone: "085-555-0114", province: "นครปฐม", product: "Roof Install", pkg: "Standard Roof – โครงหลังคา", value: 212000, stage: "quote", lastTouchAt: hAgo(20), log: [{ at: hAgo(20), text: "ส่งใบเสนอราคาเบื้องต้น ลูกค้าขอเวลาปรึกษาครอบครัว" }] }),
-    mkJob({ id: "J-2611-0103", customer: "คุณชนิดา วงศ์ใหญ่", phone: "087-555-0103", province: "สงขลา", product: "Roof Install", pkg: "Standard Roof – โครงหลังคา", value: 155000, stage: "deposit", lastTouchAt: hAgo(60), log: [{ at: hAgo(60), text: "ลูกค้าตกลงราคาเบื้องต้น ส่งใบแจ้งมัดจำ" }] }),
-    mkJob({ id: "J-2611-0104", customer: "คุณเอกชัย ธรรมดี", phone: "086-555-0104", province: "ขอนแก่น", product: "Roof Install", pkg: "Standard Roof – กระเบื้อง", value: 186500, stage: "survey", surveyAt: dFromNow(0, 14), depositPaidAt: hAgo(90), lastTouchAt: hAgo(26), log: [{ at: hAgo(90), text: "รับมัดจำ 30% แล้ว" }, { at: hAgo(26), text: "นัดสำรวจหน้างานวันนี้ 14:00" }] }),
-    mkJob({ id: "J-2611-0105", customer: "คุณวรรณา เพชรดี", phone: "064-555-0105", province: "กรุงเทพมหานคร", product: "Solar Roof", pkg: "Solar Roof – 5 kWp", value: 122000, stage: "survey", surveyAt: dFromNow(2, 10), depositPaidAt: hAgo(48), lastTouchAt: hAgo(12), log: [{ at: hAgo(48), text: "รับมัดจำ 30% แล้ว" }] }),
-    mkJob({ id: "J-2611-0115", customer: "คุณสมพร บุญรอด", phone: "081-555-0115", province: "ภูเก็ต", product: "Roof Install", pkg: "Total Roof – Complete Roof", value: 398000, stage: "survey", depositPaidAt: hAgo(120), lastTouchAt: hAgo(70), log: [{ at: hAgo(120), text: "รับมัดจำ 30% แล้ว" }] }),
-    mkJob({ id: "J-2611-0106", customer: "คุณประเสริฐ บุญมี", phone: "083-555-0106", province: "กรุงเทพมหานคร", product: "Roof Install", pkg: "Total Roof – Complete Roof", value: 520000, stage: "final", depositPaidAt: hAgo(200), lastTouchAt: hAgo(55), log: [{ at: hAgo(55), text: "สำรวจเสร็จ พบโครงเดิมต้องเสริม ปรับราคาใหม่" }] }),
-    mkJob({ id: "J-2611-0107", customer: "คุณสมหมาย แก้วมณี", phone: "089-555-0107", province: "เชียงใหม่", product: "Solar Roof", pkg: "Solar Roof – 5 kWp", value: 98000, stage: "collect", depositPaidAt: hAgo(260), lastTouchAt: hAgo(30), log: [{ at: hAgo(30), text: "ลูกค้ายืนยันราคา Final ส่งใบแจ้งชำระส่วนที่เหลือ" }] }),
-    mkJob({ id: "J-2611-0108", customer: "คุณลักขณา สายทอง", phone: "082-555-0108", province: "สงขลา", product: "Roof Install", pkg: "Standard Roof – กระเบื้อง", value: 245000, stage: "aftersale", depositPaidAt: hAgo(400), paidAt: hAgo(150), lastTouchAt: hAgo(40),
-      after: { prep: hAgo(120) }, afterEta: { ship: dFromNow(-1, 9), install: dFromNow(2, 8), handover: dFromNow(6, 16) }, log: [{ at: hAgo(150), text: "รับเงินครบ 100% ส่งข้อมูลให้ทีมติดตั้ง" }, { at: hAgo(120), text: "คลังเตรียมสินค้าเสร็จ" }] }),
-    mkJob({ id: "J-2611-0109", customer: "คุณบุญเรือง ทองคำ", phone: "080-555-0109", province: "ภูเก็ต", product: "Solar Roof", pkg: "Solar Roof – 10 kWp", value: 310000, stage: "aftersale", depositPaidAt: hAgo(500), paidAt: hAgo(260), lastTouchAt: hAgo(8),
-      after: { prep: hAgo(240), ship: hAgo(200), install: hAgo(80) }, afterEta: { handover: dFromNow(0, 16) }, log: [{ at: hAgo(80), text: "ทีมติดตั้งเริ่มงานแล้ว" }] }),
-    mkJob({ id: "J-2611-0110", customer: "คุณไพโรจน์ ดวงดี", phone: "087-555-0110", province: "ขอนแก่น", product: "Roof Install", pkg: "Standard Roof – โครงหลังคา", value: 175000, stage: "aftersale", depositPaidAt: hAgo(700), paidAt: hAgo(500), lastTouchAt: hAgo(52),
-      after: { prep: hAgo(450), ship: hAgo(400), install: hAgo(300), handover: hAgo(52) }, afterEta: {}, log: [{ at: hAgo(52), text: "ส่งมอบงานให้ลูกค้า ลูกค้าเซ็นรับแล้ว" }] }),
-    mkJob({ id: "J-2611-0111", customer: "คุณศิริพร จันทร์เพ็ญ", phone: "086-555-0111", province: "ระยอง", product: "Roof Install", pkg: "Standard Roof – กระเบื้อง", value: 129000, stage: "done", depositPaidAt: hAgo(900), paidAt: hAgo(750), lastTouchAt: hAgo(200),
-      after: { prep: hAgo(700), ship: hAgo(650), install: hAgo(600), handover: hAgo(500), warranty: hAgo(480) }, log: [{ at: hAgo(480), text: "ออกใบรับประกัน 5 ปี" }] }),
-    mkJob({ id: "J-2611-0112", customer: "คุณทวีศักดิ์ ศรีสวัสดิ์", phone: "081-555-0112", province: "นครสวรรค์", product: "Roof Install", pkg: "Standard Roof – โครงหลังคา", value: 98000, stage: "cancelled", cancelReason: "ลูกค้าเลื่อนโครงการไปปีหน้า", lastTouchAt: hAgo(300), log: [{ at: hAgo(300), text: "ลูกค้าแจ้งยกเลิก" }] }),
+    mk({ id: "J-2611-0113", customer: "คุณสมศักดิ์ ใจเย็น", phone: "081-555-0113", province: "สงขลา", segment: "general", work: "truss", value: 486000, at: "ase_mark", daysIn: 4, touchH: 30 }),
+    mk({ id: "J-2611-0101", customer: "คุณจันทร์เพ็ญ สายสุด", phone: "089-555-0101", province: "ขอนแก่น", segment: "general", work: "roof", value: 168000, at: "quote1", daysIn: 2, touchH: 20 }),
+    mk({ id: "J-2611-0102", customer: "คุณรัตนา พรหมมา", phone: "062-555-0102", province: "สงขลา", segment: "general", work: "roof", value: 245000, quote1Value: 245000, at: "deposit", daysIn: 6, touchH: 100 }),
+    mk({ id: "J-2611-0114", customer: "คุณธีรพงษ์ มั่นคง", phone: "085-555-0114", province: "นครปฐม", segment: "hbd", work: "roof", value: 212000, at: "quote1", daysIn: 1, touchH: 20 }),
+    mk({ id: "J-2611-0103", customer: "คุณชนิดา วงศ์ใหญ่", phone: "087-555-0103", province: "สงขลา", segment: "general", work: "ase", value: 355000, quote1Value: 355000, at: "deposit", daysIn: 6, touchH: 60 }),
+    mk({ id: "J-2611-0104", customer: "คุณเอกชัย ธรรมดี", phone: "086-555-0104", province: "ขอนแก่น", segment: "general", work: "roof", value: 186500, quote1Value: 186500, at: "survey", daysIn: 7, surveyOffset: 0, touchH: 26 }),
+    mk({ id: "J-2611-0105", customer: "คุณวรรณา เพชรดี", phone: "064-555-0105", province: "กรุงเทพมหานคร", segment: "general", work: "roof", value: 122000, quote1Value: 122000, at: "survey", daysIn: 10, surveyOffset: -3, touchH: 80 }),
+    mk({ id: "J-2611-0115", customer: "คุณสมพร บุญรอด", phone: "081-555-0115", province: "ภูเก็ต", segment: "general", work: "truss", value: 398000, quote1Value: 398000, at: "survey", daysIn: 9, surveyOffset: 2, touchH: 40 }),
+    mk({ id: "J-2611-0116", customer: "คุณวิชัย รุ่งเรือง", phone: "089-555-0116", province: "เชียงใหม่", segment: "general", work: "truss", value: 276000, quote1Value: 276000, at: "truss_design", daysIn: 17, surveyOffset: -6, touchH: 70 }),
+    mk({ id: "J-2611-0106", customer: "คุณประเสริฐ บุญมี", phone: "083-555-0106", province: "กรุงเทพมหานคร", segment: "general", work: "roof", value: 520000, quote1Value: 480000, at: "quote2", daysIn: 10, surveyOffset: -2, touchH: 30 }),
+    mk({ id: "J-2611-0117", customer: "คุณมาลี ใจดี", phone: "082-555-0117", province: "ชลบุรี", segment: "hbd", work: "truss", value: 330000, at: "truss_design", daysIn: 4, touchH: 28 }),
+    mk({ id: "J-2611-0107", customer: "คุณสมหมาย แก้วมณี", phone: "089-555-0107", province: "เชียงใหม่", segment: "general", work: "roof", value: 98000, quote1Value: 90000, at: "close", daysIn: 14, surveyOffset: -5, touchH: 54 }),
+    mk({ id: "J-2611-0119", customer: "คุณนิรันดร์ เจริญสุข", phone: "086-555-0119", province: "นครราชสีมา", segment: "general", work: "roof", value: 205000, quote1Value: 205000, at: "install_plan", daysIn: 14, surveyOffset: -8, touchH: 20 }),
+    mk({ id: "J-2611-0108", customer: "คุณลักขณา สายทอง", phone: "082-555-0108", province: "สงขลา", segment: "general", work: "roof", value: 245000, quote1Value: 240000, at: "install_plan", daysIn: 15, surveyOffset: -9, scm: { ordered: hAgo(60), readyEta: addWd(NOW.toISOString(), 6) }, touchH: 40 }),
+    mk({ id: "J-2611-0118", customer: "คุณอรทัย สมบูรณ์", phone: "084-555-0118", province: "นครสวรรค์", segment: "hbd", work: "ase", value: 640000, at: "deliver", daysIn: 20, scm: { ordered: hAgo(240), readyEta: addWd(NOW.toISOString(), 2) }, touchH: 30 }),
+    mk({ id: "J-2611-0109", customer: "คุณบุญเรือง ทองคำ", phone: "080-555-0109", province: "ภูเก็ต", segment: "general", work: "truss", value: 310000, quote1Value: 300000, at: "install", daysIn: 36, surveyOffset: -28, scm: { ordered: hAgo(500), readyEta: hAgo(200) }, touchH: 8 }),
+    mk({ id: "J-2611-0110", customer: "คุณไพโรจน์ ดวงดี", phone: "087-555-0110", province: "ขอนแก่น", segment: "hbd", work: "roof", value: 175000, at: "handover", daysIn: 22, scm: { ordered: hAgo(700), readyEta: hAgo(500) }, touchH: 52 }),
+    mk({ id: "J-2611-0111", customer: "คุณศิริพร จันทร์เพ็ญ", phone: "086-555-0111", province: "ระยอง", segment: "general", work: "roof", value: 129000, quote1Value: 129000, at: "done", daysIn: 40, surveyOffset: -33, scm: { ordered: hAgo(700), readyEta: hAgo(600) }, touchH: 200 }),
+    mk({ id: "J-2611-0112", customer: "คุณทวีศักดิ์ ศรีสวัสดิ์", phone: "081-555-0112", province: "นครสวรรค์", segment: "general", work: "roof", value: 98000, at: "quote1", daysIn: 9, cancel: "ลูกค้าเลื่อนโครงการไปปีหน้า", touchH: 300 }),
   ];
 }
 
-/* ---------- น้องเลขา: สร้างงานที่ต้องทำจากกฎ ---------- */
-export type TaskKind = "lead_sla" | "lead_followup" | "lead_convert" | "survey_today" | "survey_book" | "quote_stale" | "deposit_chase" | "final_chase" | "collect" | "after_overdue" | "after_today" | "warranty";
+/* ---------- น้องเลขา: สร้างงานจากกฎ ---------- */
+export type TaskKind = "lead_sla" | "lead_followup" | "lead_convert" | "se_step" | "deposit_chase" | "close_chase" | "survey_today" | "follow_party" | "scm_status";
 export interface Task {
   id: string; kind: TaskKind; priority: 1 | 2 | 3; title: string; who: string; reason: string; action: string;
-  ref: { type: "lead" | "job"; id: string }; draft?: string; value?: number; phone?: string;
+  ref: { type: "lead" | "job"; id: string }; draft?: string; value?: number; phone?: string; party?: Party;
 }
+export const TASK_ICON: Record<TaskKind, string> = {
+  lead_sla: "call", lead_followup: "forum", lead_convert: "rocket_launch", se_step: "task_alt", deposit_chase: "payments", close_chase: "account_balance_wallet",
+  survey_today: "pin_drop", follow_party: "support_agent", scm_status: "inventory_2",
+};
 
 export function buildTasks(leads: Lead[], jobs: Job[]): Task[] {
   const out: Task[] = [];
@@ -169,52 +350,68 @@ export function buildTasks(leads: Lead[], jobs: Job[]): Task[] {
       });
     } else if (l.status === "qualified") {
       out.push({
-        id: `t-${l.id}`, kind: "lead_convert", priority: 2, title: `เปิด Ops ให้ ${l.name}`, who: l.name, phone: l.phone,
-        reason: `ผ่านการสกรีนแล้ว รอเปิด Ops มา ${durText(hoursSince(l.createdAt))} · ${l.product}`, action: "เปิด Ops", ref: { type: "lead", id: l.id },
+        id: `t-${l.id}`, kind: "lead_convert", priority: 2, title: `เปิด Opp ให้ ${l.name}`, who: l.name, phone: l.phone,
+        reason: `ผ่านการสกรีนแล้ว รอเปิด Opp มา ${durText(hoursSince(l.createdAt))} · ${l.product}`, action: "เปิด Opp", ref: { type: "lead", id: l.id },
       });
     }
   }
+
   for (const j of jobs) {
+    const cur = currentStep(j);
+    if (!cur) continue;
+    const due = dueOf(j, cur);
+    const late = lateWd(due);
     const idle = hoursSince(j.lastTouchAt);
     const ref = { type: "job" as const, id: j.id };
     const base = { who: j.customer, phone: j.phone, value: j.value, ref };
-    if (j.stage === "survey") {
-      if (isToday(j.surveyAt)) out.push({ ...base, id: `t-${j.id}`, kind: "survey_today", priority: 1, title: `สำรวจหน้างาน ${j.customer}`, reason: `นัดวันนี้ ${timeTh(j.surveyAt)} · ${j.province}`, action: "ดูงาน",
-        draft: `สวัสดีค่ะ คุณ${first(j.customer)} วันนี้ทีมสำรวจจะเข้าไปที่หน้างานเวลา ${timeTh(j.surveyAt)} นะคะ รบกวนให้มีผู้ดูแลพื้นที่อยู่ด้วยค่ะ` });
-      else if (!j.surveyAt) out.push({ ...base, id: `t-${j.id}`, kind: "survey_book", priority: 2, title: `นัดสำรวจ ${j.customer}`, reason: `รับมัดจำแล้วแต่ยังไม่มีวันนัดสำรวจ (${durText(idle)})`, action: "นัดสำรวจ",
-        draft: `สวัสดีค่ะ คุณ${first(j.customer)} ทีมได้รับมัดจำเรียบร้อยแล้วนะคะ ขอนัดวันเข้าสำรวจหน้างาน สะดวกวันไหนช่วงสัปดาห์นี้คะ` });
-    }
-    if (j.stage === "quote" && idle > 72) out.push({ ...base, id: `t-${j.id}`, kind: "quote_stale", priority: 2, title: `ตามใบเสนอราคา ${j.customer}`, reason: `ส่งราคาไปแล้ว ${durText(idle)} ยังไม่มีความเคลื่อนไหว`, action: "ตามลูกค้า",
-      draft: `สวัสดีค่ะ คุณ${first(j.customer)} ทีม Housing Expert ติดตามใบเสนอราคา ${j.pkg} นะคะ มีส่วนไหนอยากให้ปรับหรืออธิบายเพิ่มไหมคะ` });
-    if (j.stage === "deposit" && idle > 48) out.push({ ...base, id: `t-${j.id}`, kind: "deposit_chase", priority: 2, title: `เตือนมัดจำ ${j.customer}`, reason: `รอมัดจำ ${baht(depositOf(j))} มา ${durText(idle)}`, action: "แจ้งเตือน",
-      draft: `สวัสดีค่ะ คุณ${first(j.customer)} ขอแจ้งยอดมัดจำ ${baht(depositOf(j))} เพื่อจองคิวสำรวจหน้างานนะคะ หากโอนแล้วรบกวนส่งสลิปได้เลยค่ะ` });
-    if (j.stage === "final" && idle > 48) out.push({ ...base, id: `t-${j.id}`, kind: "final_chase", priority: 2, title: `ตามราคา Final ${j.customer}`, reason: `ส่งราคาหลังสำรวจไปแล้ว ${durText(idle)}`, action: "ตามลูกค้า",
-      draft: `สวัสดีค่ะ คุณ${first(j.customer)} ทีมส่งใบเสนอราคาฉบับสุดท้ายหลังสำรวจหน้างานไปแล้วนะคะ ขออนุญาตสอบถามว่าสะดวกยืนยันราคาได้เมื่อไหร่คะ` });
-    if (j.stage === "collect") out.push({ ...base, id: `t-${j.id}`, kind: "collect", priority: 1, title: `เก็บเงินส่วนที่เหลือ ${j.customer}`, reason: `ต้องเก็บครบ 100% ก่อนส่งงานติดตั้ง · คงเหลือ ${baht(j.value - depositOf(j))}`, action: "บันทึกรับเงิน",
-      draft: `สวัสดีค่ะ คุณ${first(j.customer)} ขอแจ้งยอดคงเหลือ ${baht(j.value - depositOf(j))} เพื่อเข้าคิวติดตั้งนะคะ โอนแล้วรบกวนส่งสลิปให้ทีมได้เลยค่ะ` });
-    if (j.stage === "aftersale") {
-      const next = AFTER_STEPS.find((s) => !j.after[s.key]);
-      if (next) {
-        const eta = j.afterEta[next.key];
-        if (eta && new Date(eta).getTime() < NOW.getTime() && !isToday(eta)) out.push({ ...base, id: `t-${j.id}`, kind: "after_overdue", priority: 1, title: `${next.label}เลยกำหนด · ${j.customer}`, reason: `${next.team} ควรเสร็จเมื่อ ${dtTh(eta)} (เลยมา ${durText(hoursSince(eta))}) ยังไม่มีสถานะกลับมา`, action: "ถามทีม",
-          draft: `ทีม${next.team.replace("ทีม", "")} ขอสถานะงาน ${j.id} (${j.customer}) ขั้น "${next.label}" หน่อยครับ เลยกำหนดมาแล้ว` });
-        else if (eta && isToday(eta)) out.push({ ...base, id: `t-${j.id}`, kind: "after_today", priority: 2, title: `${next.label}วันนี้ · ${j.customer}`, reason: `กำหนด ${timeTh(eta)} วันนี้ โดย${next.team}`, action: "ดูสถานะ" });
-        if (next.key === "warranty" && j.after.handover) out.push({ ...base, id: `t-${j.id}-w`, kind: "warranty", priority: 2, title: `ออกใบรับประกัน ${j.customer}`, reason: `ส่งมอบเมื่อ ${agoText(j.after.handover)} ยังไม่ออกใบรับประกัน`, action: "ออกใบรับประกัน",
-          draft: `สวัสดีค่ะ คุณ${first(j.customer)} ทีมขอส่งใบรับประกันงาน ${j.pkg} ให้นะคะ หากมีข้อสงสัยหลังใช้งานติดต่อได้ตลอดค่ะ` });
+    const fn = first(j.customer);
+
+    if (cur.owner === "SE") {
+      if (cur.key === "deposit" && (idle > 48 || late > 0)) {
+        out.push({ ...base, id: `t-${j.id}`, kind: "deposit_chase", priority: 2, title: `ตามมัดจำ ${j.customer}`, reason: `รอมัดจำ ${baht(depositOf(j))} · ${late > 0 ? `เลยแผน ${late} วันทำการ` : `ลูกค้าเงียบมา ${durText(idle)}`}`, action: "แจ้งเตือน",
+          draft: `สวัสดีค่ะ คุณ${fn} ขอแจ้งยอดมัดจำ ${baht(depositOf(j))} เพื่อล็อกคิวสำรวจหน้างานนะคะ ชำระผ่านแอปได้เลย หากโอนแล้วรบกวนส่งสลิปค่ะ` });
+      } else if (cur.key === "close" && (idle > 48 || late > 0)) {
+        const remain = j.value - depositOf(j);
+        out.push({ ...base, id: `t-${j.id}`, kind: "close_chase", priority: late >= 2 ? 1 : 2, title: `ตามลูกค้าจ่ายครบ 100% · ${j.customer}`, reason: `ต้องเก็บครบก่อนส่งข้อมูลให้ KIM/SCM · คงเหลือ ${baht(remain)} · ${late > 0 ? `เลยแผน ${late} วันทำการ` : `เงียบมา ${durText(idle)}`}`, action: "บันทึกรับเงิน",
+          draft: `สวัสดีค่ะ คุณ${fn} ใบเสนอราคาฉบับหลังสำรวจส่งให้แล้วนะคะ ยอดคงเหลือ ${baht(remain)} เมื่อชำระครบทีมจะเข้าคิวสั่งสินค้าและวางแผนติดตั้งทันทีค่ะ` });
+      } else if (late >= 0) {
+        out.push({ ...base, id: `t-${j.id}`, kind: "se_step", priority: late > 0 ? 1 : 2, title: `${cur.label} · ${j.customer}`, reason: `${dueLabel(due)} (แผน PT ${dateTh(due)}) · ${cur.hint}`, action: "ดูงาน" });
       }
+    } else {
+      const party = PARTY[cur.owner];
+      if (cur.key === "survey" && isToday(j.surveyAt)) {
+        out.push({ ...base, id: `t-${j.id}-sv`, kind: "survey_today", priority: 2, title: `วันนี้ KIM เข้าสำรวจ ${j.customer}`, reason: `นัด ${timeTh(j.surveyAt)} · ${j.province} · แจ้งลูกค้าให้มีผู้ดูแลพื้นที่อยู่ด้วย`, action: "ดูงาน",
+          draft: `สวัสดีค่ะ คุณ${fn} วันนี้ทีม KIM จะเข้าสำรวจหน้างานเวลา ${timeTh(j.surveyAt)} นะคะ รบกวนให้มีผู้ดูแลพื้นที่อยู่ด้วยค่ะ` });
+      }
+      if (late >= 0) {
+        out.push({ ...base, id: `t-${j.id}`, kind: "follow_party", party: cur.owner, priority: late > 0 ? 1 : 2, title: `ตาม ${party.label}: ${cur.result ?? cur.label} · ${j.customer}`,
+          reason: `${dueLabel(due)} (กำหนด ${dateTh(due)}) · รอ ${party.label} · ${cur.label}`, action: "ถามหน่วยงาน",
+          draft: `สวัสดีครับ ทีม${party.label} ขอสถานะ "${cur.result ?? cur.label}" ของงาน ${j.id} (${j.customer}, ${j.province}) หน่อยครับ กำหนดเดิม ${dateTh(due)} ทีมขายต้องใช้ต่อในขั้นถัดไป` });
+      }
+    }
+    if (j.done.close && !j.scm.ordered && !isFinished(j) && wdBetween(j.done.close, NOW.toISOString()) >= 2) {
+      out.push({ ...base, id: `t-${j.id}-scm`, kind: "scm_status", party: "SCM", priority: 2, title: `ตาม SCM: สถานะสั่งซื้อโรงงาน · ${j.customer}`,
+        reason: `ปิดขายเมื่อ ${dateTh(j.done.close)} ส่งใบเสนอราคาฉบับแก้ไขให้ SCM แล้ว ยังไม่มีสถานะสั่งซื้อกลับมา`, action: "ถามหน่วยงาน",
+        draft: `สวัสดีครับ ทีม SCM ขอสถานะการ Map สินค้าและสั่งซื้อโรงงานของงาน ${j.id} (${j.customer}) หน่อยครับ ใบเสนอราคาฉบับแก้ไขส่งไปเมื่อ ${dateTh(j.done.close)} KIM ต้องรู้วันที่สินค้าครบเพื่อวางแผนติดตั้ง` });
     }
   }
   return out.sort((a, b) => a.priority - b.priority || (b.value ?? 0) - (a.value ?? 0));
 }
 
-export const TASK_ICON: Record<TaskKind, string> = {
-  lead_sla: "call", lead_followup: "forum", lead_convert: "rocket_launch", survey_today: "pin_drop", survey_book: "event", quote_stale: "request_quote",
-  deposit_chase: "payments", final_chase: "edit_note", collect: "account_balance_wallet", after_overdue: "warning", after_today: "schedule", warranty: "workspace_premium",
-};
-
-/** งานที่เสี่ยงหลุด (ใช้ในหน้าหลักและแชตเลขา) */
+/** งานที่เสี่ยงหลุด/ช้ากว่าแผน PT (ใช้ในหน้าหลักและแชตเลขา) */
 export function atRisk(leads: Lead[], jobs: Job[]) {
-  const risky = jobs.filter((j) => (j.stage === "quote" && hoursSince(j.lastTouchAt) > 72) || (j.stage === "deposit" && hoursSince(j.lastTouchAt) > 48) || (j.stage === "final" && hoursSince(j.lastTouchAt) > 48));
+  const tasks = buildTasks(leads, jobs);
+  const ids = new Set(tasks.filter((t) => t.ref.type === "job" && (t.priority === 1 || t.kind === "deposit_chase" || t.kind === "close_chase")).map((t) => t.ref.id));
+  const risky = jobs.filter((j) => ids.has(j.id));
   const breach = leads.filter((l) => l.status === "waiting" && leadSla(l).state === "breach");
   return { jobs: risky, leads: breach, value: risky.reduce((s, j) => s + j.value, 0) };
+}
+
+/** ยอดที่ต้องเก็บตอนนี้ของงาน (มัดจำ หรือส่วนที่เหลือก่อนปิดขาย) */
+export function dueMoney(j: Job): number {
+  const c = currentStep(j);
+  if (!c) return 0;
+  if (c.key === "deposit") return depositOf(j);
+  if (c.key === "close") return j.value - depositOf(j);
+  return 0;
 }

@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { leadSla, type Lead } from "./crm-mock-data";
+import { PARTY, leadSla, type Lead, type Party } from "./crm-mock-data";
 
 export const glass = "rounded-2xl border border-white/70 bg-white/80 backdrop-blur-xl shadow-[0_1px_2px_rgba(15,23,42,.04),0_8px_24px_-12px_rgba(79,70,229,.18)]";
 export const grad = "bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-500";
@@ -29,6 +29,16 @@ export function SlaBadge({ lead }: { lead: Lead }) {
     <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-bold", cls)}>
       <Icon name={icon} style={{ fontSize: 13 }} />
       {s.text}
+    </span>
+  );
+}
+
+export function PartyBadge({ party, className }: { party: Party; className?: string }) {
+  const p = PARTY[party];
+  return (
+    <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-bold", p.cls, className)}>
+      <Icon name={p.icon} style={{ fontSize: 13 }} />
+      {p.label}
     </span>
   );
 }
