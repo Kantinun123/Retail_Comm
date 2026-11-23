@@ -1,0 +1,292 @@
+"use client";
+import { useState } from "react";
+import { Icon } from "@/components/commission/icon";
+import { cn } from "@/lib/utils";
+import {
+  NOW, OWNERS, PARTY, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday,
+  lateWd, packetsOf, planTotals, stepsOf, template, type Job, type Lead, type Segment, type StepDef, type StepKey, type Task, type Work,
+} from "./crm-mock-data";
+import { Drawer, Field, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
+
+export type ScmEvent = "ordered" | "eta";
+
+export function JobDrawer({ job, tasks, onClose, onComplete, onScm, onCancel, toast }: {
+  job: Job | null; tasks: Task[]; onClose: () => void; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void;
+  onScm: (id: string, ev: ScmEvent) => void; onCancel: (id: string, reason: string) => void; toast: (m: string) => void;
+}) {
+  return (
+    <Drawer open={!!job} onClose={onClose} wide title={job?.customer ?? ""} subtitle={job ? `${job.id} · ${job.opsId} · ${job.province}` : ""}>
+      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onScm={onScm} onCancel={onCancel} toast={toast} />}
+    </Drawer>
+  );
+}
+
+function JobBody({ job, task, onComplete, onScm, onCancel, toast }: {
+  job: Job; task?: Task; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void; onScm: (id: string, ev: ScmEvent) => void;
+  onCancel: (id: string, reason: string) => void; toast: (m: string) => void;
+}) {
+  const steps = stepsOf(job);
+  const cur = currentStep(job);
+  const totals = planTotals(steps);
+  const [surveyAt, setSurveyAt] = useState(() => `${addWd(NOW.toISOString(), 3).slice(0, 10)}T10:00`);
+  const [cancelling, setCancelling] = useState(false);
+  const [reason, setReason] = useState("");
+  const packets = packetsOf(job);
+  const dep = depositOf(job);
+  const finished = isFinished(job);
+  const closed = !!job.done.close;
+
+  return (
+    <>
+      <div className={cn(glass, "p-4")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn("rounded-full px-3 py-1 text-[11.5px] font-bold", job.segment === "hbd" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600")}>{SEGMENT_LABEL[job.segment]}</span>
+          <span className="rounded-full bg-indigo-50 px-3 py-1 text-[11.5px] font-bold text-indigo-700">{WORK_LABEL[job.work]}</span>
+          <span className="ml-auto text-[20px] font-bold tracking-tight text-indigo-700">{baht(job.value)}</span>
+        </div>
+        <p className="mt-2 text-[12px] text-slate-500">
+          แผน PT: รับแบบ → ส่งมอบรวม <b className="text-slate-700">{totals.total} วันทำการ</b> · ปิดขาย → ส่งมอบ <b className="text-slate-700">{totals.afterClose} วันทำการ</b>
+          {job.cancelReason && <span className="ml-2 font-semibold text-rose-600">ยกเลิก: {job.cancelReason}</span>}
+          {finished && <span className="ml-2 font-semibold text-emerald-600">จบงานแล้ว</span>}
+        </p>
+      </div>
+
+      {task && (
+        <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
+          <div className="mb-1 flex items-center gap-1.5 text-[12px] font-bold text-violet-700"><Icon name="auto_awesome" style={{ fontSize: 16 }} />น้องเลขาแนะนำ</div>
+          <p className="text-[13px] font-semibold text-slate-800">{task.title}</p>
+          <p className="text-[12px] text-slate-600">{task.reason}</p>
+          {task.draft && (
+            <div className="mt-2 rounded-xl bg-white/80 p-3">
+              <p className="text-[12px] leading-relaxed text-slate-600">{task.draft}</p>
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => { void navigator.clipboard?.writeText(task.draft ?? ""); toast("คัดลอกข้อความแล้ว"); }} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">คัดลอก</button>
+                <button onClick={() => toast(task.party ? `ส่งข้อความถึงทีม ${PARTY[task.party].label} แล้ว (ตัวอย่าง)` : `ส่งข้อความถึง ${job.customer} แล้ว (ตัวอย่าง)`)} className="rounded-lg bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white">{task.party ? "ส่งให้หน่วยงาน" : "ส่งทาง LINE"}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={cn(glass, "p-4")}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-[13px] font-bold text-slate-900">ขั้นตอนตาม Project Timeline</h3>
+          <span className="text-[11px] text-slate-400">{steps.filter((s) => job.done[s.key]).length}/{steps.length} ขั้น</span>
+        </div>
+        <ol className="space-y-0">
+          {steps.map((s, i) => (
+            <StepRow key={s.key} s={s} job={job} last={i === steps.length - 1} isCur={cur?.key === s.key}
+              surveyAt={surveyAt} setSurveyAt={setSurveyAt} onComplete={onComplete} onScm={onScm} toast={toast} />
+          ))}
+        </ol>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className={cn(glass, "p-4")}>
+          <h3 className="mb-1 text-[13px] font-bold text-slate-900">ใบเสนอราคาและการเงิน</h3>
+          <KV k="ใบเสนอราคาจากแบบ" v={job.done.quote1 ? `ส่งแล้ว ${dateTh(job.done.quote1)} · ${baht(job.quote1Value ?? job.value)}` : "ยังไม่ส่ง"} />
+          {hasDeposit(job) && <KV k="ใบเสนอราคาหลังสำรวจ" v={job.done.quote2 ? `ส่งแล้ว ${dateTh(job.done.quote2)} · ${baht(job.value)}` : !job.done.survey ? "รอรายงานสำรวจจาก KIM" : job.work !== "roof" && !job.done.truss_design ? "รอแบบทรัส + Cutting List จากห้องแบบ" : "พร้อมทำใบเสนอราคา"} />}
+          {hasDeposit(job) && <KV k={`มัดจำ ${30}%`} v={<span className={job.done.deposit ? "text-emerald-700" : "text-amber-700"}>{baht(dep)} · {job.done.deposit ? `รับแล้ว ${dateTh(job.done.deposit)}` : "ยังไม่ได้รับ"}</span>} />}
+          <KV k="เก็บครบ 100%" v={<span className={closed ? "text-emerald-700" : "text-slate-800"}>{baht(job.value)} · {closed ? `ครบ ${dateTh(job.done.close)}` : `คงเหลือ ${baht(job.value - dep)}`}</span>} />
+          {job.surveyAt && <KV k="วันนัดสำรวจ" v={<span className={isToday(job.surveyAt) ? "text-cyan-700" : ""}>{dtTh(job.surveyAt)}{isToday(job.surveyAt) ? " (วันนี้)" : ""}</span>} />}
+          <KV k="ผู้ดูแล" v={job.owner} />
+          <KV k="เบอร์ลูกค้า" v={job.phone} />
+        </div>
+        <div className={cn(glass, "p-4")}>
+          <div className="mb-1 flex items-center justify-between">
+            <h3 className="text-[13px] font-bold text-slate-900">สถานะสินค้า (จาก SCM)</h3>
+            <PartyBadge party="SCM" />
+          </div>
+          {!job.done.deposit && !closed ? <p className="py-3 text-[12px] text-slate-400">SCM จะได้รับรายการจองสินค้าเมื่อรับมัดจำ{job.segment === "hbd" ? " (งาน HBD ส่งใบเสนอราคาให้ SCM ตอนปิดขาย)" : ""}</p> : (
+            <>
+              <KV k="รายการจองสินค้า" v={job.done.deposit ? `ส่งแล้ว ${dateTh(job.done.deposit)}` : "ไม่มี (ปิดขายจากแบบ)"} />
+              <KV k="ใบเสนอราคาฉบับแก้ไข" v={closed ? `ส่งแล้ว ${dateTh(job.done.close)}` : "รอปิดขาย"} />
+              <KV k="สั่งซื้อโรงงาน" v={job.scm.ordered ? `สั่งแล้ว ${dateTh(job.scm.ordered)}` : closed ? <span className="text-amber-700">รอ SCM Map และสั่งซื้อ</span> : "-"} />
+              <KV k="สินค้าครบ (คาด)" v={job.scm.readyEta ? dateTh(job.scm.readyEta) : "-"} />
+              {closed && !finished && !job.cancelReason && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {!job.scm.ordered && <button onClick={() => { onScm(job.id, "ordered"); toast("SCM แจ้งสั่งซื้อโรงงานแล้ว (จำลอง)"); }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">จำลอง: SCM สั่งซื้อแล้ว</button>}
+                  {job.scm.ordered && !job.scm.readyEta && <button onClick={() => { onScm(job.id, "eta"); toast("SCM แจ้งวันที่สินค้าครบแล้ว (จำลอง)"); }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">จำลอง: SCM แจ้งวันสินค้าครบ</button>}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className={cn(glass, "p-4")}>
+        <h3 className="mb-2 text-[13px] font-bold text-slate-900">ข้อมูลที่แลกกับหน่วยงาน</h3>
+        <ul className="space-y-1.5">
+          {packets.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-[12px]">
+              <PartyBadge party={p.party} />
+              <span className="shrink-0 text-slate-400">{p.dir === "out" ? "CRM →" : "→ CRM"}</span>
+              <span className="min-w-0 flex-1 truncate text-slate-700">{p.title}</span>
+              {p.state === "waiting" ? <span className={cn("shrink-0 text-[10.5px] font-bold", lateWd(p.due!) > 0 ? "text-rose-600" : "text-amber-600")}>รอ · {dueLabel(p.due!)}</span>
+                : <span className="shrink-0 text-[10.5px] text-slate-400">{p.state === "sent" ? "ส่งแล้ว" : "รับแล้ว"} {dateTh(p.at)}</span>}
+            </li>
+          ))}
+          {packets.length === 0 && <li className="text-[12px] text-slate-400">ยังไม่มีการส่งข้อมูลให้หน่วยงานอื่น</li>}
+        </ul>
+      </div>
+
+      <div className={cn(glass, "p-4")}>
+        <h3 className="mb-2 text-[13px] font-bold text-slate-900">ประวัติ</h3>
+        <ul className="space-y-2">
+          {[...job.log].sort((a, b) => +new Date(b.at) - +new Date(a.at)).map((l, i) => (
+            <li key={i} className="flex gap-2 text-[12px]"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" /><span className="text-slate-700">{l.text}<span className="ml-2 text-slate-400">{dtTh(l.at)}</span></span></li>
+          ))}
+          {job.log.length === 0 && <li className="text-[12px] text-slate-400">ยังไม่มีประวัติ</li>}
+        </ul>
+        <p className="mt-2 text-[11px] text-slate-400">เคลื่อนไหวล่าสุด {agoText(job.lastTouchAt)}</p>
+      </div>
+
+      {!job.cancelReason && !finished && (
+        <div className="flex flex-wrap items-center justify-end gap-2 pb-2">
+          {!cancelling ? <button onClick={() => setCancelling(true)} className="rounded-xl px-3 py-2 text-[12.5px] font-semibold text-rose-600 hover:bg-rose-50">ยกเลิกงาน</button> : (
+            <>
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เหตุผลที่ยกเลิก" className={cn(inputCls, "w-52")} />
+              <button disabled={!reason.trim()} onClick={() => onCancel(job.id, reason.trim())} className="rounded-xl bg-rose-600 px-3 py-2 text-[12.5px] font-bold text-white disabled:opacity-40">ยืนยัน</button>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm, toast }: {
+  s: StepDef; job: Job; last: boolean; isCur: boolean; surveyAt: string; setSurveyAt: (v: string) => void;
+  onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void; onScm: (id: string, ev: ScmEvent) => void; toast: (m: string) => void;
+}) {
+  const done = job.done[s.key];
+  const due = dueOf(job, s);
+  const late = isCur ? lateWd(due) : 0;
+  const owner = PARTY[s.owner];
+  const outs = s.sends.filter((x) => x.at === "done");
+  return (
+    <li className="relative flex gap-3 pb-4 last:pb-0">
+      {!last && <span className={cn("absolute left-[15px] top-8 h-[calc(100%-18px)] w-0.5", done ? "bg-emerald-400" : "bg-slate-200")} />}
+      <span className={cn("relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full", done ? "bg-emerald-500 text-white" : late > 0 ? "bg-rose-500 text-white" : isCur ? "bg-indigo-600 text-white ring-4 ring-indigo-100" : "bg-slate-100 text-slate-400")}>
+        <Icon name={done ? "check" : owner.icon} style={{ fontSize: 18 }} />
+      </span>
+      <div className="min-w-0 flex-1 pt-0.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn("text-[13px] font-semibold", done || isCur ? "text-slate-900" : "text-slate-400")}>{s.label}</span>
+          <PartyBadge party={s.owner} className={!done && !isCur ? "opacity-60" : ""} />
+        </div>
+        <div className={cn("text-[11.5px]", late > 0 ? "font-semibold text-rose-600" : "text-slate-500")}>
+          {done ? `เสร็จ ${dtTh(done)}` : isCur ? `${dueLabel(due)} · กำหนด ${dateTh(due)}` : `แผน ${dateTh(due)}`}
+          {done && new Date(done).getTime() > new Date(due).getTime() + 86400e3 ? <span className="ml-1 text-amber-600">(ช้ากว่าแผน)</span> : null}
+        </div>
+        {isCur && <p className="mt-1 text-[11.5px] leading-relaxed text-slate-500">{s.hint}</p>}
+
+        {isCur && s.owner === "SE" && (
+          <div className="mt-2 space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+            {s.key === "deposit" && (
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-slate-500">วันที่ล็อกคิวเข้าสำรวจ</span>
+                <input type="datetime-local" value={surveyAt} onChange={(e) => setSurveyAt(e.target.value)} className={inputCls} />
+              </label>
+            )}
+            {outs.length > 0 && (
+              <div className="text-[11.5px] text-slate-600">
+                เมื่อทำเสร็จ CRM จะส่งอัตโนมัติ:
+                <ul className="mt-1 space-y-0.5">
+                  {outs.map((o, i) => <li key={i} className="flex items-center gap-1.5"><PartyBadge party={o.party} /><span>{o.title}</span></li>)}
+                </ul>
+              </div>
+            )}
+            <button
+              onClick={() => { onComplete(job.id, s.key, s.key === "deposit" ? { surveyAt: new Date(`${surveyAt}:00+07:00`).toISOString() } : undefined); toast(outs.length ? `บันทึกแล้ว และส่งข้อมูลให้ ${outs.map((o) => PARTY[o.party].label).join(" + ")}` : `บันทึก "${s.label}" แล้ว`); }}
+              className={btnPrimary}>
+              <Icon name="task_alt" style={{ fontSize: 18 }} />{s.key === "deposit" ? "รับมัดจำ + ล็อกคิวสำรวจ" : s.key === "close" ? "บันทึกรับเงินครบ 100%" : `ทำเสร็จ: ${s.label}`}
+            </button>
+          </div>
+        )}
+
+        {isCur && s.owner !== "SE" && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+            <span className="text-[11.5px] text-slate-600">รอ <b>{owner.label}</b> ส่ง &quot;{s.result}&quot; กลับมา</span>
+            <button onClick={() => { onComplete(job.id, s.key); toast(`${owner.label} ส่ง "${s.result}" กลับมาแล้ว (จำลอง)`); }} className={cn(btnGhost, "!px-3 !py-1.5 !text-[11.5px]")}>จำลอง: {owner.label}ส่งข้อมูลกลับ</button>
+            {s.key === "deliver" && job.done.close && !job.scm.ordered && <button onClick={() => { onScm(job.id, "ordered"); toast("SCM แจ้งสั่งซื้อโรงงานแล้ว (จำลอง)"); }} className={cn(btnGhost, "!px-3 !py-1.5 !text-[11.5px]")}>จำลอง: SCM สั่งซื้อแล้ว</button>}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/* ---------------- เปิด Opp ใหม่ ---------------- */
+export interface NewJobInput { customer: string; phone: string; province: string; segment: Segment; work: Work; value: number; owner: string; leadId?: string }
+export function NewJobDrawer({ open, lead, onClose, onCreate }: { open: boolean; lead: Lead | null; onClose: () => void; onCreate: (i: NewJobInput) => void }) {
+  return (
+    <Drawer open={open} onClose={onClose} title="เปิด Opp ใหม่" subtitle={lead ? `จาก Lead ${lead.id}` : "กรอกข้อมูลลูกค้าและประเภทงาน"}>
+      {open && <NewJobBody key={lead?.id ?? "blank"} lead={lead} onCreate={onCreate} onClose={onClose} />}
+    </Drawer>
+  );
+}
+function NewJobBody({ lead, onCreate, onClose }: { lead: Lead | null; onCreate: (i: NewJobInput) => void; onClose: () => void }) {
+  const [f, setF] = useState({ customer: lead?.name ?? "", phone: lead?.phone ?? "", province: lead?.province ?? "", value: "", owner: OWNERS[0] });
+  const [segment, setSegment] = useState<Segment>("general");
+  const [work, setWork] = useState<Work>(/ทรัส|อะเส/.test(lead?.interest ?? "") ? (/อะเส/.test(lead?.interest ?? "") ? "ase" : "truss") : "roof");
+  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const value = parseFloat(f.value.replace(/,/g, "")) || 0;
+  const ok = f.customer.trim() && f.phone.trim() && f.province.trim() && value > 0;
+  const tpl = template(segment, work);
+  const t = planTotals(tpl);
+  const needsRoom = tpl.some((s) => s.owner === "ROOM");
+
+  return (
+    <>
+      {lead && <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-[12.5px] font-medium text-emerald-800"><Icon name="check_circle" style={{ fontSize: 18 }} />ดึงข้อมูลจาก Lead มาให้แล้ว{lead.interest ? ` · "${lead.interest}"` : ""}</div>}
+      {lead && lead.product !== "Roof Install" && <div className="rounded-2xl bg-amber-50 px-4 py-3 text-[12px] text-amber-800">Flow ที่รองรับในตัวอย่างนี้คือ Roof Installation (Project Timeline 01/08/2026) เท่านั้น</div>}
+      <div className={cn(glass, "space-y-3 p-4")}>
+        <h3 className="text-[13px] font-bold text-slate-900">ข้อมูลลูกค้า</h3>
+        <Field label="ชื่อ-สกุล *"><input value={f.customer} onChange={(e) => set("customer", e.target.value)} className={inputCls} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="เบอร์ติดต่อ *"><input value={f.phone} onChange={(e) => set("phone", e.target.value)} className={inputCls} /></Field>
+          <Field label="จังหวัดหน้างาน *"><input value={f.province} onChange={(e) => set("province", e.target.value)} className={inputCls} /></Field>
+        </div>
+      </div>
+      <div className={cn(glass, "space-y-3 p-4")}>
+        <h3 className="text-[13px] font-bold text-slate-900">กลุ่มลูกค้า</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {(["general", "hbd"] as const).map((s) => (
+            <button key={s} onClick={() => setSegment(s)} className={cn("rounded-xl border p-3 text-left transition", segment === s ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300")}>
+              <div className="text-[12.5px] font-bold text-slate-900">{s === "general" ? "ลูกค้าทั่วไป" : "HBD Focus"}</div>
+              <div className="text-[11px] text-slate-500">{s === "general" ? "มัดจำ → สำรวจ → เสนอราคาหลังสำรวจ → ปิดขาย" : "ปิดขายจากแบบ ไม่มีมัดจำ/สำรวจ"}</div>
+            </button>
+          ))}
+        </div>
+        <h3 className="pt-1 text-[13px] font-bold text-slate-900">ประเภทงาน</h3>
+        <div className="space-y-2">
+          {(["roof", "truss", "ase"] as const).map((w) => {
+            const tt = planTotals(template(segment, w));
+            return (
+              <button key={w} onClick={() => setWork(w)} className={cn("flex w-full items-center justify-between rounded-xl border p-3 text-left transition", work === w ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300")}>
+                <span className="text-[12.5px] font-bold text-slate-900">{WORK_LABEL[w]}</span>
+                <span className="text-[11px] text-slate-500">รวม {tt.total} วัน · หลังปิดขาย {tt.afterClose} วัน</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3 text-[11.5px] leading-relaxed text-slate-600">
+          <b className="text-slate-700">ลำดับขั้นตอน ({t.total} วันทำการ):</b> {tpl.map((s) => s.label.replace(/ \(.*\)/, "")).join(" → ")}
+          {needsRoom && <div className="mt-1 text-fuchsia-700">งานนี้ต้องส่งข้อมูลให้ห้องแบบ (ขีดแนวอะเส / แบบทรัส) ก่อนเสนอราคา</div>}
+        </div>
+      </div>
+      <div className={cn(glass, "space-y-3 p-4")}>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="มูลค่าประมาณการ (บาท) *"><input inputMode="numeric" value={f.value} onChange={(e) => set("value", e.target.value.replace(/[^\d]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","))} placeholder="เช่น 250,000" className={cn(inputCls, "text-right tabular-nums")} /></Field>
+          <Field label="ผู้ดูแล"><select value={f.owner} onChange={(e) => set("owner", e.target.value)} className={inputCls}>{OWNERS.map((p) => <option key={p}>{p}</option>)}</select></Field>
+        </div>
+        {value > 0 && segment === "general" && <p className="text-[12px] text-slate-500">มัดจำ 30% = <b className="text-slate-800">{baht(Math.round(value * 0.3))}</b></p>}
+      </div>
+      <div className="flex justify-end gap-2 pb-2">
+        <button onClick={onClose} className={btnGhost}>ยกเลิก</button>
+        <button disabled={!ok} onClick={() => onCreate({ customer: f.customer, phone: f.phone, province: f.province, segment, work, value, owner: f.owner, leadId: lead?.id })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Opp</button>
+      </div>
+    </>
+  );
+}
