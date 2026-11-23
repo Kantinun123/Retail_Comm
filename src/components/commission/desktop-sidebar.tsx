@@ -35,6 +35,7 @@ export function DesktopSidebar() {
     match: (p) => (p === "/app/boq" || p.startsWith("/app/boq/")) && p !== "/app/boq/overview" && p !== "/app/boq/new",
   });
   if (session.isSales) items.push({ href: "/app/boq/new", icon: "add_circle", label: "ขอ BOQ ใหม่", match: (p) => p === "/app/boq/new" });
+  if (session.isSales || session.isAdmin || session.isArea) items.push({ href: "/app/refund", icon: "currency_exchange", label: session.isSales ? "ขอคืนเงินลูกค้า" : "คำขอคืนเงิน", match: (p) => p === "/app/refund" || p.startsWith("/app/refund/") });
   if (session.isAdmin) items.push({ href: "/app/boq/holidays", icon: "event_busy", label: "วันหยุด (SLA)", match: (p) => p === "/app/boq/holidays" });
   if (!team) items.push({ href: "/app/chat", icon: "chat", label: "สอบถาม" });
   items.push({ href: "/app/member", icon: "person", label: "ฉัน" });
