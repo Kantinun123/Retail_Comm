@@ -91,6 +91,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, toast }: {
           <h3 className="mb-1 text-[13px] font-bold text-slate-900">ใบเสนอราคาและการเงิน</h3>
           <KV k="ใบเสนอราคาจากแบบ" v={job.done.quote1 ? `ส่งแล้ว ${dateTh(job.done.quote1)} · ${baht(job.quote1Value ?? job.value)}` : "ยังไม่ส่ง"} />
           {hasDeposit(job) && <KV k="ใบเสนอราคาหลังสำรวจ" v={job.done.quote2 ? `ส่งแล้ว ${dateTh(job.done.quote2)} · ${baht(job.value)}` : !job.done.survey ? "รอรายงานสำรวจจาก KIM" : job.work !== "roof" && !job.done.truss_design ? "รอแบบทรัส + Cutting List จากห้องแบบ" : "พร้อมทำใบเสนอราคา"} />}
+          {hasDeposit(job) && <KV k="หักส่วนลดค่าเตรียมการ (มัดจำที่ชำระแล้ว)" v={<span className={job.done.deposit ? "text-rose-600" : "text-slate-400"}>{job.done.deposit ? `−${baht(dep)}` : `จะหักเมื่อรับมัดจำ ${baht(dep)}`} · ยอดส่วนที่เหลือ {baht(job.value - dep)}</span>} />}
           {hasDeposit(job) && <KV k={depositLabel(job)} v={<span className={job.done.deposit ? "text-emerald-700" : "text-amber-700"}>{baht(dep)} · {job.done.deposit ? `รับแล้ว ${dateTh(job.done.deposit)}` : "ยังไม่ได้รับ"}</span>} />}
           <KV k="เก็บครบ 100%" v={<span className={closed ? "text-emerald-700" : "text-slate-800"}>{baht(job.value)} · {closed ? `ครบ ${dateTh(job.done.close)}` : `คงเหลือ ${baht(job.value - dep)}`}</span>} />
           {job.surveyAt && <KV k="วันนัดสำรวจ" v={<span className={isToday(job.surveyAt) ? "text-cyan-700" : ""}>{dtTh(job.surveyAt)}{isToday(job.surveyAt) ? " (วันนี้)" : ""}</span>} />}
