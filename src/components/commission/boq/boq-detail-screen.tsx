@@ -156,6 +156,52 @@ function FileLink({ f }: { f: BoqFile }) {
   );
 }
 
+/** รูปย่อ + ดูเต็มจอ (เฉพาะจอกว้าง; มือถือใช้รายการไฟล์ตามเดิม) */
+function ImageGallery({ files }: { files: BoqFile[] }) {
+  const imgs = files.filter((f) => f.mime?.startsWith("image/"));
+  const [open, setOpen] = useState<number | null>(null);
+  useEffect(() => {
+    if (open === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(null);
+      if (e.key === "ArrowRight") setOpen((v) => (v === null ? v : (v + 1) % imgs.length));
+      if (e.key === "ArrowLeft") setOpen((v) => (v === null ? v : (v + imgs.length - 1) % imgs.length));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, imgs.length]);
+  if (!imgs.length) return null;
+  const cur = open === null ? null : imgs[open];
+  return (
+    <>
+      <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-2.5">
+        {imgs.map((f, i) => (
+          <button key={f.id} type="button" onClick={() => setOpen(i)} className="group rounded-xl overflow-hidden border border-slate-200 bg-slate-50 text-left">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fileUrl(f.id)} alt={f.name} loading="lazy" className="w-full h-36 object-cover group-hover:scale-[1.03] transition" />
+            <p className="px-2.5 py-1.5 text-[11px] text-slate-600 truncate flex items-center gap-1"><Icon name="zoom_in" style={{ fontSize: 15 }} />{f.name}</p>
+          </button>
+        ))}
+      </div>
+      {cur && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col" onClick={() => setOpen(null)}>
+          <div className="flex items-center gap-3 px-5 py-3 text-white text-[13px]" onClick={(e) => e.stopPropagation()}>
+            <span className="truncate">{cur.name} · {(open ?? 0) + 1}/{imgs.length}</span>
+            <a href={fileUrl(cur.id, true)} className="ml-auto w-9 h-9 grid place-items-center rounded-full hover:bg-white/10" aria-label="ดาวน์โหลด"><Icon name="download" /></a>
+            <button type="button" onClick={() => setOpen(null)} className="w-9 h-9 grid place-items-center rounded-full hover:bg-white/10" aria-label="ปิด"><Icon name="close" /></button>
+          </div>
+          <div className="flex-1 flex items-center justify-center gap-4 px-4 pb-6 min-h-0" onClick={(e) => e.stopPropagation()}>
+            {imgs.length > 1 && <button type="button" onClick={() => setOpen((v) => ((v ?? 0) + imgs.length - 1) % imgs.length)} className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="ก่อนหน้า"><Icon name="chevron_left" /></button>}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fileUrl(cur.id)} alt={cur.name} className="max-h-full max-w-[85vw] object-contain rounded-lg" />
+            {imgs.length > 1 && <button type="button" onClick={() => setOpen((v) => ((v ?? 0) + 1) % imgs.length)} className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="ถัดไป"><Icon name="chevron_right" /></button>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const money = (v: string) => {
   const n = v.replace(/[^\d]/g, "");
   return n ? Number(n).toLocaleString("th-TH") : "";
@@ -442,8 +488,10 @@ export function BoqDetailScreen({ id }: { id: number }) {
   return (
     <>
       <BoqHeader title={j.reqNo} back="/app/boq" />
-      <div className="space-y-3 pb-6">
-        <section className={cn(card, "p-4 space-y-3")}>
+      {/* มือถือ: เรียงตาม order-* (หัว -> สิ่งที่ต้องทำ -> ข้อมูล -> ... -> ไทม์ไลน์) ; จอกว้าง: ซ้าย = ข้อมูล, ขวา = สิ่งที่ต้องทำ + ไทม์ไลน์ (ติดอยู่กับที่) */}
+      <div className="flex flex-col gap-3 pb-6 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-5 lg:items-start">
+        <div className="contents lg:flex lg:flex-col lg:gap-4 lg:col-start-1 lg:min-w-0">
+        <section className={cn(card, "p-4 space-y-3 order-1 lg:order-none")}>
           <div className="flex items-center gap-2 flex-wrap">
             <StatusPill status={j.status} className="text-[11px] px-2.5 py-1" />
             {sla && <span className={cn("text-[11px] font-semibold px-2.5 py-1 rounded-full", sla.cls)}>{sla.text}</span>}
@@ -457,10 +505,9 @@ export function BoqDetailScreen({ id }: { id: number }) {
           <Stepper status={j.status} />
         </section>
 
-        <ActionPanel key={`${j.status}-${j.versions.length}-${j.quotes.length}`} d={d} onDone={refresh} />
-
-        <section className={cn(card, "p-4")}>
+        <section className={cn(card, "p-4 order-3 lg:order-none")}>
           <h3 className="text-[13px] font-bold text-slate-800 mb-1">ข้อมูลคำขอ</h3>
+          <div className="lg:grid lg:grid-cols-2 lg:gap-x-10">
           <Row k="ความต้องการ" v={needLabel(j.need)} />
           <Row k="งบประมาณ" v={baht(j.budget)} />
           {j.customerPhone && <Row k="เบอร์ลูกค้า" v={<a href={`tel:${j.customerPhone}`} className="text-sky-700">{j.customerPhone}</a>} />}
@@ -473,11 +520,13 @@ export function BoqDetailScreen({ id }: { id: number }) {
           <Row k="ส่งคำขอ" v={dateTh(j.createdAt, true)} />
           <Row k="กำหนดส่งของห้องแบบ" v={dateTh(j.dueAt, true)} />
           {j.opNo && <Row k="เลข Opportunity" v={j.opNo} />}
+          </div>
           {j.note && <Row k="หมายเหตุ" v={j.note} />}
         </section>
 
-        <section className={cn(card, "p-4 space-y-2")}>
+        <section className={cn(card, "p-4 space-y-2 order-4 lg:order-none")}>
           <h3 className="text-[13px] font-bold text-slate-800">จุดที่ทำ BOQ ({j.points.length} จุด)</h3>
+          <div className="grid gap-2 lg:grid-cols-2">
           {j.points.map((p) => (
             <div key={p.no} className="flex gap-3 rounded-xl bg-slate-50 p-2.5">
               <span className="w-7 h-7 shrink-0 rounded-full bg-slate-900 text-white text-[12px] font-bold grid place-items-center">{p.no}</span>
@@ -488,6 +537,7 @@ export function BoqDetailScreen({ id }: { id: number }) {
               </div>
             </div>
           ))}
+          </div>
           {[
             { k: "photo" as const, t: "รูปจุดที่ใช้สินค้า" },
             { k: "plan" as const, t: "แบบแปลน" },
@@ -496,13 +546,14 @@ export function BoqDetailScreen({ id }: { id: number }) {
           ].map(({ k, t }) => byKind(k).length > 0 && (
             <div key={k} className="pt-1">
               <p className="text-[11px] text-slate-500 mb-1">{t}</p>
-              <div className="grid grid-cols-1 gap-1.5">{byKind(k).map((f) => <FileLink key={f.id} f={f} />)}</div>
+              {(k === "photo" || k === "plan") && <div className="mb-2"><ImageGallery files={byKind(k)} /></div>}
+              <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2">{byKind(k).map((f) => <FileLink key={f.id} f={f} />)}</div>
             </div>
           ))}
         </section>
 
         {j.versions.length > 0 && (
-          <section className={cn(card, "p-4 space-y-2")}>
+          <section className={cn(card, "p-4 space-y-2 order-5 lg:order-none")}>
             <h3 className="text-[13px] font-bold text-slate-800">ไฟล์ BOQ ทุกเวอร์ชัน</h3>
             {[...j.versions].reverse().map((v) => {
               const vf = j.files.filter((f) => f.version === v.v);
@@ -525,7 +576,7 @@ export function BoqDetailScreen({ id }: { id: number }) {
         )}
 
         {(j.quotes.length > 0 || j.status === "win" || j.status === "loss") && (
-          <section className={cn(card, "p-4")}>
+          <section className={cn(card, "p-4 order-6 lg:order-none")}>
             <h3 className="text-[13px] font-bold text-slate-800 mb-1">ใบเสนอราคา & ผล</h3>
             {j.quotes.map((q, i) => <Row key={i} k={`ใบเสนอราคา ${q.no}${i < j.quotes.length - 1 ? " (เดิม)" : ""}`} v={baht(q.amount)} />)}
             {j.status === "win" && <Row k="ยอดปิดจริง" v={<span className="text-emerald-700">{baht(j.finalAmount)}</span>} />}
@@ -535,7 +586,13 @@ export function BoqDetailScreen({ id }: { id: number }) {
           </section>
         )}
 
-        <section className={cn(card, "p-4")}>
+        </div>
+
+        <aside className="contents lg:flex lg:flex-col lg:gap-4 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pb-2">
+        <div className="order-2 lg:order-none">
+          <ActionPanel key={`${j.status}-${j.versions.length}-${j.quotes.length}`} d={d} onDone={refresh} />
+        </div>
+        <section className={cn(card, "p-4 order-7 lg:order-none")}>
           <h3 className="text-[13px] font-bold text-slate-800 mb-2">ไทม์ไลน์</h3>
           <ol className="relative border-l-2 border-slate-200 ml-2 space-y-3">
             {[...j.events].reverse().map((e, i) => (
@@ -547,6 +604,7 @@ export function BoqDetailScreen({ id }: { id: number }) {
             ))}
           </ol>
         </section>
+        </aside>
       </div>
     </>
   );

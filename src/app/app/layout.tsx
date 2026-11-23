@@ -1,5 +1,5 @@
 import { AppGuard } from "@/components/commission/app-guard";
-
+import { AppMain } from "@/components/commission/app-main";
 export default function ProtectedLayout({
   children,
 }: {
@@ -7,9 +7,7 @@ export default function ProtectedLayout({
 }) {
   return (
     <AppGuard>
-      <main className="flex-1 flex flex-col relative w-full max-w-md mx-auto px-4 pb-28">
-        {children}
-      </main>
+      <AppMain>{children}</AppMain>
     </AppGuard>
   );
 }

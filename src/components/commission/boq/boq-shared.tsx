@@ -159,7 +159,7 @@ export function BoqHeader({ title, sub, back }: { title: string; sub?: string; b
   const { session } = useSession();
   const teamOnly = session?.role === "designer" || session?.role === "marketing";
   return (
-    <header className="flex items-center justify-between gap-2 py-3 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
+    <header className="flex items-center justify-between gap-2 py-3 lg:py-5 sticky top-0 bg-[#f7f4f4]/90 backdrop-blur z-20">
       <div className="flex items-center gap-2 min-w-0">
         {back && (
           <Link href={back} className="w-9 h-9 rounded-full bg-white border border-slate-200 grid place-items-center shrink-0" aria-label="กลับ">
@@ -168,7 +168,7 @@ export function BoqHeader({ title, sub, back }: { title: string; sub?: string; b
         )}
         <div className="min-w-0">
           <p className="text-[10px] text-slate-500 leading-tight">BOQ สินค้า DECAAR</p>
-          <h1 className="font-bold text-[16px] text-[#231313] leading-tight truncate">{title}</h1>
+          <h1 className="font-bold text-[16px] lg:text-[22px] text-[#231313] leading-tight truncate">{title}</h1>
           {sub && <p className="text-[11px] text-slate-500 truncate">{sub}</p>}
         </div>
       </div>
@@ -176,7 +176,7 @@ export function BoqHeader({ title, sub, back }: { title: string; sub?: string; b
         <button
           type="button"
           onClick={() => { doLogout(); router.replace("/"); }}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full shrink-0"
+          className="inline-flex lg:hidden items-center gap-1 text-[12px] font-semibold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full shrink-0"
         >
           <Icon name="logout" style={{ fontSize: 16 }} />
           ออกจากระบบ

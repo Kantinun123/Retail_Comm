@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { isWidePath } from "./app-main";
 import { Icon } from "./icon";
 import { NotificationBell } from "./notification-bell";
 import { AREA_HOME, useSession } from "@/lib/commission/session";
@@ -152,6 +154,8 @@ const SERVICE_SALES_ITEM = {
 
 export function BottomNav({ active }: { active: NavKey }) {
   const { session } = useSession();
+  // หน้าจอกว้าง: จอ lg ขึ้นไปใช้เมนูซ้าย (DesktopSidebar) แทน
+  const wide = isWidePath(usePathname());
 
   // เมนูเพิ่ม (ผลประโยชน์พนักงานในร้าน + ฐานข้อมูล) โชว์ให้ร้านค้าตัวแทนและผู้ดูแลระบบ
   const isSales = !!session && session.isSales;
@@ -204,7 +208,7 @@ export function BottomNav({ active }: { active: NavKey }) {
   const memberActive = active === "member";
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-slate-100 pb-safe z-30">
+    <nav className={cn("fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur border-t border-slate-100 pb-safe z-30", wide && "lg:hidden")}>
       <div
         className="grid h-16"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}

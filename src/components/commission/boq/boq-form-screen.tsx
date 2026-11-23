@@ -246,6 +246,7 @@ export function BoqFormScreen() {
 
   return (
     <>
+      <div className="w-full lg:max-w-3xl lg:mx-auto">
       <BoqHeader title="สร้างคำขอ BOQ DECAAR" back="/app/boq" />
       <div className="space-y-3 pb-6">
         {loadErr && <p className="rounded-xl bg-red-50 border border-red-200 p-3 text-[12px] text-red-700">โหลดรายการสินค้าไม่สำเร็จ: {loadErr}</p>}
@@ -277,7 +278,7 @@ export function BoqFormScreen() {
             <label className={labelCls}>ชื่อ-นามสกุลลูกค้า *</label>
             <input value={customer} onChange={(e) => setCustomer(e.target.value)} maxLength={120} className={cn(inputCls, show(bad.customer) && badCls)} />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 lg:gap-3">
             <div>
               <label className={labelCls}>เบอร์โทร</label>
               <input inputMode="tel" value={phone} onChange={(e) => setPhone(formatThaiPhone(e.target.value))} maxLength={12} placeholder="08X-XXX-XXXX" className={cn(inputCls, "tabular-nums", show(bad.phone) && badCls)} />
@@ -404,6 +405,7 @@ export function BoqFormScreen() {
             {saving ? "กำลังส่ง..." : busy > 0 ? "รออัปโหลดไฟล์..." : "ส่งคำขอให้ห้องแบบ"}
           </button>
         </div>
+      </div>
       </div>
     </>
   );

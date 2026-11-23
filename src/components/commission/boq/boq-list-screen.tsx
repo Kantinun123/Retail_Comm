@@ -4,6 +4,7 @@
    - ห้องแบบ: รอรับงาน / งานของฉัน / ทั้งหมด + งานค้างของห้องแบบแต่ละคน
    - Marketing / admin / ร้าน / Area: ดูอย่างเดียว กรองสถานะ + ค้นหา */
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../icon";
 import { BottomNav } from "../bottom-nav";
@@ -44,6 +45,53 @@ function JobCard({ j, role, me, now }: { j: BoqListItem; role: BoqRole; me: stri
       {j.status === "quoted" && j.quoteAmount != null && <p className="text-[11px] text-indigo-700 mt-1">เสนอราคา {baht(j.quoteAmount)}</p>}
       {j.status === "win" && <p className="text-[11px] text-emerald-700 mt-1 font-semibold">ยอดปิดจริง {baht(j.finalAmount)}</p>}
     </Link>
+  );
+}
+
+/** ตารางงาน (เฉพาะจอกว้าง lg ขึ้นไป) — คลิกทั้งแถวเพื่อเปิดงาน */
+function JobTable({ list, role, me, now }: { list: BoqListItem[]; role: BoqRole; me: string; now: Date }) {
+  const router = useRouter();
+  const heads = ["เลขที่", "ลูกค้า", role === "sales" ? "ห้องแบบ" : "ร้าน / พนักงานขาย", "ความต้องการ", "จุด", "งบ", ...(role === "sales" ? [] : ["ห้องแบบ"]), "สถานะ", "กำหนดส่ง"];
+  return (
+    <div className={cn(card, "overflow-hidden")}>
+      <table className="w-full text-[13px]">
+        <thead className="bg-slate-50 text-[11.5px] text-slate-500">
+          <tr>{heads.map((h) => <th key={h} className="text-left font-semibold px-4 py-3 whitespace-nowrap">{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {list.map((j) => {
+            const sla = DESIGNER_PHASE.includes(j.status) ? slaBadge(j.dueAt, now) : null;
+            const lockedByOther = role === "designer" && j.designerId && j.designerId !== me && (DESIGNER_PHASE.includes(j.status) || j.status === "need_info");
+            return (
+              <tr key={j.id} onClick={() => router.push(`/app/boq/${j.id}`)} className={cn("border-t border-slate-100 hover:bg-red-50/40 cursor-pointer", lockedByOther && "opacity-60")}>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <Link href={`/app/boq/${j.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold text-slate-500 hover:text-[#d32029]">{j.reqNo}</Link>
+                  <p className="text-[11px] text-slate-400">{dateTh(j.createdAt, true)}</p>
+                </td>
+                <td className="px-4 py-3"><p className="font-bold text-slate-800">{j.customerName}</p><p className="text-[11px] text-slate-500">{j.province ?? "-"}</p></td>
+                <td className="px-4 py-3">
+                  {role === "sales" ? (j.designerName ?? <span className="text-slate-400">ยังไม่มีคนรับ</span>) : <><p className="text-slate-700">{j.dealerName}</p><p className="text-[11px] text-slate-500">{j.repName}</p></>}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">{needLabel(j.need)}</td>
+                <td className="px-4 py-3 text-center">{j.points}</td>
+                <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{baht(j.budget)}</td>
+                {role !== "sales" && <td className="px-4 py-3">{j.designerName ? `${lockedByOther ? "🔒 " : ""}${j.designerName}` : <span className="text-slate-400">-</span>}</td>}
+                <td className="px-4 py-3">
+                  <StatusPill status={j.status} />
+                  {j.status === "quoted" && j.quoteAmount != null && <p className="text-[11px] text-indigo-700 mt-1">เสนอ {baht(j.quoteAmount)}</p>}
+                  {j.status === "win" && <p className="text-[11px] text-emerald-700 mt-1 font-semibold">ปิด {baht(j.finalAmount)}</p>}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <p>{dateTh(j.dueAt)}</p>
+                  {sla && <span className={cn("text-[10.5px] font-semibold px-1.5 py-0.5 rounded", sla.cls)}>{sla.text}</span>}
+                </td>
+              </tr>
+            );
+          })}
+          {list.length === 0 && <tr><td colSpan={heads.length} className="text-center text-slate-400 py-10">ไม่มีงานในหมวดนี้</td></tr>}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -91,6 +139,8 @@ export function BoqListScreen() {
   const [error, setError] = useState("");
   const [tab, setTab] = useState("");
   const [q, setQ] = useState("");
+  // มุมมองบนจอกว้าง: ตาราง (ค่าเริ่มต้น) / การ์ด 3 คอลัมน์ ; มือถือเป็นการ์ดเสมอ
+  const [view, setView] = useState<"table" | "cards">("table");
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -143,7 +193,7 @@ export function BoqListScreen() {
           <PushToggle hideWhenOn offNote={role === "designer" ? "เปิดไว้เพื่อรู้ทันทีเมื่อมีคำขอ BOQ ใหม่ / ถูกขอแก้ไข" : role === "sales" ? "เปิดไว้เพื่อรู้ทันทีเมื่อห้องแบบรับงาน / ส่ง BOQ แล้ว" : "เปิดไว้รับสรุปรายสัปดาห์ และงานที่เกินกำหนด"} />
         )}
         {data && role !== "sales" && role !== "designer" && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 lg:hidden">
             <Link href="/app/boq/overview" className="flex-1 text-center py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-[12px] font-bold">ภาพรวม</Link>
             <span className="flex-1 text-center py-2 rounded-xl bg-slate-900 text-white text-[12px] font-bold">รายการงาน</span>
           </div>
@@ -152,7 +202,7 @@ export function BoqListScreen() {
           <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-800">ระบบขอ BOQ DECAAR ยังไม่เปิดใช้งาน</p>
         )}
         {role === "sales" && data?.enabled && (
-          <Link href="/app/boq/new" className={cn(btn, "w-full bg-[#d32029] text-white flex items-center justify-center gap-1.5 py-3")}>
+          <Link href="/app/boq/new" className={cn(btn, "w-full lg:w-auto lg:px-6 bg-[#d32029] text-white flex items-center justify-center gap-1.5 py-3")}>
             <Icon name="add_circle" style={{ fontSize: 20 }} /> ขอ BOQ DECAAR ใหม่
           </Link>
         )}
@@ -167,7 +217,7 @@ export function BoqListScreen() {
         {!data && !error && <p className="text-center text-[12px] text-slate-400 py-8">กำลังโหลด...</p>}
 
         {data && role !== "designer" && (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 lg:max-w-2xl">
             {[
               { k: "คำขอทั้งหมด", v: String(items.length) },
               { k: "อัตรา Win", v: closed.length ? `${Math.round((wins.length / closed.length) * 100)}%` : "-" },
@@ -196,16 +246,26 @@ export function BoqListScreen() {
 
         {data && (
           <>
-            <Tabs tabs={tabs} items={items} value={curTab.key} onChange={setTab} />
-            {role !== "sales" && (
-              <div className="relative">
-                <Icon name="search" className="absolute left-3 top-2.5 text-slate-400" style={{ fontSize: 18 }} />
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา เลขที่ / ลูกค้า / ร้าน / พนักงาน" className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-[13px] outline-none" />
+            <div className="space-y-3 lg:space-y-0 lg:flex lg:items-center lg:gap-3">
+              <div className="lg:flex-1 min-w-0"><Tabs tabs={tabs} items={items} value={curTab.key} onChange={setTab} /></div>
+              {role !== "sales" && (
+                <div className="relative lg:w-80 shrink-0">
+                  <Icon name="search" className="absolute left-3 top-2.5 text-slate-400" style={{ fontSize: 18 }} />
+                  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา เลขที่ / ลูกค้า / ร้าน / พนักงาน" className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-[13px] outline-none" />
+                </div>
+              )}
+              <div className="hidden lg:flex rounded-xl bg-white border border-slate-200 p-0.5 shrink-0">
+                {(["table", "cards"] as const).map((v) => (
+                  <button key={v} type="button" onClick={() => setView(v)} title={v === "table" ? "มุมมองตาราง" : "มุมมองการ์ด"} className={cn("px-2.5 py-1.5 rounded-lg", view === v ? "bg-slate-900 text-white" : "text-slate-500")}>
+                    <Icon name={v === "table" ? "table_rows" : "grid_view"} style={{ fontSize: 18 }} />
+                  </button>
+                ))}
               </div>
-            )}
-            <div className="space-y-2.5">
+            </div>
+            {view === "table" && <div className="hidden lg:block"><JobTable list={list} role={role} me={me} now={now} /></div>}
+            <div className={cn("grid gap-2.5", view === "table" ? "lg:hidden" : "lg:grid-cols-3 lg:gap-3")}>
               {list.map((j) => <JobCard key={j.id} j={j} role={role} me={me} now={now} />)}
-              {list.length === 0 && <p className="text-center text-[12px] text-slate-400 py-8">ไม่มีงานในหมวดนี้</p>}
+              {list.length === 0 && <p className="text-center text-[12px] text-slate-400 py-8 lg:col-span-3">ไม่มีงานในหมวดนี้</p>}
             </div>
           </>
         )}

@@ -125,7 +125,7 @@ export function BoqOverviewScreen() {
     <>
       <BoqHeader title="ภาพรวม BOQ DECAAR" sub={marketing ? "Marketing · ดูอย่างเดียว" : undefined} back={marketing ? undefined : "/app/boq"} />
       <div className="space-y-5 pb-6">
-        <div className="flex gap-2">
+        <div className="flex gap-2 lg:hidden">
           <span className="flex-1 text-center py-2 rounded-xl bg-slate-900 text-white text-[12px] font-bold">ภาพรวม</span>
           <Link href="/app/boq" className="flex-1 text-center py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-[12px] font-bold">รายการงาน</Link>
         </div>
@@ -133,7 +133,7 @@ export function BoqOverviewScreen() {
         {marketing && <PushToggle hideWhenOn offNote="เปิดไว้รับสรุปรายสัปดาห์ งานเกินกำหนด และ Win ยอดใหญ่ / Loss ให้ยี่ห้ออื่น" />}
         <section className={cn(card, "p-3 space-y-2")}>
           <p className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5"><Icon name="tune" className="text-sky-700" style={{ fontSize: 17 }} />ตัวกรอง</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
             <div>
               <label className="block text-[10px] text-slate-500 mb-0.5">ปี</label>
               <select className={sel} value={String(f.year)} onChange={(e) => set({ year: e.target.value === "all" ? "all" : Number(e.target.value), month: null })}>
@@ -201,7 +201,7 @@ export function BoqOverviewScreen() {
         {error && <p className="rounded-xl bg-red-50 border border-red-200 p-3 text-[12px] text-red-700">โหลดไม่สำเร็จ: {error}</p>}
         {!s && !error && <p className="text-center text-[12px] text-slate-400 py-8">กำลังโหลด...</p>}
         {s && (
-          <div className={cn("space-y-5 transition-opacity", loading && "opacity-50")}>
+          <div className={cn("space-y-5 transition-opacity lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-5 lg:items-start", loading && "opacity-50")}>
             <section>
               <H3 icon="pending_actions">สถานะงานตอนนี้</H3>
               <div className="grid grid-cols-3 gap-2">
@@ -296,7 +296,7 @@ export function BoqOverviewScreen() {
             )}
 
             {(f.dealer || role === "sales" ? s.reps : s.stores).length > 0 && (
-              <section>
+              <section className="lg:col-span-2">
                 <H3 icon={f.dealer ? "badge" : "storefront"}>{f.dealer ? "แยกรายพนักงาน" : "แยกรายร้าน"}</H3>
                 <div className={cn(card, "divide-y divide-slate-100")}>
                   {(f.dealer ? s.reps : s.stores).map((r) => {
@@ -320,8 +320,8 @@ export function BoqOverviewScreen() {
               </section>
             )}
 
-            {s.funnel.requested === 0 && <p className="text-center text-[12px] text-slate-400 py-6">ยังไม่มีคำขอในช่วงนี้</p>}
-            <p className="text-[10px] text-slate-400 text-center">สถานะ: {Object.entries(s.status).map(([k, n]) => `${STATUS_META[k as BoqStatus]?.label ?? k} ${n}`).join(" · ") || "-"}</p>
+            {s.funnel.requested === 0 && <p className="text-center text-[12px] text-slate-400 py-6 lg:col-span-2">ยังไม่มีคำขอในช่วงนี้</p>}
+            <p className="text-[10px] text-slate-400 text-center lg:col-span-2">สถานะ: {Object.entries(s.status).map(([k, n]) => `${STATUS_META[k as BoqStatus]?.label ?? k} ${n}`).join(" · ") || "-"}</p>
           </div>
         )}
       </div>
