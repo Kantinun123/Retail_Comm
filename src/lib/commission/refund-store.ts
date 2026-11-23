@@ -85,7 +85,7 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 const post = <T>(url: string, body: unknown) => getJson<T>(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
 export interface RefundListItem {
-  id: number; reqNo: string; status: RefundStatus; round: number; type: RefundType; group: JobGroup;
+  id: number; reqNo: string; isTest: boolean; status: RefundStatus; round: number; type: RefundType; group: JobGroup;
   custName: string; amount: number; projectNo: string; soNo: string | null;
   requesterId: string; requesterName: string; dealerName: string | null;
   approverId: string | null; approverName: string | null; financeId: string | null; financeName: string | null;

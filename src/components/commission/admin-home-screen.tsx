@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { BoqSummaryCard } from "./boq/boq-summary-card";
+import { RefundHomeCard } from "./refund/refund-home-card";
 import { ProfileCard } from "./profile-card";
 import { doLogout, useSession, enterStoreView, enterStaffView } from "@/lib/commission/session";
 import { getDealers } from "@/lib/commission/logic";
@@ -254,6 +255,7 @@ export function AdminHomeScreen() {
         <section>
           <h3 className="text-[12px] font-bold text-[#5b21b6] mb-2 px-1">จัดการระบบ</h3>
           <div className="space-y-2.5">
+            <RefundHomeCard variant="admin" />
             <Link href="/app/data-center" className="rounded-2xl border border-violet-100 bg-white shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] hover:border-violet-300 hover:-translate-y-0.5 transition-all">
               <div className="w-12 h-12 rounded-2xl bg-violet-50 text-[#7c3aed] flex items-center justify-center shrink-0">
                 <Icon name="cloud_sync" className="text-2xl" />

@@ -44,7 +44,7 @@ export async function GET() {
     me: ctx.userId,
     enabled: isEnabled(ctx.isTest, ctx.role),
     items: rows.map((r) => ({
-      id: r.id, reqNo: r.req_no, status: r.status, round: r.round, type: r.refund_type, group: r.job_group,
+      id: r.id, reqNo: r.req_no, isTest: !!r.is_test, status: r.status, round: r.round, type: r.refund_type, group: r.job_group,
       custName: r.cust_name, amount: Number(r.refund_amount), projectNo: r.project_no, soNo: r.so_no,
       requesterId: r.requester_id, requesterName: (r.rep_code && repName.get(r.rep_code as string)) || nameOf.get(r.requester_id) || "-",
       dealerName: r.dealer_code ? dealerName.get(r.dealer_code as string) ?? r.dealer_code : null,

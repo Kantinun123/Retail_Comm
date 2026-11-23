@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { BoqSummaryCard } from "./boq/boq-summary-card";
+import { RefundHomeCard } from "./refund/refund-home-card";
 import { SearchableSelect, type ComboOption } from "./searchable-select";
 import { doLogout, setAreaStaff, setAreaStore, useSession } from "@/lib/commission/session";
 import { fetchStores, type StoreInfo } from "@/lib/commission/employee-store";
@@ -365,6 +366,8 @@ export function AreaHomeScreen() {
           </div>
           <Icon name="chevron_right" className="text-slate-300 text-xl shrink-0" />
         </Link>
+
+        <RefundHomeCard variant="approver" />
 
         <p className="text-[13.5px] font-bold text-[#231313] px-1">เลือกเรื่องที่ต้องการดู</p>
 
