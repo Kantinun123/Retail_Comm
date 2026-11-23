@@ -12,6 +12,7 @@ import {
 import { subscribeDataset } from "./dataset";
 import { createClient } from "@/lib/supabase/client";
 import type { Dealer, FilterState, Role, TeamMember } from "./types";
+import { isRefundTeamRole } from "@/lib/commission/types";
 
 /** ร้าน placeholder กัน session.dealer เป็น undefined ตอน dataset ยังไม่โหลด */
 const EMPTY_DEALER: Dealer = {
@@ -429,6 +430,7 @@ export function useHomeHref(): string {
   if (session && session.isSales) return "/app/home-staff";
   if (session && session.role === "marketing") return "/app/boq/overview";
   if (session && session.role === "designer") return "/app/boq";
+  if (session && isRefundTeamRole(session.role)) return "/app/refund";
   // Area: มุมมองพนักงาน -> หน้าหลักพนักงาน ; เลือกร้านแล้ว -> หน้าหลักของร้านนั้น ; ยังไม่เลือก -> หน้าหลัก (การ์ดเลือกเรื่อง)
   if (session && session.isArea) return session.areaViewRep ? "/app/home-staff" : session.areaViewDealer ? "/app/home" : AREA_HOME;
   // admin ใช้ Hub ร่วมกับร้านค้า (เวอร์ชันทุกร้าน)

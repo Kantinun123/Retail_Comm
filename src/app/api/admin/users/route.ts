@@ -14,7 +14,7 @@ import { emailToUsername, isValidStoreUsername, usernameToEmail } from "@/lib/co
  */
 
 /** บัญชีรายคน (Area / Coach / หัวหน้า Area / พนักงานขาย) — admin รีเซ็ตรหัส / ระงับได้ แต่ไม่ผ่าน flow อนุมัติร้าน */
-const AREA_ROLES = new Set(["area", "coach", "re", "area_head", "sales", "designer", "marketing"]);
+const AREA_ROLES = new Set(["area", "coach", "re", "area_head", "sales", "designer", "marketing", "finance", "accounting", "refund_approver"]);
 
 async function requireAdmin() {
   const ctx = await getAuthContext();

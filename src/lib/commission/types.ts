@@ -1,6 +1,9 @@
 /* Shared domain types for the commission portal */
 
-export type Role = "dealer" | "sales" | "admin" | "area" | "designer" | "marketing";
+export type Role = "dealer" | "sales" | "admin" | "area" | "designer" | "marketing" | "finance" | "accounting" | "refund_approver";
+/** บทบาททีมขอคืนเงิน (ไม่ผูกร้าน, ใช้ได้เฉพาะหน้า /app/refund) */
+export const REFUND_TEAM_ROLES = ["finance", "accounting", "refund_approver"] as const;
+export const isRefundTeamRole = (r: string | null | undefined): r is "finance" | "accounting" | "refund_approver" => !!r && (REFUND_TEAM_ROLES as readonly string[]).includes(r);
 
 export type GroupKey = "solution" | "product";
 

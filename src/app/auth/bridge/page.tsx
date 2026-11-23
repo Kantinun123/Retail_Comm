@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AREA_HOME, doLogin } from "@/lib/commission/session";
 import { isAreaRole, setMustChangePassword } from "@/lib/commission/auth-login";
+import { isRefundTeamRole } from "@/lib/commission/types";
 
 interface Me {
   role: string;
@@ -47,10 +48,10 @@ export default function AuthBridgePage() {
           doLogin({ role: "dealer", dealerCode: json.me.dealerCode });
           setMustChangePassword(!!json.me.mustChangePassword);
           router.replace(json.me.mustChangePassword ? "/app/change-password" : "/app/home");
-        } else if (role === "designer" || role === "marketing") {
+        } else if (role === "designer" || role === "marketing" || isRefundTeamRole(role)) {
           doLogin({ role });
           setMustChangePassword(!!json.me.mustChangePassword);
-          router.replace(json.me.mustChangePassword ? "/app/change-password" : role === "marketing" ? "/app/boq/overview" : "/app/boq");
+          router.replace(json.me.mustChangePassword ? "/app/change-password" : role === "marketing" ? "/app/boq/overview" : role === "designer" ? "/app/boq" : "/app/refund");
         } else if (role === "sales" && json.me.repCode && json.me.dealerCode) {
           doLogin({ role: "sales", dealerCode: json.me.dealerCode, repCode: json.me.repCode, repName: name ?? undefined });
           setMustChangePassword(!!json.me.mustChangePassword);

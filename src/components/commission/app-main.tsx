@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { DesktopSidebar } from "./desktop-sidebar";
 
 /** หน้าที่รองรับจอกว้าง (เพิ่มทีละหน้าเมื่อปรับ layout แล้ว) */
-export const WIDE_PREFIXES = ["/app/boq"];
+export const WIDE_PREFIXES = ["/app/boq", "/app/refund"];
 export const isWidePath = (p: string | null) => !!p && WIDE_PREFIXES.some((w) => p === w || p.startsWith(w + "/"));
 
 export function AppMain({ children }: { children: React.ReactNode }) {

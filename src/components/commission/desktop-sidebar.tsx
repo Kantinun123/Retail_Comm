@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
 
 type Item = { href: string; icon: string; label: string; match?: (p: string) => boolean };
-const ROLE_LABEL: Record<string, string> = { designer: "ห้องแบบ", marketing: "Marketing", admin: "ผู้ดูแลระบบ", sales: "พนักงานขาย", area: "Area / Coach", dealer: "ร้านค้า" };
+const ROLE_LABEL: Record<string, string> = { designer: "ห้องแบบ", marketing: "Marketing", finance: "Finance", accounting: "บัญชี", refund_approver: "ผู้อนุมัติคืนเงิน", admin: "ผู้ดูแลระบบ", sales: "พนักงานขาย", area: "Area / Coach", dealer: "ร้านค้า" };
 
 export function DesktopSidebar() {
   const { session } = useSession();
@@ -16,9 +16,14 @@ export function DesktopSidebar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   if (!session) return null;
-  const team = session.role === "designer" || session.role === "marketing";
+  const refundTeam = session.role === "finance" || session.role === "accounting" || session.role === "refund_approver";
+  const team = session.role === "designer" || session.role === "marketing" || refundTeam;
 
   const items: Item[] = [];
+  if (refundTeam) {
+    items.push({ href: "/app/refund", icon: "currency_exchange", label: "คำขอคืนเงิน", match: (p) => p === "/app/refund" || p.startsWith("/app/refund/") });
+    items.push({ href: "/app/member", icon: "person", label: "ฉัน" });
+  } else {
   if (session.role !== "designer") items.push({ href: home, icon: "home", label: "หน้าหลัก", match: (p) => p === home && home !== "/app/boq/overview" });
   if (session.role !== "sales" && session.role !== "designer") {
     items.push({ href: "/app/boq/overview", icon: "insights", label: "ภาพรวม BOQ", match: (p) => p === "/app/boq/overview" });
@@ -33,6 +38,7 @@ export function DesktopSidebar() {
   if (session.isAdmin) items.push({ href: "/app/boq/holidays", icon: "event_busy", label: "วันหยุด (SLA)", match: (p) => p === "/app/boq/holidays" });
   if (!team) items.push({ href: "/app/chat", icon: "chat", label: "สอบถาม" });
   items.push({ href: "/app/member", icon: "person", label: "ฉัน" });
+  }
 
   return (
     <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col bg-white border-r border-slate-200 z-30">

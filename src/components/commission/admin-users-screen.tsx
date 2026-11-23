@@ -35,7 +35,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "rejected", label: "ปฏิเสธ/ระงับ" },
 ];
 
-type RoleFilter = "all" | "dealer" | "area" | "coach" | "sales" | "boq";
+type RoleFilter = "all" | "dealer" | "area" | "coach" | "sales" | "boq" | "refund";
 const ROLE_FILTERS: { key: RoleFilter; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
   { key: "dealer", label: "ร้านค้า" },
@@ -43,6 +43,7 @@ const ROLE_FILTERS: { key: RoleFilter; label: string }[] = [
   { key: "coach", label: "Coach" },
   { key: "sales", label: "พนักงานขาย" },
   { key: "boq", label: "ทีม BOQ" },
+  { key: "refund", label: "ทีมคืนเงิน" },
 ];
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   dealer: { label: "ร้านค้า", cls: "bg-red-50 text-[#a11119] border-red-200" },
@@ -53,10 +54,13 @@ const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   sales: { label: "พนักงาน", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   designer: { label: "ห้องแบบ", cls: "bg-sky-50 text-sky-700 border-sky-200" },
   marketing: { label: "Marketing", cls: "bg-violet-50 text-violet-700 border-violet-200" },
+  finance: { label: "Finance", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  accounting: { label: "บัญชี", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  refund_approver: { label: "ผู้อนุมัติคืนเงิน", cls: "bg-amber-50 text-amber-700 border-amber-200" },
 };
 
 /** ป้ายบทบาทในคำขอรีเซ็ตรหัสของกลุ่ม Area */
-const RESET_ROLE_LABEL: Record<string, string> = { area: "Area", coach: "Coach", re: "Coach", area_head: "หัวหน้า Area", sales: "พนักงานขาย", designer: "ห้องแบบ", marketing: "Marketing" };
+const RESET_ROLE_LABEL: Record<string, string> = { area: "Area", coach: "Coach", re: "Coach", area_head: "หัวหน้า Area", sales: "พนักงานขาย", designer: "ห้องแบบ", marketing: "Marketing", finance: "Finance", accounting: "บัญชี", refund_approver: "ผู้อนุมัติคืนเงิน" };
 
 export function AdminUsersScreen() {
   const { session, ready } = useSession();
@@ -218,7 +222,7 @@ export function AdminUsersScreen() {
 
   const q = query.trim().toLowerCase();
   const shown = users.filter((u) => {
-    const r = u.role === "area_head" ? "area" : u.role === "designer" || u.role === "marketing" ? "boq" : u.role ?? ""; // หัวหน้า Area อยู่ในกลุ่ม Area
+    const r = u.role === "area_head" ? "area" : u.role === "designer" || u.role === "marketing" ? "boq" : u.role === "finance" || u.role === "accounting" || u.role === "refund_approver" ? "refund" : u.role ?? ""; // หัวหน้า Area อยู่ในกลุ่ม Area
     if (roleFilter !== "all" && r !== roleFilter) return false;
     if (!q) return true;
     return [u.username, u.full_name, u.dealer_code, u.dealer_name, u.requested_dealer_code, u.requested_dealer_name, u.rep_code]
@@ -432,7 +436,7 @@ export function AdminUsersScreen() {
             const storeName = u.dealer_name ?? u.requested_dealer_name;
             const storeCode = u.dealer_code ?? u.requested_dealer_code;
             const badge = u.role ? ROLE_BADGE[u.role] : undefined;
-            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re" || u.role === "area_head" || u.role === "sales" || u.role === "designer" || u.role === "marketing";
+            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re" || u.role === "area_head" || u.role === "sales" || u.role === "designer" || u.role === "marketing" || u.role === "finance" || u.role === "accounting" || u.role === "refund_approver";
             return (
               <div key={u.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
                 <div className="flex items-start justify-between gap-2">
