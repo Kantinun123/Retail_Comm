@@ -34,8 +34,8 @@ if (WIN) {
   const s = (v) => { const x = String(v ?? "").trim(); return x || null; };
   const want = new Map();
   for (const r of raw) {
-    // เฉพาะกลุ่มงานหลังคา (ROOF SERVICE มาจาก H3 ROOF SYSTEM / METAL ROOF)
-    if (!["ROOF SYSTEM", "METAL ROOF"].includes(String(r.H3).trim())) continue;
+    // เฉพาะกลุ่มงานหลังคา (ROOF SERVICE มาจาก H3 ROOF SYSTEM / METAL ROOF) + Roof Reno งานเปลี่ยนหลังคา (H5 REROOF)
+    if (!["ROOF SYSTEM", "METAL ROOF"].includes(String(r.H3).trim()) && String(r.H5).trim() !== "REROOF") continue;
     const p = String(r.project_number).trim();
     if (!p || want.has(p)) continue;
     want.set(p, { project_number: p, customer_first: s(r.customer_first_name), customer_last: s(r.customer_last_name), customer_type: s(r.customer_type_name), province: s(r.province_name), ref_opp: s(r.ref_opp), h7: s(r.H7) });

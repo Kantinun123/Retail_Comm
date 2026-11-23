@@ -80,15 +80,20 @@ export async function fetchLineTracking(period?: string): Promise<({ ok: true } 
   }
 }
 
+/** กลุ่ม Solution ของงาน: Roof Reno = งานเปลี่ยนหลังคา (Rudy REROOF / BA Re-Roof) ; ที่เหลือ = Roof Service */
+export const isReroof = (h5: string | null | undefined) => /^re-?roof$/i.test(String(h5 ?? "").trim());
+export const solutionLabel = (h5: string | null | undefined) => (isReroof(h5) ? "Roof Reno (เปลี่ยนหลังคา)" : "Roof Service");
+/** "Roof Service · TOTAL ROOF" / "Roof Reno (เปลี่ยนหลังคา)" */
+export const jobTypeText = (h5: string | null | undefined) => (isReroof(h5) ? solutionLabel(h5) : `Roof Service · ${h5 ?? "-"}`);
 /** CSV (เปิดด้วย Excel ได้ ภาษาไทยไม่เพี้ยน) — 1 แถวต่องาน */
 export function lineTrackingCsv(t: LineTracking, customers: LineCustomer[]): string {
   const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const head = ["เดือน", "Coach", "Area", "รหัสร้าน", "ร้าน", "โมเดล", "ลูกค้า", "ประเภทลูกค้า", "จังหวัด", "สถานะกลุ่ม Line (ลูกค้า)", "ชื่อกลุ่ม Line", "พนักงานขาย", "แหล่ง", "เลขงาน", "เลข OP", "ประเภทงาน", "วันที่เปิดงาน", "ยอด (รวม VAT)", "สถานะของงานนี้"];
+  const head = ["เดือน", "Coach", "Area", "รหัสร้าน", "ร้าน", "โมเดล", "ลูกค้า", "ประเภทลูกค้า", "จังหวัด", "สถานะกลุ่ม Line (ลูกค้า)", "ชื่อกลุ่ม Line", "พนักงานขาย", "แหล่ง", "เลขงาน", "เลข OP", "กลุ่ม Solution", "ประเภทงาน", "วันที่เปิดงาน", "ยอด (รวม VAT)", "สถานะของงานนี้"];
   const lines = [head.map(q).join(",")];
   for (const c of customers)
     for (const j of c.jobs)
       lines.push(
-        [t.period, c.coachName, c.areaName, c.dealerCode, c.dealerName, c.model, c.name, c.type, c.province, LINE_STATUS[c.status].label, c.groupName, j.sales ?? c.salesName, j.source === "ba" ? "BA" : "Rudy", j.project, j.opps, j.h5, j.orderDate, j.amount, LINE_STATUS[j.status].label]
+        [t.period, c.coachName, c.areaName, c.dealerCode, c.dealerName, c.model, c.name, c.type, c.province, LINE_STATUS[c.status].label, c.groupName, j.sales ?? c.salesName, j.source === "ba" ? "BA" : "Rudy", j.project, j.opps, solutionLabel(j.h5), j.h5, j.orderDate, j.amount, LINE_STATUS[j.status].label]
           .map(q)
           .join(",")
       );

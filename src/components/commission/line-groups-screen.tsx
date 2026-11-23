@@ -16,6 +16,7 @@ import { useHomeHref, useSession } from "@/lib/commission/session";
 import { monthLabel, shiftPeriod, shortDate } from "@/lib/commission/eval-tracking-store";
 import {
   fetchLineTracking,
+  jobTypeText,
   LINE_STATUS,
   LINE_STATUS_ORDER,
   lineTrackingCsv,
@@ -307,7 +308,7 @@ function CustomerRow({ c, onClick }: { c: LineCustomer; onClick: () => void }) {
         <StatusChip s={c.status} />
       </span>
       <span className="block text-[10.5px] text-slate-500 mt-0.5 truncate">
-        {c.salesName ? `พนักงานขาย: ${c.salesName}` : "ไม่ระบุพนักงานขาย"} · {c.jobs[0]?.h5 ?? "-"}
+        {c.salesName ? `พนักงานขาย: ${c.salesName}` : "ไม่ระบุพนักงานขาย"} · {[...new Set(c.jobs.map((j) => jobTypeText(j.h5)))].join(" + ")}
         {" · "}
         {[...new Set(c.jobs.map((j) => (j.source === "ba" ? "BA" : "Rudy")))].join("+")}
       </span>
@@ -398,7 +399,7 @@ function CustomerSheet({ c, onClose }: { c: LineCustomer; onClose: () => void })
                   <StatusChip s={j.status} />
                 </span>
                 <span className="block text-[10.5px] text-slate-600 mt-0.5">
-                  {j.source === "ba" ? "BA งานติดตั้ง" : `CRM: ${j.opps ?? "—"}`} · {j.h5 ?? "-"}
+                  {j.source === "ba" ? "BA งานติดตั้ง" : `CRM: ${j.opps ?? "—"}`} · {jobTypeText(j.h5)}
                 </span>
                 <span className="block text-[10.5px] text-slate-600">
                   {j.source === "ba" ? "ปิดการขาย" : "เปิดงาน"} {shortDate(j.orderDate)} · ยอด {baht(j.amount)}

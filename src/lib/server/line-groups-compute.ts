@@ -3,8 +3,9 @@
    ห้าม import ผ่าน alias "@/..." (สคริปต์ node เรียกไฟล์นี้ตรง ๆ)
 
    กติกา (ผู้ใช้ยืนยัน พ.ย. 69)
-   - งาน = (1) Rudy: service_sales_lines กลุ่ม ROOF SERVICE (building_type OB/NONRES)
-           (2) BA : ba_service_sales_lines กลุ่ม ROOF SERVICE เฉพาะงานติดตั้ง (type_of_job I) — เลขงาน = เลขใบเสนอราคา Q…
+   - งาน = (1) Rudy: service_sales_lines กลุ่ม ROOF SERVICE + Roof Reno เฉพาะ H5 REROOF (building_type OB/NONRES)
+           (2) BA : ba_service_sales_lines กลุ่ม ROOF SERVICE + Roof Reno เฉพาะ Re-Roof ; เฉพาะงานติดตั้ง (type_of_job I) — เลขงาน = เลขใบเสนอราคา Q…
+     Roof Reno อื่น (Roof Repair / Repaint / Top up / Renew) ไม่นับ (ผู้ใช้ยืนยัน 23 พ.ย. 69)
      ร้าน Housing Expert + SCG Home ตั้งแต่ FROM
    - เฉพาะช่องทาง B2C (คอลัมน์ H7 ของไฟล์ Rudy -> rudy_job_customers.h7)
    - ลูกค้าคนเดียวกัน = home_id เดียวกันใน CRM หรือ ร้านเดียวกัน + ชื่อเดียวกันตาม normName()
@@ -32,6 +33,9 @@ export interface ParsedLineFile {
 }
 
 export const FROM_PERIOD = "2026-01";
+/** Roof Reno ที่นับ = งานเปลี่ยนหลังคาเท่านั้น (Rudy H5 / BA service_group) */
+export const RUDY_REROOF = "REROOF";
+export const BA_REROOF = "Re-Roof";
 const RANK: Record<LineStatusKey, number> = { register: 3, not_register: 2, no_bot: 1 };
 
 /** "10/24/26" (m/d/yy) หรือ "2026-10-24 04:13:46" (ไฟล์จาก Google Drive) -> "2026-10-24" */
@@ -155,11 +159,15 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
   const storeOk = new Set((dealers ?? []).map((d) => d.code as string));
 
   type L = { id: number; project_number: string; dealer_code: string | null; period: string; order_date: string | null; h5: string | null; sales_name: string | null; rep_code: string | null; amount_incl_vat: number | null };
-  const lines = await keyset<L>("service_sales_lines", "id", (last) => {
-    let q = sb.from("service_sales_lines").select("id, project_number, dealer_code, period, order_date, h5, sales_name, rep_code, amount_incl_vat").eq("group3", "ROOF SERVICE").in("building_type", ["OB", "NONRES"]).gte("period", from).order("id").limit(1000);
-    if (last !== null) q = q.gt("id", last);
-    return q;
-  });
+  // Rudy: กลุ่ม ROOF SERVICE + Roof Reno เฉพาะงานเปลี่ยนหลังคา (กลุ่ม Qchang H5 = REROOF) ; Roof Reno อื่นไม่นับ (ผู้ใช้ยืนยัน 23 พ.ย. 69)
+  const rudyLines = (filter: { group3: string; h5?: string }) =>
+    keyset<L>("service_sales_lines", "id", (last) => {
+      let q = sb.from("service_sales_lines").select("id, project_number, dealer_code, period, order_date, h5, sales_name, rep_code, amount_incl_vat").eq("group3", filter.group3).in("building_type", ["OB", "NONRES"]).gte("period", from).order("id").limit(1000);
+      if (filter.h5) q = q.eq("h5", filter.h5);
+      if (last !== null) q = q.gt("id", last);
+      return q;
+    });
+  const lines = [...(await rudyLines({ group3: "ROOF SERVICE" })), ...(await rudyLines({ group3: "Qchang", h5: RUDY_REROOF }))];
   const jobs = new Map<string, L & { amount: number; source: "rudy" | "ba"; ba_customer?: string | null }>();
   for (const l of lines) {
     if (!l.dealer_code || !storeOk.has(l.dealer_code)) continue;
@@ -188,13 +196,16 @@ export async function computeLineTracking(sb: Sb, opts: { entries?: LineGroupEnt
     else if ((c.h7 ?? "").trim() && c.h7!.trim() !== "B2C") { jobs.delete(p); nonB2c++; }
   }
 
-  // งาน BA กลุ่ม ROOF SERVICE — เฉพาะงานติดตั้ง (I) ; งานสำรวจ (S) ไม่นับ (ผู้ใช้ยืนยัน พ.ย. 69)
+  // งาน BA กลุ่ม ROOF SERVICE + Roof Reno เฉพาะ Re-Roof (งานเปลี่ยนหลังคา) — เฉพาะงานติดตั้ง (I) ; งานสำรวจ (S) ไม่นับ (ผู้ใช้ยืนยัน พ.ย. 69)
   type B = { id: number; job_code: string; period: string; win_date: string | null; dealer_code: string | null; customer_name: string | null; type_of_job: string | null; service_group: string | null; amount: number | null; rep_code: string | null; sales_name: string | null; seller_name: string | null };
-  const baLines = await keyset<B>("ba_service_sales_lines", "id", (last) => {
-    let q = sb.from("ba_service_sales_lines").select("id, job_code, period, win_date, dealer_code, customer_name, type_of_job, service_group, amount, rep_code, sales_name, seller_name").eq("group3", "ROOF SERVICE").eq("type_of_job", "I").gte("period", from).order("id").limit(1000);
-    if (last !== null) q = q.gt("id", last);
-    return q;
-  });
+  const baQuery = (filter: { group3: string; serviceGroup?: string }) =>
+    keyset<B>("ba_service_sales_lines", "id", (last) => {
+      let q = sb.from("ba_service_sales_lines").select("id, job_code, period, win_date, dealer_code, customer_name, type_of_job, service_group, amount, rep_code, sales_name, seller_name").eq("group3", filter.group3).eq("type_of_job", "I").gte("period", from).order("id").limit(1000);
+      if (filter.serviceGroup) q = q.eq("service_group", filter.serviceGroup);
+      if (last !== null) q = q.gt("id", last);
+      return q;
+    });
+  const baLines = [...(await baQuery({ group3: "ROOF SERVICE" })), ...(await baQuery({ group3: "Qchang", serviceGroup: BA_REROOF }))];
   let baJobs = 0;
   for (const b of baLines) {
     const code = String(b.job_code ?? "").trim().toUpperCase();
