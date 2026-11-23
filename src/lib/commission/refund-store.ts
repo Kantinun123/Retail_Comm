@@ -97,7 +97,10 @@ export interface RefundOptions {
   approvers: Record<JobGroup, Person | null>;
   areas: Person[];
   enabled: boolean;
+  /** บัญชีพนักงานขายส่วนกลาง: ผู้ขอกรอกข้อมูลตัวเองในฟอร์ม */
+  central?: boolean;
 }
+export interface RequesterForm { name: string; nickname: string; email: string; phone: string; unit: string }
 export interface RefundFile { id: number; kind: DocKind | "revised_receipt" | "other"; round: number; name: string; size: number | null; mime: string | null; created_at: string }
 export interface RefundEventRow { at: string; actor_name: string | null; kind: string; text: string | null; tone: "ok" | "warn" | "bad" | null }
 export interface RefundDetail {
@@ -111,6 +114,7 @@ export interface RefundDetail {
   transfer_date: string | null; created_at: string; due_at: string | null;
   requester: { id: string; name: string; phone: string | null; email: string | null };
   dealer_name: string | null; requester_unit: string | null;
+  requester_name: string | null; requester_nickname: string | null; requester_email: string | null; requester_phone: string | null;
   approver: { id: string; name: string; phone: string | null } | null;
   finance: { id: string; name: string; phone: string | null } | null;
   required_docs: DocKind[]; files: RefundFile[]; events: RefundEventRow[];

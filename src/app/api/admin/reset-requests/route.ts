@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     // ร้านค้า: บัญชีของร้าน ; Area/Coach: บัญชีตาม profile_id (ต้องยังเป็นกลุ่ม Area และใช้งานอยู่ — ไม่รีเซ็ต admin ผ่านทางนี้)
     const { data: prof } =
       reqRow.kind === "staff"
-        ? await sb.from("profiles").select("id, email").eq("id", reqRow.profile_id).in("role", ["area", "coach", "re", "area_head", "sales", "designer", "marketing", "finance", "accounting", "refund_approver"]).eq("status", "approved").maybeSingle()
+        ? await sb.from("profiles").select("id, email").eq("id", reqRow.profile_id).in("role", ["area", "coach", "re", "area_head", "sales", "designer", "marketing", "finance", "accounting", "refund_approver", "sales_central"]).eq("status", "approved").maybeSingle()
         : await sb.from("profiles").select("id, email").eq("dealer_code", reqRow.dealer_code).eq("role", "dealer")
         .eq("is_test", false).eq("status", "approved").maybeSingle();
     if (!prof) {

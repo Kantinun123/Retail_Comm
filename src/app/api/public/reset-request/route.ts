@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { usernameToEmail } from "@/lib/commission/username";
 
 /** บัญชีรายคนที่ขอรีเซ็ตผ่านฟอร์มนี้ได้ (พนักงานขาย + กลุ่ม Area ; ร้านค้าใช้ dealerCode) */
-const STAFF_ROLES = ["area", "coach", "re", "area_head", "sales", "designer", "marketing", "finance", "accounting", "refund_approver"];
+const STAFF_ROLES = ["area", "coach", "re", "area_head", "sales", "designer", "marketing", "finance", "accounting", "refund_approver", "sales_central"];
 
 /**
  * ร้านค้าส่งคำขอรีเซ็ตรหัสผ่าน (ไม่ต้อง login)

@@ -29,7 +29,7 @@ export function requiredDocs(type: RefundType, cust: "company" | "person"): DocK
 export type RefundRole = "sales" | "approver" | "finance" | "accounting" | "admin" | "viewer";
 const AREA_ROLES = ["area", "coach", "re", "area_head"];
 export function refundRoleOf(ctx: AuthContext): RefundRole {
-  if (ctx.role === "sales") return "sales";
+  if (ctx.role === "sales" || ctx.role === "sales_central") return "sales";
   if (ctx.role === "finance") return "finance";
   if (ctx.role === "accounting") return "accounting";
   if (ctx.role === "admin") return "admin";
@@ -44,7 +44,26 @@ export interface RefundRow {
   approver_id: string | null; finance_id: string | null;
   docs_received_at: string | null; parcel_tracking: string | null;
   cust_name: string; refund_amount: number;
+  requester_name?: string | null; requester_nickname?: string | null;
 }
+/** พนักงานขายส่วนกลาง: บัญชีใช้ร่วมกัน ไม่ผูกร้าน — ผู้ขอกรอกข้อมูลตัวเองทุกคำขอ */
+export const isCentralSales = (ctx: AuthContext) => ctx.role === "sales_central";
+export interface RequesterInput { name?: string; nickname?: string; email?: string; phone?: string; unit?: string }
+/** ตรวจข้อมูลผู้ขอที่กรอกเอง -> คอลัมน์ของ refund_requests */
+export function validateRequester(v: RequesterInput | undefined): { ok: true; row: Record<string, string | null> } | { ok: false; error: string } {
+  const t = (s: unknown, max: number) => (typeof s === "string" ? s.trim().slice(0, max) : "");
+  const name = t(v?.name, 120), nickname = t(v?.nickname, 40), email = t(v?.email, 120).toLowerCase(), unit = t(v?.unit, 120);
+  const phone = t(v?.phone, 20).replace(/\D/g, "");
+  if (!name) return { ok: false, error: "กรุณากรอกชื่อ-นามสกุลผู้ขอ" };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "อีเมลผู้ขอไม่ถูกต้อง" };
+  if (phone.length < 9 || phone.length > 10) return { ok: false, error: "เบอร์โทรผู้ขอไม่ถูกต้อง" };
+  if (!unit) return { ok: false, error: "กรุณากรอกหน่วยงานของผู้ขอ" };
+  const phoneFmt = phone.length === 10 ? `${phone.slice(0, 3)}-${phone.slice(3, 6)}-${phone.slice(6)}` : `${phone.slice(0, 2)}-${phone.slice(2, 5)}-${phone.slice(5)}`;
+  return { ok: true, row: { requester_name: name, requester_nickname: nickname || null, requester_email: email, requester_phone: phoneFmt, requester_unit: unit } };
+}
+/** ชื่อผู้ขอที่กรอกเอง "ชื่อ (เล่น)" หรือ null ถ้าไม่ใช่คำขอจากบัญชีส่วนกลาง */
+export const typedRequesterName = (r: { requester_name?: string | null; requester_nickname?: string | null }) =>
+  r.requester_name ? (r.requester_nickname ? `${r.requester_name} (${r.requester_nickname})` : r.requester_name) : null;
 /** คำขอจากบัญชีทดสอบ เห็นเฉพาะบัญชีทดสอบ (และ admin) */
 export function canViewRefund(ctx: AuthContext, r: RefundRow): boolean {
   const role = refundRoleOf(ctx);
@@ -120,6 +139,8 @@ export interface RefundInput {
   custType?: string; custName?: string; custTaxId?: string; custBranch?: string; custPhone?: string;
   paidAmount?: number; whtBase?: number | null; refundAmount?: number; cancelDetail?: string; reason?: string;
   bankName?: string; bankAccountNo?: string; bankAccountName?: string; customerSendsDirect?: boolean; approverId?: string;
+  /** เฉพาะบัญชีพนักงานขายส่วนกลาง */
+  requester?: RequesterInput;
 }
 const txt = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const money = (v: unknown) => { const n = Math.round(Number(v) * 100) / 100; return Number.isFinite(n) ? n : 0; };

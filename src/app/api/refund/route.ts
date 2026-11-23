@@ -3,11 +3,11 @@ import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import { actorName } from "@/lib/server/boq";
 import {
-  DOC_KINDS, REFUND_BUCKET, TYPE_LABEL, addRefundEvent, areaApprovers, autoApprover, canViewRefund, notifyRefund, refundRoleOf, requiredDocs, validateRefund,
+  DOC_KINDS, REFUND_BUCKET, TYPE_LABEL, addRefundEvent, areaApprovers, autoApprover, canViewRefund, isCentralSales, notifyRefund, refundRoleOf, requiredDocs, typedRequesterName, validateRefund, validateRequester,
   type RefundInput, type RefundRow,
 } from "@/lib/server/refund";
 
-const LIST_COLS = "id, req_no, is_test, status, round, refund_type, job_group, requester_id, rep_code, dealer_code, approver_id, finance_id, docs_received_at, parcel_tracking, cust_name, refund_amount, project_no, so_no, created_at, updated_at, due_at, approved_at, transfer_date";
+const LIST_COLS = "id, req_no, is_test, status, round, refund_type, job_group, requester_id, rep_code, dealer_code, approver_id, finance_id, docs_received_at, parcel_tracking, cust_name, refund_amount, project_no, so_no, created_at, updated_at, due_at, approved_at, transfer_date, requester_name, requester_nickname, requester_unit";
 const bad = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
 /** เปิดให้ทุกคน: REFUND_ENABLED=1 ใน Vercel ; ก่อนเปิด = บัญชีทดสอบ + admin */
 const isEnabled = (isTest: boolean, role: string) => process.env.REFUND_ENABLED === "1" || isTest || role === "admin";
@@ -46,8 +46,8 @@ export async function GET() {
     items: rows.map((r) => ({
       id: r.id, reqNo: r.req_no, isTest: !!r.is_test, status: r.status, round: r.round, type: r.refund_type, group: r.job_group,
       custName: r.cust_name, amount: Number(r.refund_amount), projectNo: r.project_no, soNo: r.so_no,
-      requesterId: r.requester_id, requesterName: (r.rep_code && repName.get(r.rep_code as string)) || nameOf.get(r.requester_id) || "-",
-      dealerName: r.dealer_code ? dealerName.get(r.dealer_code as string) ?? r.dealer_code : null,
+      requesterId: r.requester_id, requesterName: typedRequesterName(r) || (r.rep_code && repName.get(r.rep_code as string)) || nameOf.get(r.requester_id) || "-",
+      dealerName: r.dealer_code ? dealerName.get(r.dealer_code as string) ?? r.dealer_code : ((r.requester_unit as string | null) ?? null),
       approverId: r.approver_id, approverName: r.approver_id ? nameOf.get(r.approver_id) ?? "-" : null,
       financeId: r.finance_id, financeName: r.finance_id ? nameOf.get(r.finance_id) ?? "-" : null,
       hasParcel: !!r.parcel_tracking, docsReceived: !!r.docs_received_at,
@@ -62,12 +62,16 @@ type CreateBody = RefundInput & { files?: { kind?: string; path?: string; name?:
 export async function POST(req: Request) {
   const ctx = await getAuthContext();
   if (!ctx) return bad("unauthenticated", 401);
-  if (refundRoleOf(ctx) !== "sales" || !ctx.repCode) return bad("เฉพาะพนักงานขายสร้างคำขอได้", 403);
+  const central = isCentralSales(ctx);
+  if (refundRoleOf(ctx) !== "sales" || (!ctx.repCode && !central)) return bad("เฉพาะพนักงานขายสร้างคำขอได้", 403);
   if (!isEnabled(ctx.isTest, ctx.role)) return bad("ระบบขอคืนเงินยังไม่เปิดใช้งาน", 403);
   const b = (await req.json().catch(() => null)) as CreateBody | null;
   if (!b) return bad("ข้อมูลไม่ถูกต้อง");
   const v = validateRefund(b);
   if (!v.ok) return bad(v.error);
+  // บัญชีส่วนกลาง: ผู้ขอกรอกชื่อ / อีเมล / เบอร์ / หน่วยงานเอง
+  const rq = central ? validateRequester(b.requester) : null;
+  if (rq && !rq.ok) return bad(rq.error);
   const row = v.row;
   const sb = createServiceClient();
   // ผู้อนุมัติ: ตามกลุ่มงาน ; roof หา Area ของร้านไม่เจอ -> ใช้คนที่เลือก (ต้องอยู่ในรายชื่อ Area)
@@ -82,8 +86,8 @@ export async function POST(req: Request) {
 
   const { data: no, error: noErr } = await sb.rpc("refund_next_no");
   if (noErr || !no) return bad(noErr?.message ?? "ออกเลขที่คำขอไม่สำเร็จ", 500);
-  const { data: rep } = await sb.from("sale_reps").select("name, nickname").eq("rep_code", ctx.repCode).maybeSingle();
-  const { data: dealer } = ctx.dealerCode ? await sb.from("dealers").select("name").eq("code", ctx.dealerCode).maybeSingle() : { data: null };
+  const { data: rep } = ctx.repCode ? await sb.from("sale_reps").select("name, nickname").eq("rep_code", ctx.repCode).maybeSingle() : { data: null };
+  const { data: dealer } = ctx.dealerCode && !central ? await sb.from("dealers").select("name").eq("code", ctx.dealerCode).maybeSingle() : { data: null };
   const { data: created, error: cErr } = await sb
     .from("refund_requests")
     .insert({
@@ -92,9 +96,10 @@ export async function POST(req: Request) {
       is_test: ctx.isTest,
       status: "pending_approval",
       requester_id: ctx.userId,
-      rep_code: ctx.repCode,
-      dealer_code: ctx.dealerCode,
+      rep_code: central ? null : ctx.repCode,
+      dealer_code: central ? null : ctx.dealerCode,
       requester_unit: (dealer?.name as string | undefined) ?? null,
+      ...(rq?.ok ? rq.row : {}),
       approver_id: approver.id,
     })
     .select("id, req_no, is_test, status, round, refund_type, job_group, requester_id, rep_code, dealer_code, approver_id, finance_id, docs_received_at, parcel_tracking, cust_name, refund_amount")
@@ -114,7 +119,8 @@ export async function POST(req: Request) {
   }
   const { error: fErr } = await sb.from("refund_files").insert(rows);
   if (fErr) return rollback(fErr.message);
-  const name = rep?.name ? (rep.nickname ? `${rep.name} (${rep.nickname})` : (rep.name as string)) : await actorName(sb, ctx);
+  const typed = rq?.ok ? typedRequesterName(rq.row) : null;
+  const name = typed ?? (rep?.name ? (rep.nickname ? `${rep.name} (${rep.nickname})` : (rep.name as string)) : await actorName(sb, ctx));
   await addRefundEvent(sb, id, ctx, name, "created", `ส่งคำขอ${TYPE_LABEL[row.refund_type as "wht"]} ฿${Number(row.refund_amount).toLocaleString("th-TH", { minimumFractionDigits: 2 })} · ผู้อนุมัติ ${approver.name}`);
   await notifyRefund(sb, created as unknown as RefundRow, "new");
   return NextResponse.json({ ok: true, id, reqNo: no });

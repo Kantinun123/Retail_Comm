@@ -3,7 +3,7 @@ import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import { actorName, dueAfterBusinessDays, loadHolidays } from "@/lib/server/boq";
 import {
-  DOC_KINDS, FINANCE_CHECKS, REFUND_BUCKET, SLA, TYPE_LABEL, addRefundEvent, autoApprover, canSeeBank, canViewRefund, notifyRefund, refundCaps, refundRoleOf, requiredDocs, validateRefund,
+  DOC_KINDS, FINANCE_CHECKS, REFUND_BUCKET, SLA, TYPE_LABEL, addRefundEvent, autoApprover, canSeeBank, canViewRefund, isCentralSales, notifyRefund, refundCaps, refundRoleOf, requiredDocs, typedRequesterName, validateRefund, validateRequester,
   type RefundInput, type RefundRow,
 } from "@/lib/server/refund";
 
@@ -45,7 +45,9 @@ export async function GET(_req: Request, { params }: Ctx) {
     item: {
       ...r,
       bank_account_no: showBank ? r.bank_account_no : mask(String(r.bank_account_no ?? "")),
-      requester: { ...(person(r.requester_id) ?? { id: r.requester_id, name: "-", phone: null }), name: rep?.name ? (rep.nickname ? `${rep.name} (${rep.nickname})` : rep.name) : person(r.requester_id)?.name ?? "-", phone: (rep?.phone as string | null) ?? person(r.requester_id)?.phone ?? null, email: (rep?.email as string | null) ?? null },
+      requester: typedRequesterName(r)
+        ? { id: r.requester_id, name: typedRequesterName(r)!, phone: (r.requester_phone as string | null) ?? null, email: (r.requester_email as string | null) ?? null }
+        : { ...(person(r.requester_id) ?? { id: r.requester_id, name: "-", phone: null }), name: rep?.name ? (rep.nickname ? `${rep.name} (${rep.nickname})` : rep.name) : person(r.requester_id)?.name ?? "-", phone: (rep?.phone as string | null) ?? person(r.requester_id)?.phone ?? null, email: (rep?.email as string | null) ?? null },
       dealer_name: (dealer?.name as string | undefined) ?? null,
       approver: person(r.approver_id),
       finance: person(r.finance_id),
@@ -68,7 +70,8 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!b?.action) return bad("ข้อมูลไม่ถูกต้อง");
   const caps = refundCaps(ctx, r);
   const text = typeof b.text === "string" ? b.text.trim().slice(0, 1000) : "";
-  const name = await actorName(sb, ctx);
+  // บัญชีส่วนกลาง: ใช้ชื่อที่ผู้ขอกรอกไว้ในคำขอเป็นชื่อในประวัติ
+  const name = r.requester_id === ctx.userId && typedRequesterName(r) ? typedRequesterName(r)! : await actorName(sb, ctx);
   const forbid = () => bad("ทำรายการนี้ไม่ได้ในสถานะปัจจุบัน", 403);
   // อัปเดตแบบมีเงื่อนไขสถานะเดิม (กันกดซ้ำ / สองคนกดพร้อมกัน)
   const update = async (patch: Record<string, unknown>, fromStatus: string[]) => {
@@ -104,6 +107,8 @@ export async function POST(req: Request, { params }: Ctx) {
         if (!caps.edit) return forbid();
         const v = validateRefund(b.data ?? {});
         if (!v.ok) return bad(v.error);
+        const rq = isCentralSales(ctx) ? validateRequester(b.data?.requester) : null;
+        if (rq && !rq.ok) return bad(rq.error);
         const fromFinance = r.status === "finance_returned";
         const round = fromFinance ? r.round + 1 : r.round;
         // ผู้อนุมัติ: คนเดิม เว้นแต่เปลี่ยนกลุ่มงาน (metal/smart -> ตามตาราง ; roof -> Area ของร้าน หรือคนเดิม)
@@ -130,7 +135,7 @@ export async function POST(req: Request, { params }: Ctx) {
           const { error: fErr } = await sb.from("refund_files").insert(rows);
           if (fErr) return bad(fErr.message, 500);
         }
-        if (!(await update({ ...v.row, approver_id: approverId, round, status: "pending_approval", approved_at: null, due_at: null }, ["returned", "finance_returned"]))) return forbid();
+        if (!(await update({ ...v.row, ...(rq?.ok ? rq.row : {}), approver_id: approverId, round, status: "pending_approval", approved_at: null, due_at: null }, ["returned", "finance_returned"]))) return forbid();
         await addRefundEvent(sb, id, ctx, name, "resubmitted",
           `${fromFinance ? `แก้ไขตามที่ Finance แจ้งแล้ว ส่งให้ผู้อนุมัติอีกครั้ง (รอบที่ ${round})` : "แก้ไขแล้ว ส่งขออนุมัติอีกครั้ง"}${rows.length ? ` · แนบเอกสารใหม่ ${rows.length} ไฟล์` : ""}${text ? ` · ${text}` : ""}`);
         await notifyRefund(sb, await fresh(), "resubmitted");

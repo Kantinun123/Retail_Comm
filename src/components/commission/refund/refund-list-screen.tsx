@@ -10,6 +10,7 @@ import { Icon } from "../icon";
 import { PushToggle } from "../push-toggle";
 import { cn } from "@/lib/utils";
 import { doLogout, useSession } from "@/lib/commission/session";
+import { isRefundTeamRole } from "@/lib/commission/types";
 import { baht2, dateTh, fetchRefundList, groupLabel, typeLabel, type RefundListItem, type RefundRole, type RefundStatus } from "@/lib/commission/refund-store";
 import { btn, card } from "../boq/boq-shared";
 import { RefundPill } from "./refund-detail-screen";
@@ -127,7 +128,7 @@ export function RefundListScreen() {
   const cur = tabs.find((t) => t.key === tab) ?? tabs.find((t) => t.key === firstWithItems)!;
   const kw = q.trim().toLowerCase();
   const list = items.filter(cur.match).filter((j) => !kw || `${j.reqNo} ${j.custName} ${j.projectNo} ${j.soNo ?? ""} ${j.requesterName} ${j.dealerName ?? ""}`.toLowerCase().includes(kw));
-  const team = session.role === "finance" || session.role === "accounting" || session.role === "refund_approver";
+  const team = isRefundTeamRole(session.role); // รวมพนักงานขายส่วนกลาง (ไม่มีหน้าหลักอื่น)
   return (
     <>
       <header className="flex items-center justify-between gap-2 py-3 lg:py-5">

@@ -6,9 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./icon";
 import { cn } from "@/lib/utils";
 import { doLogout, useHomeHref, useSession } from "@/lib/commission/session";
+import { isRefundTeamRole } from "@/lib/commission/types";
 
 type Item = { href: string; icon: string; label: string; match?: (p: string) => boolean };
-const ROLE_LABEL: Record<string, string> = { designer: "ห้องแบบ", marketing: "Marketing", finance: "Finance", accounting: "บัญชี", refund_approver: "ผู้อนุมัติคืนเงิน", admin: "ผู้ดูแลระบบ", sales: "พนักงานขาย", area: "Area / Coach", dealer: "ร้านค้า" };
+const ROLE_LABEL: Record<string, string> = { designer: "ห้องแบบ", marketing: "Marketing", finance: "Finance", accounting: "บัญชี", refund_approver: "ผู้อนุมัติคืนเงิน", sales_central: "พนักงานขายส่วนกลาง", admin: "ผู้ดูแลระบบ", sales: "พนักงานขาย", area: "Area / Coach", dealer: "ร้านค้า" };
 
 export function DesktopSidebar() {
   const { session } = useSession();
@@ -16,7 +17,7 @@ export function DesktopSidebar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   if (!session) return null;
-  const refundTeam = session.role === "finance" || session.role === "accounting" || session.role === "refund_approver";
+  const refundTeam = isRefundTeamRole(session.role);
   const team = session.role === "designer" || session.role === "marketing" || refundTeam;
 
   const items: Item[] = [];

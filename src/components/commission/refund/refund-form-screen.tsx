@@ -10,7 +10,7 @@ import { formatThaiPhone } from "@/lib/th-provinces";
 import {
   BANKS, CUST_TYPES, DOC_ADDRESS, DOC_META, JOB_GROUPS, REFUND_TYPES, WHT_RATE,
   createRefund, docHint, fetchRefund, fetchRefundOptions, fmt2, fmtTaxId, num, refundAction, refundFileUrl, requiredDocs, uploadRefundDoc, baht2,
-  type CustType, type DocKind, type JobGroup, type RefundDetail, type RefundOptions, type RefundType, type UploadedDoc,
+  type CustType, type DocKind, type JobGroup, type RefundDetail, type RefundOptions, type RefundType, type RequesterForm, type UploadedDoc,
 } from "@/lib/commission/refund-store";
 import { Chips, Section, badCls, btn, inputCls, labelCls } from "../boq/boq-shared";
 
@@ -78,6 +78,9 @@ export function RefundFormScreen({ editId }: { editId?: number }) {
   const [slots, setSlots] = useState<Partial<Record<DocKind, Slot>>>({});
   const [direct, setDirect] = useState(false);
   const [approverId, setApproverId] = useState("");
+  // บัญชีพนักงานขายส่วนกลาง (ใช้ร่วมกันหลายคน): ผู้ขอกรอกข้อมูลตัวเองทุกคำขอ
+  const [rq, setRq] = useState<RequesterForm>({ name: "", nickname: "", email: "", phone: "", unit: "" });
+  const setR = (k: keyof RequesterForm, v: string) => setRq((o) => ({ ...o, [k]: v }));
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState("");
@@ -91,6 +94,7 @@ export function RefundFormScreen({ editId }: { editId?: number }) {
           if (cancelled) return;
           setOrig(r);
           setType(r.refund_type); setGroup(r.job_group); setCustType(r.cust_type); setDirect(r.customer_sends_direct);
+          if (r.requester_name) setRq({ name: r.requester_name, nickname: r.requester_nickname ?? "", email: r.requester_email ?? "", phone: formatThaiPhone(r.requester_phone ?? ""), unit: r.requester_unit ?? "" });
           setF({
             projectNo: r.project_no, soNo: r.so_no ?? "", receiptNo: r.receipt_no ?? "", projectName: r.project_name ?? "", custName: r.cust_name, taxId: r.cust_tax_id,
             branch: r.cust_branch ?? "สำนักงานใหญ่", custPhone: r.cust_phone ?? "", paid: fmt2(Number(r.paid_amount)), whtBase: r.wht_base != null ? fmt2(Number(r.wht_base)) : "",
@@ -113,7 +117,16 @@ export function RefundFormScreen({ editId }: { editId?: number }) {
   const approverName = orig && group === orig.job_group ? orig.approver?.name : autoApprover?.name ?? opt?.areas.find((a) => a.id === approverId)?.name;
   const needPick = !orig && group === "roof" && !autoApprover;
 
+  const central = !!opt?.central;
+  const rqPhone = rq.phone.replace(/\D/g, "").length;
+  const badRq = {
+    name: central && !rq.name.trim(),
+    email: central && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rq.email.trim()),
+    phone: central && (rqPhone < 9 || rqPhone > 10),
+    unit: central && !rq.unit.trim(),
+  };
   const bad = {
+    requester: badRq.name || badRq.email || badRq.phone || badRq.unit,
     type: !type, group: !group, custType: !effCust,
     projectNo: !/^(E?RD|BA)[A-Z0-9-]{4,}$/i.test(f.projectNo.trim()), soNo: group === "roof" && !f.soNo.trim(),
     custName: !f.custName.trim(), taxId: f.taxId.replace(/\D/g, "").length !== 13,
@@ -125,7 +138,7 @@ export function RefundFormScreen({ editId }: { editId?: number }) {
   };
   const show = (b: boolean) => tried && b;
   const missing = [
-    bad.type && "ประเภทการคืนเงิน", bad.group && "กลุ่มงาน", bad.projectNo && "เลข Project (RD… / BA…)", bad.soNo && "เลข SO",
+    bad.requester && "ข้อมูลผู้ขอ", bad.type && "ประเภทการคืนเงิน", bad.group && "กลุ่มงาน", bad.projectNo && "เลข Project (RD… / BA…)", bad.soNo && "เลข SO",
     bad.custType && "ประเภทลูกค้า", bad.custName && "ชื่อลูกค้า", bad.taxId && "เลข 13 หลัก", bad.paid && "ยอดที่ลูกค้าชำระ",
     bad.refund && (refund > num(f.paid) ? "ยอดขอคืนเกินยอดที่ชำระ" : "ยอดขอคืน"), bad.cancelDetail && "ส่วนที่ยกเลิก", bad.reason && "สาเหตุการคืนเงิน",
     bad.bank && "บัญชีรับเงินคืน", bad.docs && `เอกสาร ${needDocs.filter((k) => !hasDoc(k)).length} รายการ`, bad.approver && "ผู้อนุมัติ",
@@ -156,6 +169,7 @@ export function RefundFormScreen({ editId }: { editId?: number }) {
       custType: effCust, custName: f.custName, custTaxId: f.taxId, custBranch: f.branch, custPhone: f.custPhone,
       paidAmount: num(f.paid), whtBase: type === "wht" && f.whtBase ? num(f.whtBase) : null, refundAmount: refund, cancelDetail: f.cancelDetail, reason: f.reason,
       bankName: f.bank, bankAccountNo: f.accNo, bankAccountName: f.accName, customerSendsDirect: direct, approverId: approverId || undefined,
+      requester: central ? rq : undefined,
     };
     const files = needDocs.flatMap((k) => slots[k]?.uploaded ?? []);
     try {
@@ -193,6 +207,17 @@ export function RefundFormScreen({ editId }: { editId?: number }) {
           </div>
         )}
 
+        {central ? (
+          <Section no="1" title="ผู้ขอคืนเงิน *" hint="บัญชีส่วนกลาง กรอกข้อมูลของคุณเองทุกครั้ง (ใช้ติดต่อกลับและแสดงในบันทึกขออนุมัติ)" invalid={show(bad.requester)} invalidText="กรุณากรอกข้อมูลผู้ขอให้ครบ">
+            <div className="grid gap-2.5 lg:grid-cols-2">
+              <div><label className={labelCls}>ชื่อ-นามสกุล *</label><input value={rq.name} onChange={(e) => setR("name", e.target.value)} maxLength={120} className={cn(inputCls, show(badRq.name) && badCls)} /></div>
+              <div><label className={labelCls}>ชื่อเล่น</label><input value={rq.nickname} onChange={(e) => setR("nickname", e.target.value)} maxLength={40} className={inputCls} /></div>
+              <div><label className={labelCls}>อีเมล *</label><input type="email" inputMode="email" autoCapitalize="none" value={rq.email} onChange={(e) => setR("email", e.target.value)} maxLength={120} placeholder="name@scg.com" className={cn(inputCls, show(badRq.email) && badCls)} /></div>
+              <div><label className={labelCls}>เบอร์โทร *</label><input inputMode="tel" value={rq.phone} onChange={(e) => setR("phone", formatThaiPhone(e.target.value))} placeholder="08X-XXX-XXXX" className={cn(inputCls, show(badRq.phone) && badCls)} /></div>
+              <div className="lg:col-span-2"><label className={labelCls}>หน่วยงาน / สังกัด *</label><input value={rq.unit} onChange={(e) => setR("unit", e.target.value)} maxLength={120} className={cn(inputCls, show(badRq.unit) && badCls)} /></div>
+            </div>
+          </Section>
+        ) : (
         <Section no="1" title="ผู้ขอคืนเงิน" hint="ระบบดึงจากบัญชีที่เข้าระบบ">
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] space-y-0.5">
             <p className="font-semibold text-slate-800">{opt?.requester.name ?? "…"}</p>
@@ -200,6 +225,7 @@ export function RefundFormScreen({ editId }: { editId?: number }) {
             <p className="text-slate-500">{opt?.requester.unit ?? "-"}</p>
           </div>
         </Section>
+        )}
 
         <Section no="2" title="ประเภทการคืนเงิน *" invalid={show(bad.type)} invalidText="กรุณาเลือกประเภทการคืนเงิน">
           <div className="grid gap-2 lg:grid-cols-3">

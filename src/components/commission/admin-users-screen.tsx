@@ -57,10 +57,11 @@ const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   finance: { label: "Finance", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   accounting: { label: "บัญชี", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   refund_approver: { label: "ผู้อนุมัติคืนเงิน", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  sales_central: { label: "พนักงานขายส่วนกลาง", cls: "bg-rose-50 text-rose-700 border-rose-200" },
 };
 
 /** ป้ายบทบาทในคำขอรีเซ็ตรหัสของกลุ่ม Area */
-const RESET_ROLE_LABEL: Record<string, string> = { area: "Area", coach: "Coach", re: "Coach", area_head: "หัวหน้า Area", sales: "พนักงานขาย", designer: "ห้องแบบ", marketing: "Marketing", finance: "Finance", accounting: "บัญชี", refund_approver: "ผู้อนุมัติคืนเงิน" };
+const RESET_ROLE_LABEL: Record<string, string> = { area: "Area", coach: "Coach", re: "Coach", area_head: "หัวหน้า Area", sales: "พนักงานขาย", designer: "ห้องแบบ", marketing: "Marketing", finance: "Finance", accounting: "บัญชี", refund_approver: "ผู้อนุมัติคืนเงิน", sales_central: "พนักงานขายส่วนกลาง" };
 
 export function AdminUsersScreen() {
   const { session, ready } = useSession();
@@ -222,7 +223,7 @@ export function AdminUsersScreen() {
 
   const q = query.trim().toLowerCase();
   const shown = users.filter((u) => {
-    const r = u.role === "area_head" ? "area" : u.role === "designer" || u.role === "marketing" ? "boq" : u.role === "finance" || u.role === "accounting" || u.role === "refund_approver" ? "refund" : u.role ?? ""; // หัวหน้า Area อยู่ในกลุ่ม Area
+    const r = u.role === "area_head" ? "area" : u.role === "designer" || u.role === "marketing" ? "boq" : u.role === "finance" || u.role === "accounting" || u.role === "refund_approver" || u.role === "sales_central" ? "refund" : u.role ?? ""; // หัวหน้า Area อยู่ในกลุ่ม Area
     if (roleFilter !== "all" && r !== roleFilter) return false;
     if (!q) return true;
     return [u.username, u.full_name, u.dealer_code, u.dealer_name, u.requested_dealer_code, u.requested_dealer_name, u.rep_code]
@@ -436,7 +437,7 @@ export function AdminUsersScreen() {
             const storeName = u.dealer_name ?? u.requested_dealer_name;
             const storeCode = u.dealer_code ?? u.requested_dealer_code;
             const badge = u.role ? ROLE_BADGE[u.role] : undefined;
-            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re" || u.role === "area_head" || u.role === "sales" || u.role === "designer" || u.role === "marketing" || u.role === "finance" || u.role === "accounting" || u.role === "refund_approver";
+            const isStaff = u.role === "area" || u.role === "coach" || u.role === "re" || u.role === "area_head" || u.role === "sales" || u.role === "designer" || u.role === "marketing" || u.role === "finance" || u.role === "accounting" || u.role === "refund_approver" || u.role === "sales_central";
             return (
               <div key={u.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3.5">
                 <div className="flex items-start justify-between gap-2">
