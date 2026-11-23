@@ -100,6 +100,20 @@ export function RefundListScreen() {
       { key: "mine", label: "ที่ฉันอนุมัติ", match: (j) => j.approverId === me && j.status !== "pending_approval" },
       { key: "all", label: "ทั้งหมด", match: () => true },
     ];
+    if (role === "finance") return [
+      { key: "queue", label: "รอรับงาน", match: st("pending_finance") },
+      { key: "mine", label: "งานของฉัน", match: (j) => j.financeId === me && ["finance_working", "finance_returned"].includes(j.status) },
+      { key: "all", label: "Finance ทั้งหมด", match: st("pending_finance", "finance_working", "finance_returned") },
+      { key: "done", label: "ตรวจผ่านแล้ว", match: (j) => j.financeId === me && ["pending_transfer", "transferred", "closed"].includes(j.status) },
+      { key: "every", label: "ทั้งหมด", match: () => true },
+    ];
+    if (role === "accounting") return [
+      { key: "ready", label: "รอโอนเงิน", match: st("pending_transfer") },
+      { key: "parcel", label: "เอกสารกำลังมา", match: (j) => j.hasParcel && !j.docsReceived && ACTIVE.includes(j.status) },
+      { key: "finance", label: "รอ Finance", match: st("pending_finance", "finance_working", "finance_returned") },
+      { key: "done", label: "โอนแล้ว", match: st("transferred", "closed") },
+      { key: "every", label: "ทั้งหมด", match: () => true },
+    ];
     return [
       { key: "active", label: "กำลังดำเนินการ", match: st(...ACTIVE) },
       { key: "approval", label: "รออนุมัติ", match: st("pending_approval", "returned", "finance_returned") },

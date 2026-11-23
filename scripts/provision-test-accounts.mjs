@@ -4,6 +4,7 @@
 //   test.areahead -> หัวหน้า Area (เห็นทุกร้านที่มี Area ดูแล ไม่ต้องผูก rep)
 //   test.se       -> พนักงานขาย SE อั๋น (SR0067) ร้าน 5100895 — ร้านมาจาก sale_reps ตอน login
 //   test.designer / test.designer2 -> ห้องแบบ (BOQ DECAAR) ; test.marketing -> Marketing ดูอย่างเดียว
+//   test.finance / test.finance2 -> Finance (ขอคืนเงิน) ; test.accounting -> บัญชี (ขอคืนเงิน)
 //   test.he       -> ร้าน HE 5100895 (บ.สมาร์ท โฮมโปรดักส์) ; test.scg -> ร้าน SCG Home 5102653 (บุญถาวร จันทบุรี)
 //   บัญชีร้านแบบทดสอบไม่นับใน "1 บัญชีต่อร้าน" (unique index ยกเว้น is_test) -> ร้านยังมีบัญชีจริงได้ตามปกติ
 // ใช้: node scripts/provision-test-accounts.mjs          (dry-run)
@@ -32,6 +33,9 @@ const ACCOUNTS = [
   { username: "test.designer", role: "designer", rep: null, label: "ห้องแบบ" },
   { username: "test.designer2", role: "designer", rep: null, label: "ห้องแบบ คนที่ 2" },
   { username: "test.marketing", role: "marketing", rep: null, label: "Marketing" },
+  { username: "test.finance", role: "finance", rep: null, label: "Finance" },
+  { username: "test.finance2", role: "finance", rep: null, label: "Finance คนที่ 2" },
+  { username: "test.accounting", role: "accounting", rep: null, label: "บัญชี" },
 ];
 
 function tempPassword() {

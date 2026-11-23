@@ -7,7 +7,8 @@ import { Icon } from "../icon";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/commission/session";
 import {
-  CARRIERS, DOC_ADDRESS, DOC_META, STATUS_META, STEPS, baht2, dateTh, fetchRefund, fmtTaxId, groupLabel, refundAction, refundFileUrl, stepIndex, typeLabel,
+  CARRIERS, DOC_ADDRESS, DOC_META, FINANCE_CHECKS, STATUS_META, STEPS, baht2, dateTh, fetchRefund, fmtTaxId, groupLabel, refundAction, refundFileUrl, stepIndex, typeLabel, uploadRefundDoc,
+  type UploadedDoc,
   type DocKind, type RefundCaps, type RefundDetail, type RefundRole, type RefundStatus,
 } from "@/lib/commission/refund-store";
 import { btn, card, inputCls } from "../boq/boq-shared";
@@ -47,11 +48,26 @@ function Stepper({ status }: { status: RefundStatus }) {
   );
 }
 
+function CheckRow({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={cn("w-full text-left px-3 py-2 rounded-xl border text-[12px] flex items-center gap-2", on ? "border-rose-400 bg-rose-50 text-rose-900 font-semibold" : "border-slate-200 bg-white text-slate-600")}>
+      <Icon name={on ? "check_box" : "check_box_outline_blank"} style={{ fontSize: 17 }} />{label}
+    </button>
+  );
+}
+
 function ActionPanel({ d, caps, role, onDone }: { d: RefundDetail; caps: RefundCaps; role: RefundRole; onDone: () => void }) {
   const [text, setText] = useState("");
   const [carrier, setCarrier] = useState(d.parcel_carrier ?? CARRIERS[0]);
   const [tracking, setTracking] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [finMode, setFinMode] = useState<"" | "return">("");
+  const [finItems, setFinItems] = useState<string[]>([]);
+  const [tDate, setTDate] = useState(() => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10));
+  const [revised, setRevised] = useState<UploadedDoc[]>([]);
+  const [upBusy, setUpBusy] = useState(false);
+  const toggle = (k: string) => setFinItems((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]));
+  const docKinds = [...new Set(d.files.filter((f) => f.kind in DOC_META).map((f) => f.kind as DocKind))];
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const run = async (body: Record<string, unknown>) => {
@@ -82,6 +98,105 @@ function ActionPanel({ d, caps, role, onDone }: { d: RefundDetail; caps: RefundC
           <button type="button" disabled={saving || !text.trim()} onClick={() => run({ action: "return", text })} className={cn(btn, "flex-1 bg-orange-50 text-orange-700 border border-orange-200")}>ตีกลับให้แก้</button>
           <button type="button" disabled={saving || !text.trim()} onClick={() => run({ action: "reject", text })} className={cn(btn, "flex-1 bg-red-50 text-red-700 border border-red-200")}>ไม่อนุมัติ</button>
         </div>
+      </div>
+    );
+  }
+  /* ---------- Finance ---------- */
+  if (caps.claim) {
+    blocks.push(
+      <div key="claim" className="space-y-2">
+        <p className="text-[12px] text-slate-600">อนุมัติแล้ว · Finance ทุกคนเห็นงานนี้ คนแรกที่กดรับจะได้งาน</p>
+        <button type="button" disabled={saving} onClick={() => run({ action: "claim" })} className={cn(btn, "w-full bg-[#d32029] text-white")}>{saving ? "กำลังรับงาน..." : "รับงานนี้"}</button>
+      </div>
+    );
+  }
+  if (caps.financeAct && finMode === "return") {
+    blocks.push(
+      <div key="fret" className="space-y-2 rounded-xl border-2 border-rose-300 p-3">
+        <p className="text-[12.5px] font-bold text-rose-900">แจ้งกลับให้ทีมขายแก้ไข</p>
+        <p className="text-[11px] text-slate-500">เลือกรายการที่ผิด / ขาด — ทีมขายแก้แล้วต้องให้ผู้อนุมัติอนุมัติใหม่ แล้วงานจะกลับมาที่คุณ (ระหว่างรอไม่นับ SLA)</p>
+        <p className="text-[10.5px] font-semibold text-slate-500 pt-1">เอกสารแนบ</p>
+        {docKinds.map((k) => <CheckRow key={k} on={finItems.includes(k)} label={DOC_META[k].label} onClick={() => toggle(k)} />)}
+        <p className="text-[10.5px] font-semibold text-slate-500 pt-1">ข้อมูลในฟอร์ม</p>
+        {FINANCE_CHECKS.map((c) => <CheckRow key={c.key} on={finItems.includes(c.key)} label={c.label} onClick={() => toggle(c.key)} />)}
+        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="อธิบายสิ่งที่ต้องแก้ (บังคับ) เช่น สำเนา Book bank ยังไม่ได้เซ็นรับรอง" className={inputCls} />
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setFinMode("")} className={cn(btn, "bg-white border border-slate-200 text-slate-600")}>กลับ</button>
+          <button type="button" disabled={saving || !text.trim()} onClick={() => run({ action: "finance_return", items: finItems, text })} className={cn(btn, "flex-1 bg-rose-600 text-white")}>ส่งกลับให้ทีมขายแก้</button>
+        </div>
+      </div>
+    );
+  } else if (caps.financeAct) {
+    blocks.push(
+      <div key="fin" className="space-y-2">
+        {d.round > 1 && d.finance_issue && <p className="rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-[11.5px] text-emerald-900">รอบที่ {d.round}: ทีมขายแก้แล้ว และผู้อนุมัติอนุมัติใหม่แล้ว · ครั้งก่อนคุณแจ้งว่า “{d.finance_issue.text}”</p>}
+        <p className="text-[11.5px] text-slate-600">ตรวจข้อมูลและเอกสารแนบ{d.docs_received_at ? " (บัญชีได้รับเอกสารตัวจริงแล้ว)" : ""}{d.due_at ? ` · กำหนด ${dateTh(d.due_at)}` : ""}</p>
+        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="ความคิดเห็นถึงบัญชี (ไม่บังคับ)" className={inputCls} />
+        <button type="button" disabled={saving} onClick={() => run({ action: "finance_pass", text })} className={cn(btn, "w-full bg-emerald-600 text-white")}>เอกสารครบ ผ่าน (ส่งต่อบัญชี)</button>
+        <button type="button" onClick={() => { setFinMode("return"); setText(""); setFinItems([]); }} className={cn(btn, "w-full bg-rose-50 border border-rose-200 text-rose-700")}>ข้อมูล / เอกสารไม่ครบ · แจ้งกลับให้แก้</button>
+        <button type="button" disabled={saving} onClick={() => run({ action: "release" })} className={cn(btn, "w-full bg-white border border-slate-200 text-slate-600")}>คืนงาน (ให้ Finance คนอื่นรับ)</button>
+      </div>
+    );
+  }
+  /* ---------- บัญชี ---------- */
+  if (caps.receiveDocs) {
+    blocks.push(
+      <div key="rcv" className="space-y-2 rounded-xl border border-slate-200 p-3">
+        <p className="text-[12px] font-bold text-slate-800">เอกสารตัวจริง · {d.parcel_carrier} {d.parcel_tracking}</p>
+        <p className="text-[11px] text-slate-500">ส่งเมื่อ {dateTh(d.parcel_sent_at, true)}{d.customer_sends_direct ? " · ลูกค้าส่งตรง" : ""}</p>
+        <button type="button" disabled={saving} onClick={() => run({ action: "docs_received" })} className={cn(btn, "w-full bg-slate-900 text-white")}>ได้รับเอกสารตัวจริงแล้ว</button>
+      </div>
+    );
+  }
+  if (role === "accounting" && d.status === "pending_transfer") {
+    const ready = !!d.docs_received_at;
+    blocks.push(
+      <div key="tf" className="space-y-2 rounded-xl border border-slate-200 p-3">
+        <p className="text-[12px] font-bold text-slate-800">โอนเงินคืนลูกค้า · {baht2(d.refund_amount)}</p>
+        <p className="text-[11px] text-slate-600">{d.bank_name} {d.bank_account_no} · {d.bank_account_name}</p>
+        {d.finance_note && <p className="text-[11px] text-indigo-800 bg-indigo-50 rounded-lg p-2">Finance: {d.finance_note}</p>}
+        {!ready && <p className="text-[11px] text-amber-700">ยังไม่ได้รับเอกสารตัวจริง — โอนได้หลังกด &ldquo;ได้รับเอกสารตัวจริงแล้ว&rdquo;</p>}
+        <label className="block text-[11px] font-semibold text-slate-600">วันที่โอนเงินคืน *</label>
+        <input type="date" value={tDate} onChange={(e) => setTDate(e.target.value)} className={inputCls} />
+        {d.refund_type === "wht" && (
+          <div className={cn("rounded-xl border p-3 space-y-1.5", revised.length ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200")}>
+            <div className="flex items-center gap-2">
+              <Icon name={revised.length ? "task" : "upload_file"} className={revised.length ? "text-emerald-600" : "text-slate-400"} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-semibold text-slate-800">ใบเสร็จรับเงิน / ใบกำกับภาษีฉบับแก้ไข (ถ้ามี)</p>
+                <p className="text-[10.5px] text-slate-500">ไม่บังคับ · พนักงานขายเปิดไฟล์ส่งให้ลูกค้าได้</p>
+              </div>
+              <label className={cn(btn, "px-3 py-1.5 text-[11px] bg-slate-900 text-white cursor-pointer", upBusy && "opacity-50")}>
+                {upBusy ? "กำลังอัปโหลด..." : "แนบ"}
+                <input type="file" accept="image/*,application/pdf" className="hidden" disabled={upBusy} onChange={async (e) => {
+                  const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
+                  setUpBusy(true); setErr("");
+                  try { const up = await uploadRefundDoc(file, "revised_receipt", d.id); setRevised((a) => [...a, up]); } catch (x) { setErr(x instanceof Error ? x.message : "อัปโหลดไม่สำเร็จ"); }
+                  setUpBusy(false);
+                }} />
+              </label>
+            </div>
+            {revised.map((f, i) => (
+              <div key={f.path} className="flex items-center gap-2 text-[11.5px] text-emerald-800 pl-8">
+                <Icon name="check_circle" style={{ fontSize: 16 }} /><span className="truncate flex-1">{f.name}</span>
+                <button type="button" onClick={() => setRevised((a) => a.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600" aria-label="ลบ"><Icon name="close" style={{ fontSize: 16 }} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="หมายเหตุ (ถ้ามี)" className={inputCls} />
+        <button type="button" disabled={saving || upBusy || !ready || !tDate} onClick={() => run({ action: "transfer", transferDate: tDate, files: revised, text })} className={cn(btn, "w-full bg-emerald-600 text-white")}>บันทึกวันที่โอน (แจ้งพนักงานขาย · ผู้อนุมัติ · Finance)</button>
+      </div>
+    );
+  }
+  /* ---------- พนักงานขาย: แจ้งลูกค้า ---------- */
+  if (caps.inform) {
+    blocks.push(
+      <div key="inf" className="space-y-2 rounded-xl border-2 border-emerald-300 bg-emerald-50/60 p-3">
+        <p className="text-[12.5px] font-bold text-emerald-900">บัญชีโอนเงินคืนแล้ว วันที่ {dateTh(d.transfer_date)}</p>
+        <p className="text-[11.5px] text-emerald-900">{baht2(d.refund_amount)} เข้าบัญชี {d.bank_name} {d.bank_account_no} · {d.bank_account_name}</p>
+        {d.files.some((f) => f.kind === "revised_receipt") && <p className="text-[11px] text-emerald-900">มีใบเสร็จ / ใบกำกับภาษีฉบับแก้ไขจากบัญชี (ดูในเอกสารแนบ) ส่งให้ลูกค้าได้</p>}
+        <button type="button" disabled={saving} onClick={() => run({ action: "inform" })} className={cn(btn, "w-full bg-[#d32029] text-white")}>แจ้งวันโอนให้ลูกค้าแล้ว (ปิดงาน)</button>
       </div>
     );
   }
@@ -148,9 +263,7 @@ function ActionPanel({ d, caps, role, onDone }: { d: RefundDetail; caps: RefundC
       closed: "ปิดงานแล้ว", rejected: "ไม่ได้รับอนุมัติ (ปิดคำขอ)", cancelled: "ยกเลิกแล้ว",
     };
     blocks.push(<p key="w" className="text-[12px] text-slate-600 bg-slate-50 rounded-xl p-3">{wait[d.status] ?? "-"}</p>);
-    if ((role === "finance" || role === "accounting") && ["pending_finance", "finance_working", "pending_transfer"].includes(d.status)) {
-      blocks.push(<p key="ph3" className="text-[11px] text-slate-400">ปุ่มของ Finance / บัญชี จะเปิดในเฟสถัดไป</p>);
-    }
+
   }
   return (
     <section className={cn(card, "p-4 space-y-2.5 border-[#d32029]/30")}>

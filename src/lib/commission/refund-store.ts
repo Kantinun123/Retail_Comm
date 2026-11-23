@@ -115,14 +115,25 @@ export interface RefundDetail {
   finance: { id: string; name: string; phone: string | null } | null;
   required_docs: DocKind[]; files: RefundFile[]; events: RefundEventRow[];
 }
-export interface RefundCaps { approve: boolean; edit: boolean; parcel: boolean; cancel: boolean }
+export interface RefundCaps {
+  approve: boolean; edit: boolean; parcel: boolean; cancel: boolean;
+  claim: boolean; financeAct: boolean; receiveDocs: boolean; transfer: boolean; inform: boolean;
+}
+/** รายการที่ Finance เลือกตอนแจ้งกลับ (นอกเหนือจากชนิดเอกสาร) — ตรงกับ FINANCE_CHECKS ฝั่ง server */
+export const FINANCE_CHECKS: { key: string; label: string }[] = [
+  { key: "amount", label: "ยอดเงินที่ขอคืนไม่ถูกต้อง / ไม่ตรงกับเอกสาร" },
+  { key: "bank", label: "บัญชีรับเงินคืน (ชื่อ / เลขบัญชี) ไม่ตรงกับ Book bank" },
+  { key: "customer", label: "ข้อมูลลูกค้า / เลขผู้เสียภาษีไม่ถูกต้อง" },
+  { key: "project", label: "เลข Project / SO / ใบเสร็จไม่ถูกต้อง" },
+  { key: "reason", label: "สาเหตุการคืนเงินไม่ชัดเจน" },
+];
 export interface RefundInput {
   refundType: RefundType | ""; jobGroup: JobGroup | ""; projectNo: string; soNo: string; receiptNo: string; projectName: string;
   custType: CustType | ""; custName: string; custTaxId: string; custBranch: string; custPhone: string;
   paidAmount: number; whtBase: number | null; refundAmount: number; cancelDetail: string; reason: string;
   bankName: string; bankAccountNo: string; bankAccountName: string; customerSendsDirect: boolean; approverId?: string;
 }
-export interface UploadedDoc { kind: DocKind; path: string; name: string; size: number; mime: string }
+export interface UploadedDoc { kind: DocKind | "revised_receipt"; path: string; name: string; size: number; mime: string }
 
 export const fetchRefundList = () => getJson<{ role: RefundRole; me: string; enabled: boolean; items: RefundListItem[] }>("/api/refund");
 export const fetchRefundOptions = () => getJson<RefundOptions>("/api/refund/options");
@@ -132,7 +143,7 @@ export const refundAction = (id: number, body: Record<string, unknown>) => post<
 export const refundFileUrl = (id: number, download = false) => `/api/refund/file?id=${id}${download ? "&download=1" : ""}`;
 
 /** อัปโหลดเอกสารตรงเข้า Storage (รูปย่อด้านยาว 2000px ก่อนส่ง ; PDF / HEIC ส่งตามเดิม) */
-export async function uploadRefundDoc(file: File, kind: DocKind, requestId?: number): Promise<UploadedDoc> {
+export async function uploadRefundDoc(file: File, kind: DocKind | "revised_receipt", requestId?: number): Promise<UploadedDoc> {
   let blob: Blob = file;
   let name = file.name;
   let mime = file.type || "application/octet-stream";

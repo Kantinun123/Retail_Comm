@@ -3,7 +3,7 @@ import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import { actorName, dueAfterBusinessDays, loadHolidays } from "@/lib/server/boq";
 import {
-  DOC_KINDS, REFUND_BUCKET, SLA, TYPE_LABEL, addRefundEvent, autoApprover, canSeeBank, canViewRefund, notifyRefund, refundCaps, refundRoleOf, requiredDocs, validateRefund,
+  DOC_KINDS, FINANCE_CHECKS, REFUND_BUCKET, SLA, TYPE_LABEL, addRefundEvent, autoApprover, canSeeBank, canViewRefund, notifyRefund, refundCaps, refundRoleOf, requiredDocs, validateRefund,
   type RefundInput, type RefundRow,
 } from "@/lib/server/refund";
 
@@ -56,7 +56,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   });
 }
 
-type ActionBody = { action?: string; text?: string; carrier?: string; tracking?: string; data?: RefundInput; files?: { kind?: string; path?: string; name?: string; size?: number; mime?: string }[] };
+type ActionBody = { action?: string; text?: string; carrier?: string; tracking?: string; items?: string[]; transferDate?: string; data?: RefundInput; files?: { kind?: string; path?: string; name?: string; size?: number; mime?: string }[] };
 
 export async function POST(req: Request, { params }: Ctx) {
   const ctx = await getAuthContext();
@@ -146,6 +146,84 @@ export async function POST(req: Request, { params }: Ctx) {
         const by = r.customer_sends_direct ? "ลูกค้าส่งเอกสารตรงให้บัญชี" : r.parcel_tracking ? "ส่งเอกสารตัวจริงใหม่" : "ส่งเอกสารตัวจริง";
         await addRefundEvent(sb, id, ctx, name, "parcel", `${by} ${carrier} ${tracking}`);
         await notifyRefund(sb, r, "parcel", `${carrier} ${tracking}`);
+        break;
+      }
+      /* ---------- Finance ---------- */
+      case "claim": {
+        if (!caps.claim) return forbid();
+        // รับงานแบบ atomic: คนแรกที่กดได้งาน
+        const { data, error } = await sb.from("refund_requests")
+          .update({ status: "finance_working", finance_id: ctx.userId, finance_claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq("id", id).eq("status", "pending_finance").is("finance_id", null).select("id");
+        if (error) return bad(error.message, 500);
+        if (!(data ?? []).length) return bad("มี Finance คนอื่นรับงานนี้แล้ว", 409);
+        await addRefundEvent(sb, id, ctx, name, "claimed", "รับงาน (Finance)");
+        await notifyRefund(sb, await fresh(), "claimed");
+        break;
+      }
+      case "release": {
+        if (!caps.financeAct) return forbid();
+        if (!(await update({ status: "pending_finance", finance_id: null, finance_claimed_at: null }, ["finance_working"]))) return forbid();
+        await addRefundEvent(sb, id, ctx, name, "released", `คืนงาน (ให้ Finance คนอื่นรับ)${text ? ` · ${text}` : ""}`);
+        await notifyRefund(sb, r, "released");
+        break;
+      }
+      case "finance_pass": {
+        if (!caps.financeAct) return forbid();
+        const due = dueAfterBusinessDays(new Date(), SLA.accounting, await loadHolidays(sb)).toISOString();
+        if (!(await update({ status: "pending_transfer", finance_done_at: new Date().toISOString(), finance_note: text || null, due_at: due }, ["finance_working"]))) return forbid();
+        await addRefundEvent(sb, id, ctx, name, "finance_pass", `ตรวจแล้ว เอกสารครบ · ดำเนินการในระบบแล้ว${text ? ` · ${text}` : ""}`, "ok");
+        await notifyRefund(sb, await fresh(), "finance_pass");
+        break;
+      }
+      case "finance_return": {
+        if (!caps.financeAct) return forbid();
+        if (!text) return bad("กรุณาอธิบายสิ่งที่ต้องแก้");
+        const allowed = new Set<string>([...DOC_KINDS, ...Object.keys(FINANCE_CHECKS)]);
+        const items = [...new Set((b.items ?? []).filter((k) => allowed.has(k)))].slice(0, 20);
+        // ระหว่างรอทีมขายแก้ ไม่นับ SLA ของ Finance (due_at = null) ; finance_id คงไว้ งานกลับมาที่คนเดิม
+        if (!(await update({ status: "finance_returned", finance_issue: { items, text, at: new Date().toISOString() }, due_at: null }, ["finance_working"]))) return forbid();
+        await addRefundEvent(sb, id, ctx, name, "finance_return", `แจ้งกลับให้แก้ไข: ${text}`, "warn", { items });
+        await notifyRefund(sb, r, "finance_return", text);
+        break;
+      }
+      /* ---------- บัญชี ---------- */
+      case "docs_received": {
+        if (!caps.receiveDocs) return forbid();
+        const { error } = await sb.from("refund_requests").update({ docs_received_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", id).is("docs_received_at", null);
+        if (error) return bad(error.message, 500);
+        await addRefundEvent(sb, id, ctx, name, "docs_received", `ได้รับเอกสารตัวจริงแล้ว${text ? ` · ${text}` : ""}`, "ok");
+        await notifyRefund(sb, r, "docs_received");
+        break;
+      }
+      case "transfer": {
+        if (!caps.transfer) return forbid();
+        const day = String(b.transferDate ?? "");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return bad("กรุณาใส่วันที่โอนเงิน");
+        // ใบเสร็จ / ใบกำกับภาษีฉบับแก้ไข (เฉพาะคืนภาษีหัก ณ ที่จ่าย, ไม่บังคับ)
+        const files = r.refund_type === "wht" ? (b.files ?? []).slice(0, 5).filter((f) => f.kind === "revised_receipt" && typeof f.path === "string" && f.path.startsWith(`tmp/${ctx.userId}/`) && !f.path.includes("..")) : [];
+        const rows = [];
+        for (const f of files) {
+          const dest = `req/${id}/r${r.round}/revised_receipt/${f.path!.split("/").pop()}`;
+          const { error: mErr } = await sb.storage.from(REFUND_BUCKET).move(f.path!, dest);
+          if (mErr) return bad(`ไฟล์ ${f.name ?? ""} อัปโหลดไม่สำเร็จ ลองแนบใหม่`, 500);
+          rows.push({ request_id: id, kind: "revised_receipt", round: r.round, path: dest, name: String(f.name ?? "file").slice(0, 200), size: Number(f.size) || null, mime: String(f.mime ?? "").slice(0, 100) || null, uploaded_by: ctx.userId });
+        }
+        if (rows.length) {
+          const { error: fErr } = await sb.from("refund_files").insert(rows);
+          if (fErr) return bad(fErr.message, 500);
+        }
+        if (!(await update({ status: "transferred", transfer_date: day, due_at: null }, ["pending_transfer"]))) return forbid();
+        const th = new Date(`${day}T00:00:00`).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+        await addRefundEvent(sb, id, ctx, name, "transferred", `โอนเงินคืนแล้ว วันที่ ${th}${rows.length ? " · แนบใบเสร็จ / ใบกำกับภาษีฉบับแก้ไข" : ""}${text ? ` · ${text}` : ""}`, "ok");
+        await notifyRefund(sb, r, "transferred", th);
+        break;
+      }
+      case "inform": {
+        if (!caps.inform) return forbid();
+        const now = new Date().toISOString();
+        if (!(await update({ status: "closed", customer_informed_at: now, closed_at: now }, ["transferred"]))) return forbid();
+        await addRefundEvent(sb, id, ctx, name, "closed", `แจ้งวันโอนให้ลูกค้าแล้ว · ปิดงาน${text ? ` · ${text}` : ""}`, "ok");
         break;
       }
       case "cancel": {

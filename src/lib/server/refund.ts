@@ -59,11 +59,28 @@ export function canSeeBank(ctx: AuthContext, r: RefundRow): boolean {
   const role = refundRoleOf(ctx);
   return role === "admin" || role === "finance" || role === "accounting" || r.requester_id === ctx.userId || r.approver_id === ctx.userId;
 }
-export interface RefundCaps { approve: boolean; edit: boolean; parcel: boolean; cancel: boolean }
+/** รายการที่ Finance เลือกได้ตอนแจ้งกลับ (นอกเหนือจากชนิดเอกสาร) */
+export const FINANCE_CHECKS: Record<string, string> = {
+  amount: "ยอดเงินที่ขอคืนไม่ถูกต้อง / ไม่ตรงกับเอกสาร",
+  bank: "บัญชีรับเงินคืน (ชื่อ / เลขบัญชี) ไม่ตรงกับ Book bank",
+  customer: "ข้อมูลลูกค้า / เลขผู้เสียภาษีไม่ถูกต้อง",
+  project: "เลข Project / SO / ใบเสร็จไม่ถูกต้อง",
+  reason: "สาเหตุการคืนเงินไม่ชัดเจน",
+};
+export interface RefundCaps {
+  approve: boolean; edit: boolean; parcel: boolean; cancel: boolean;
+  claim: boolean; financeAct: boolean; receiveDocs: boolean; transfer: boolean; inform: boolean;
+}
 export function refundCaps(ctx: AuthContext, r: RefundRow): RefundCaps {
   const mine = r.requester_id === ctx.userId;
   const closed = ["closed", "rejected", "cancelled"].includes(r.status);
+  const role = refundRoleOf(ctx);
   return {
+    claim: role === "finance" && r.status === "pending_finance" && !r.finance_id,
+    financeAct: role === "finance" && r.status === "finance_working" && r.finance_id === ctx.userId,
+    receiveDocs: role === "accounting" && !!r.parcel_tracking && !r.docs_received_at && !closed,
+    transfer: role === "accounting" && r.status === "pending_transfer" && !!r.docs_received_at,
+    inform: mine && r.status === "transferred",
     approve: r.status === "pending_approval" && r.approver_id === ctx.userId,
     edit: mine && (r.status === "returned" || r.status === "finance_returned"),
     // ใส่ / เปลี่ยนเลขพัสดุได้จนกว่าบัญชีได้รับเอกสาร (ถ้า Finance แจ้งแก้ ส่งพัสดุใหม่ได้)
@@ -164,7 +181,7 @@ export async function roleIds(sb: Sb, role: string, isTest: boolean): Promise<st
   const { data } = await sb.from("profiles").select("id").eq("role", role).eq("status", "approved").eq("is_test", isTest);
   return (data ?? []).map((r) => r.id as string);
 }
-export type RefundEvent = "new" | "approved" | "returned" | "rejected" | "resubmitted" | "parcel" | "cancelled";
+export type RefundEvent = "new" | "approved" | "returned" | "rejected" | "resubmitted" | "parcel" | "cancelled" | "claimed" | "released" | "finance_pass" | "finance_return" | "docs_received" | "transferred";
 export async function notifyRefund(sb: Sb, r: RefundRow, event: RefundEvent, extra?: string) {
   const who = `${r.req_no} · ${r.cust_name} · ฿${Number(r.refund_amount).toLocaleString("th-TH")}`;
   const url = `/app/refund/${r.id}`;
@@ -185,5 +202,17 @@ export async function notifyRefund(sb: Sb, r: RefundRow, event: RefundEvent, ext
       return safePush(sb, await roleIds(sb, "accounting", r.is_test), "มีเอกสารตัวจริงส่งมา (คำขอคืนเงิน)", `${who} — ${extra ?? ""}`, url);
     case "cancelled":
       return safePush(sb, [r.approver_id, r.finance_id], "คำขอคืนเงินถูกยกเลิก", who, url);
+    case "claimed":
+      return safePush(sb, [r.requester_id], "Finance รับงานคำขอคืนเงินแล้ว", who, url);
+    case "released":
+      return safePush(sb, (await roleIds(sb, "finance", r.is_test)).filter((x) => x !== r.finance_id), "มีคำขอคืนเงินถูกคืนงาน · รอ Finance รับ", who, url);
+    case "finance_pass":
+      return safePush(sb, [...(await roleIds(sb, "accounting", r.is_test)), r.requester_id], "Finance ตรวจผ่านแล้ว · รอบัญชีโอนเงิน", who, url);
+    case "finance_return":
+      return safePush(sb, [r.requester_id], "Finance แจ้งให้แก้ไขคำขอคืนเงิน", `${who} — ${extra ?? "กรุณาแก้ไข"}`, url);
+    case "docs_received":
+      return safePush(sb, [r.requester_id], "บัญชีได้รับเอกสารตัวจริงแล้ว", who, url);
+    case "transferred":
+      return safePush(sb, [r.requester_id, r.approver_id, r.finance_id], "โอนเงินคืนลูกค้าแล้ว", `${who} — วันที่โอน ${extra ?? ""} · กรุณาแจ้งลูกค้า`, url);
   }
 }
