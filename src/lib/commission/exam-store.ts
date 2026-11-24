@@ -146,3 +146,41 @@ export function deadlineText(daysLeft: number): string {
   if (daysLeft === 0) return "ครบกำหนดวันนี้";
   return `เหลืออีก ${daysLeft} วัน`;
 }
+
+/* ---------- อันดับคนสอบครบเร็วที่สุด (admin) ---------- */
+export interface RankingRow {
+  repCode: string;
+  name: string;
+  nickname: string | null;
+  dealerCode: string;
+  dealerName: string;
+  level: string | null;
+  firstStartAt: string;
+  finishedAt: string;
+  elapsedSec: number;
+  attempts: number;
+  passes: number;
+}
+export interface ExamRanking {
+  rounds: { id: number; title: string; startsOn: string; deadlineOn: string; status: "open" | "closed" }[];
+  round: { id: number; title: string; startsOn: string; deadlineOn: string; status: "open" | "closed" } | null;
+  topicCount: number;
+  rows: RankingRow[];
+  summary: { total: number; completed: number };
+}
+export const fetchExamRanking = (roundId?: number | null, includeTest = false) =>
+  call<ExamRanking>(`/api/exam/ranking?${roundId ? `roundId=${roundId}&` : ""}${includeTest ? "includeTest=1" : ""}`);
+
+/** วินาที -> "12 ชม. 03 นาที 07 วินาที" (ชั่วโมงไม่ตัดเป็นวัน เพื่อเทียบกันตรง ๆ) */
+export function fmtDuration(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return `${h} ชม. ${String(m).padStart(2, "0")} นาที ${String(s).padStart(2, "0")} วินาที`;
+}
+/** ISO -> "24 พ.ย. 69 09:41:07" เวลาไทย */
+export function fmtDateTimeTh(iso: string): string {
+  const d = new Date(new Date(iso).getTime() + 7 * 3600_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCDate()} ${TH_MONTH[d.getUTCMonth()]} ${p((d.getUTCFullYear() + 543) % 100)} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+}

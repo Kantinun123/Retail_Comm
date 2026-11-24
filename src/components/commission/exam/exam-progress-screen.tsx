@@ -324,6 +324,16 @@ export function ExamProgressScreen() {
               <Tile n={s.notStarted} label="ยังไม่เริ่ม" tone="bg-slate-100 text-slate-700" />
             </div>
             <p className="text-[11.5px] text-slate-500 px-1">รวมสอบ {s.totalAttempts} ครั้ง · สอบผ่าน {s.totalPasses} ครั้ง</p>
+            {data?.role === "admin" && (
+              <Link href="/app/exam/ranking" className="rounded-2xl bg-gradient-to-br from-[#8f1114] to-[#d32029] text-white p-3.5 flex items-center gap-3 shadow-sm active:scale-[0.99] transition">
+                <Icon name="emoji_events" className="text-amber-300" fill style={{ fontSize: 26 }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13.5px] font-bold leading-snug">Top Rank สอบครบเร็วที่สุด</p>
+                  <p className="text-[10.5px] text-white/80">ดูผู้ที่ผ่านครบทุกหัวข้อและใช้เวลาน้อยที่สุด เพื่อแจกรางวัล</p>
+                </div>
+                <Icon name="chevron_right" style={{ fontSize: 20 }} />
+              </Link>
+            )}
 
             <Chips options={FILTERS} value={filter} onChange={setFilter} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อ / ร้าน" className={inputCls} />

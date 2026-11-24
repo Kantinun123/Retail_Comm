@@ -109,3 +109,37 @@ grant execute on function public.exam_progress(int, boolean) to service_role;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('exam-images', 'exam-images', true, 5242880, array['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
 on conflict (id) do nothing;
+
+-- อันดับคนสอบครบเร็วที่สุด (หน้า /app/exam/ranking, admin) : เวลาเริ่มสอบครั้งแรก + เวลาที่ผ่านแต่ละหัวข้อครั้งแรก
+create or replace function public.exam_ranking(p_round int, p_include_test boolean default false)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with a as (
+    select * from exam_attempts where round_id = p_round and (p_include_test or not is_test)
+  ),
+  per_rep as (
+    select rep_code,
+      min(started_at) as first_start,
+      (count(*) filter (where status = 'submitted'))::int as attempts,
+      (count(*) filter (where status = 'submitted' and passed))::int as passes
+    from a group by rep_code
+  ),
+  per_topic as (
+    select rep_code, topic_id, min(submitted_at) filter (where passed) as pass_at
+    from a where status = 'submitted' group by rep_code, topic_id
+  ),
+  tp as (
+    select rep_code, coalesce(jsonb_agg(jsonb_build_object('topic_id', topic_id, 'pass_at', pass_at)) filter (where pass_at is not null), '[]'::jsonb) as topics
+    from per_topic group by rep_code
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'rep_code', r.rep_code, 'first_start', r.first_start, 'attempts', r.attempts, 'passes', r.passes,
+    'topics', coalesce(t.topics, '[]'::jsonb))), '[]'::jsonb)
+  from per_rep r left join tp t using (rep_code)
+$$;
+revoke all on function public.exam_ranking(int, boolean) from public, anon, authenticated;
+grant execute on function public.exam_ranking(int, boolean) to service_role;
