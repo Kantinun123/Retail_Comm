@@ -153,7 +153,7 @@ export const planTotals = (steps: StepDef[]) => {
 export type ShopType = "GT" | "MT";
 export interface Intake {
   email?: string; ctype: string; fam?: string;
-  requestDate: string; shop?: string; shopType?: ShopType;
+  requestDate: string; shop?: string; shopCode?: string; shopType?: ShopType;
   btype: string; bchar: string; district: string; loc?: string; sea: string; terr: string[];
   warrSame: boolean; warrName?: string;
   refJob?: string; svc: string[]; pkgType: "total" | "standard"; pkg: string; det: Cat[]; round: "all" | "top" | "bottom";
@@ -203,6 +203,18 @@ export const CAT_ORDER: Cat[] = ["ase", "truss", "tile", "fascia"];
 export const segmentOfCtype = (ctype: string): Segment => (ctype === "HBD" ? "hbd" : "general");
 /** ประเภทงานที่ใช้เลือกแม่แบบ PT: เลือกอะเส = อะเส+ทรัส+มุง · เลือกโครงหลังคา = ทรัส+มุง · นอกนั้นมุงอย่างเดียว */
 export const workOfDet = (det: Cat[]): Work => (det.includes("ase") ? "ase" : det.includes("truss") ? "truss" : "roof");
+/** ข้อมูลที่ยังขาดในใบเปิดงาน (ตามต้นแบบ: Step 4 ต้องมีบริการ/หมวดส่งถอดแบบ/max truss/Roof condition/ทรงหลังคา/องศา, Step 5 ต้องมีไฟล์แนบ) */
+export function missingOf(i: Intake): { s4: string[]; s5: boolean; any: boolean } {
+  const s4: string[] = [];
+  if (!i.svc.length) s4.push("บริการ");
+  if (!i.det.length) s4.push("หมวดส่งถอดแบบ");
+  if (i.det.includes("truss") && !i.truss) s4.push("ระยะ max truss");
+  if (!i.rc) s4.push("Roof condition");
+  if (!i.shape) s4.push("ทรงหลังคา");
+  if (!i.deg) s4.push("องศา");
+  const s5 = i.files.length === 0;
+  return { s4, s5, any: s4.length > 0 || s5 };
+}
 /** ใบเปิดงานตัวอย่างของงานในข้อมูลตั้งต้น */
 export function sampleIntake(s: { province: string; segment: Segment; work: Work; requestDate: string }): Intake {
   const det = catsOf(s.work);
@@ -306,6 +318,7 @@ export function packetsOf(j: Job): Packet[] {
 }
 
 /* ---------- ตัวช่วยแสดงผล ---------- */
+export const valueText = (j: { value: number }) => (j.value > 0 ? baht(j.value) : "ยังไม่ประเมิน");
 export const baht = (n: number) => `฿${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 export const dateTh = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: TZ }) : "-");
 export const timeTh = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: TZ }) : "-");
@@ -357,7 +370,7 @@ export function seedLeads(): Lead[] {
 
 interface Spec {
   id: string; customer: string; phone: string; province: string; segment: Segment; work: Work; value: number; quote1Value?: number;
-  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string; model?: Model;
+  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string; model?: Model; draft?: boolean;
 }
 function mk(sp: Spec): Job {
   const job: Job = {
@@ -365,7 +378,9 @@ function mk(sp: Spec): Job {
     value: sp.value, quote1Value: sp.quote1Value, model: sp.model ?? "he", owner: sp.owner ?? "ฝน", startedAt: subWd(sp.daysIn), done: {}, scm: sp.scm ?? {},
     lastTouchAt: hAgo(sp.touchH ?? 6), log: [],
   };
-  job.intake = sampleIntake({ province: sp.province, segment: sp.segment, work: sp.work, requestDate: dayKey(job.startedAt) });
+  const intake = sampleIntake({ province: sp.province, segment: sp.segment, work: sp.work, requestDate: dayKey(job.startedAt) });
+  if (sp.draft) { intake.files = []; intake.shape = undefined; intake.deg = undefined; }
+  job.intake = intake;
   if (sp.cancel) { job.cancelReason = sp.cancel; }
   const steps = stepsOf(job);
   for (const s of steps) {
@@ -384,7 +399,7 @@ function mk(sp: Spec): Job {
 
 export function seedJobs(): Job[] {
   return [
-    mk({ id: "J-2611-0113", customer: "คุณสมศักดิ์ ใจเย็น", phone: "081-555-0113", province: "สงขลา", segment: "general", work: "truss", value: 486000, at: "ase_mark", daysIn: 4, touchH: 30 }),
+    mk({ id: "J-2611-0113", customer: "คุณสมศักดิ์ ใจเย็น", phone: "081-555-0113", province: "สงขลา", segment: "general", work: "truss", value: 486000, at: "ase_mark", daysIn: 4, touchH: 30, draft: true }),
     mk({ id: "J-2611-0101", customer: "คุณจันทร์เพ็ญ สายสุด", phone: "089-555-0101", province: "ขอนแก่น", segment: "general", work: "roof", value: 168000, at: "quote1", daysIn: 2, touchH: 20 }),
     mk({ id: "J-2611-0102", customer: "คุณรัตนา พรหมมา", phone: "062-555-0102", province: "สงขลา", segment: "general", work: "roof", value: 245000, quote1Value: 245000, at: "deposit", daysIn: 6, touchH: 100, model: "scg" }),
     mk({ id: "J-2611-0114", customer: "คุณธีรพงษ์ มั่นคง", phone: "085-555-0114", province: "นครปฐม", segment: "hbd", work: "roof", value: 212000, at: "quote1", daysIn: 1, touchH: 20 }),
@@ -407,14 +422,14 @@ export function seedJobs(): Job[] {
 }
 
 /* ---------- น้องเลขา: สร้างงานจากกฎ ---------- */
-export type TaskKind = "lead_sla" | "lead_followup" | "lead_convert" | "se_step" | "deposit_chase" | "close_chase" | "survey_today" | "follow_party" | "scm_status";
+export type TaskKind = "lead_sla" | "lead_followup" | "lead_convert" | "se_step" | "deposit_chase" | "close_chase" | "survey_today" | "follow_party" | "scm_status" | "intake_missing";
 export interface Task {
   id: string; kind: TaskKind; priority: 1 | 2 | 3; title: string; who: string; reason: string; action: string;
   ref: { type: "lead" | "job"; id: string }; draft?: string; value?: number; phone?: string; party?: Party;
 }
 export const TASK_ICON: Record<TaskKind, string> = {
   lead_sla: "call", lead_followup: "forum", lead_convert: "rocket_launch", se_step: "task_alt", deposit_chase: "payments", close_chase: "account_balance_wallet",
-  survey_today: "pin_drop", follow_party: "support_agent", scm_status: "inventory_2",
+  survey_today: "pin_drop", follow_party: "support_agent", scm_status: "inventory_2", intake_missing: "assignment_late",
 };
 
 export function buildTasks(leads: Lead[], jobs: Job[]): Task[] {
@@ -452,6 +467,10 @@ export function buildTasks(leads: Lead[], jobs: Job[]): Task[] {
     const ref = { type: "job" as const, id: j.id };
     const base = { who: j.customer, phone: j.phone, value: j.value, ref };
     const fn = first(j.customer);
+    const miss = j.intake ? missingOf(j.intake) : null;
+    if (miss?.any) {
+      out.push({ ...base, id: `t-${j.id}-im`, kind: "intake_missing", priority: 2, title: `ใบเปิดงานยังไม่ครบ · ${j.customer}`, reason: `ขาด: ${[...miss.s4, ...(miss.s5 ? ["เอกสารแนบ"] : [])].join(", ")}`, action: "กรอกใบเปิดงาน" });
+    }
 
     if (cur.owner === "SE") {
       if (cur.key === "deposit" && (idle > 48 || late > 0)) {

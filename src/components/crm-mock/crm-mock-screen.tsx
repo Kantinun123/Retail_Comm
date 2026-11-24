@@ -1,15 +1,15 @@
 "use client";
 /* Mock: CRM ทีมขาย — Lead -> Opp -> ปิดขาย + ติดตามหน่วยงาน KIM / SCM / ห้องแบบ ตาม Project Timeline งาน Roof Installation
    ข้อมูลสมมติในหน่วยความจำเท่านั้น — รีเฟรชแล้วกลับค่าเริ่มต้น ; การเชื่อมกับแอปหน่วยงานอื่นเป็นการจำลอง */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { NOW, PARTY, addWd, buildTasks, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { ChatDrawer } from "./crm-chat";
 import { JobDrawer, type ScmEvent } from "./crm-job-drawer";
-import { NewJobDrawer, type NewJobInput } from "./crm-new-opp";
+import { NewOppPage, type NewJobInput } from "./crm-new-opp";
 import { BoardView, ExchangeView } from "./crm-board";
 import { HomeView } from "./crm-home";
 import { LeadsView, type Ctx, type View } from "./crm-views";
@@ -21,6 +21,8 @@ const NAV: { key: View; label: string; icon: string }[] = [
   { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
   { key: "exchange", label: "เชื่อมข้อมูล", icon: "sync_alt" },
 ];
+
+type OppState = { lead: Lead | null; editId: string | null; step: 1 | 4 | 5 };
 
 function completeStep(j: Job, key: StepKey, extra?: { surveyAt?: string }): Job {
   const now = NOW.toISOString();
@@ -39,7 +41,14 @@ export function CrmMockScreen() {
   const [leadId, setLeadId] = useState<string | null>(sp.get("lead"));
   const [jobId, setJobId] = useState<string | null>(sp.get("job"));
   const [chat, setChat] = useState(sp.get("chat") === "1");
-  const [newJob, setNewJob] = useState<{ open: boolean; lead: Lead | null }>({ open: sp.get("new") === "1", lead: null });
+  const [opp, setOpp] = useState<OppState | null>(() => {
+    const st = Number(sp.get("step"));
+    const step = (st === 4 ? 4 : st === 5 ? 5 : 1) as 1 | 4 | 5;
+    if (sp.get("edit")) return { lead: null, editId: sp.get("edit"), step };
+    return sp.get("new") === "1" ? { lead: null, editId: null, step } : null;
+  });
+  const dirtyRef = useRef(false);
+  const onDirty = useCallback((d: boolean) => { dirtyRef.current = d; }, []);
   const [toastMsg, setToastMsg] = useState("");
 
   useEffect(() => {
@@ -54,29 +63,58 @@ export function CrmMockScreen() {
   const job = jobs.find((j) => j.id === jobId) ?? null;
   const patchJob = (id: string, fn: (j: Job) => Job) => setJobs((all) => all.map((j) => (j.id === id ? fn(j) : j)));
 
-  const openTask = (t: Task) => { setChat(false); if (t.ref.type === "lead") setLeadId(t.ref.id); else setJobId(t.ref.id); };
+  const goView = (v: View) => {
+    if (opp && dirtyRef.current && !window.confirm("ข้อมูลที่กรอกไว้ยังไม่ได้บันทึก ต้องการออกจากหน้านี้ไหม?")) return;
+    dirtyRef.current = false;
+    setOpp(null);
+    setView(v);
+  };
+  const isActive = (k: View) => !opp && view === k;
 
-  const ctx: Ctx = {
-    leads, jobs, tasks, toast: setToastMsg, go: setView,
-    openLead: setLeadId, openJob: setJobId, openTask, ask: () => setChat(true),
-    newJob: () => setNewJob({ open: true, lead: null }),
+  const openTask = (t: Task) => {
+    setChat(false);
+    if (t.kind === "intake_missing") {
+      const j = jobs.find((x) => x.id === t.ref.id);
+      const m = j?.intake ? missingOf(j.intake) : null;
+      setJobId(null);
+      setOpp({ lead: null, editId: t.ref.id, step: m && m.s4.length === 0 && m.s5 ? 5 : 4 });
+    } else if (t.ref.type === "lead") setLeadId(t.ref.id);
+    else setJobId(t.ref.id);
   };
 
-  const create = (i: NewJobInput) => {
-    const id = `J-2611-${String(101 + jobs.length).padStart(4, "0")}`;
+  const ctx: Ctx = {
+    leads, jobs, tasks, toast: setToastMsg, go: goView,
+    openLead: setLeadId, openJob: setJobId, openTask, ask: () => setChat(true),
+    newJob: () => setOpp({ lead: null, editId: null, step: 1 }),
+  };
+
+  const save = (i: NewJobInput, draft: boolean, editId: string | null) => {
     const now = NOW.toISOString();
+    if (editId) {
+      patchJob(editId, (j) => ({
+        ...j, customer: i.customer, phone: i.phone, province: i.province, segment: i.segment, work: i.work, model: i.model, value: i.value, owner: i.owner,
+        intake: i.intake, lastTouchAt: now, log: [...j.log, { at: now, text: "แก้ไขใบเปิดงาน" }],
+      }));
+      dirtyRef.current = false;
+      setOpp(null);
+      setJobId(editId);
+      setToastMsg("บันทึกการแก้ไขใบเปิดงานแล้ว");
+      return;
+    }
+    const id = `J-2611-${String(101 + jobs.length).padStart(4, "0")}`;
     const created: Job = {
       id, opsId: id.replace("J-", "OP-"), leadId: i.leadId, customer: i.customer, phone: i.phone, province: i.province, segment: i.segment, work: i.work,
       value: i.value, model: i.model, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, intake: i.intake, lastTouchAt: now,
-      log: [{ at: now, text: i.leadId ? `เปิด Opp จาก Lead ${i.leadId} และรับแบบจากลูกค้า` : "เปิด Opp และรับแบบจากลูกค้า" }],
+      log: [{ at: now, text: (i.leadId ? `เปิด Opp จาก Lead ${i.leadId} และรับแบบจากลูกค้า` : "เปิด Opp และรับแบบจากลูกค้า") + (draft ? " (บันทึกร่าง)" : "") }],
     };
     setJobs((all) => [created, ...all]);
     if (i.leadId) setLeads((all) => all.map((l) => (l.id === i.leadId ? { ...l, status: "converted" } : l)));
-    setNewJob({ open: false, lead: null });
+    dirtyRef.current = false;
+    setOpp(null);
     setLeadId(null);
     setView("board");
     setJobId(id);
-    setToastMsg(`เปิด Opp ${id} แล้ว${i.work !== "roof" ? " และส่งข้อมูลให้ห้องแบบ" : ""}`);
+    setToastMsg(draft ? `บันทึกร่าง Opp ${id} แล้ว ใบเปิดงานยังไม่ครบ กลับมาแก้ได้ที่หน้ารายละเอียดงาน` : `เปิด Opp ${id} แล้ว${i.work !== "roof" ? " และส่งข้อมูลให้ห้องแบบ" : ""}`);
   };
 
   return (
@@ -101,12 +139,12 @@ export function CrmMockScreen() {
         </div>
         <nav className="space-y-1">
           {NAV.map((n) => (
-            <button key={n.key} onClick={() => setView(n.key)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition", view === n.key ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "text-slate-600 hover:bg-indigo-50")}>
-              <Icon name={n.icon} fill={view === n.key} />{n.label}
-              {n.key === "home" && urgent > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", view === n.key ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{urgent}</span>}
+            <button key={n.key} onClick={() => goView(n.key)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition", isActive(n.key) ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "text-slate-600 hover:bg-indigo-50")}>
+              <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
+              {n.key === "home" && urgent > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{urgent}</span>}
             </button>
           ))}
-          <button onClick={() => setNewJob({ open: true, lead: null })} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold text-slate-600 transition hover:bg-indigo-50"><Icon name="add_circle" />เปิด Opp ใหม่</button>
+          <button onClick={() => { setLeadId(null); setOpp({ lead: null, editId: null, step: 1 }); }} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition", opp && !opp.editId ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "text-slate-600 hover:bg-indigo-50")}><Icon name="add_circle" fill={!!opp && !opp.editId} />เปิด Opp ใหม่</button>
         </nav>
         <div className="mt-6 space-y-1.5 px-2">
           <div className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">หน่วยงานที่เชื่อมต่อ</div>
@@ -125,17 +163,25 @@ export function CrmMockScreen() {
 
       <main className="relative z-10 px-4 pb-28 pt-5 md:px-8 lg:ml-64 lg:pb-10">
         <div className="mx-auto max-w-[1400px]">
-          {view === "home" && <HomeView c={ctx} />}
-          {view === "leads" && <LeadsView c={ctx} />}
-          {view === "board" && <BoardView c={ctx} />}
-          {view === "exchange" && <ExchangeView c={ctx} />}
+          {opp ? (
+            <NewOppPage key={`${opp.editId ?? "new"}-${opp.lead?.id ?? ""}`} lead={opp.lead} editJob={opp.editId ? jobs.find((j) => j.id === opp.editId) ?? null : null} jobs={jobs}
+              initialStep={opp.step} onDirty={onDirty} toast={setToastMsg} onSave={save}
+              onCancel={() => { dirtyRef.current = false; setOpp(null); }} />
+          ) : (
+            <>
+              {view === "home" && <HomeView c={ctx} />}
+              {view === "leads" && <LeadsView c={ctx} />}
+              {view === "board" && <BoardView c={ctx} />}
+              {view === "exchange" && <ExchangeView c={ctx} />}
+            </>
+          )}
         </div>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/70 bg-white/90 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-xl lg:hidden">
         {NAV.map((n) => (
-          <button key={n.key} onClick={() => setView(n.key)} className={cn("flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold", view === n.key ? "text-indigo-600" : "text-slate-400")}>
-            <Icon name={n.icon} fill={view === n.key} />{n.label}
+          <button key={n.key} onClick={() => goView(n.key)} className={cn("flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
+            <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
           </button>
         ))}
         <button onClick={() => setChat(true)} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold text-violet-600"><Icon name="auto_awesome" />น้องเลขา</button>
@@ -143,8 +189,9 @@ export function CrmMockScreen() {
 
       <LeadDrawer lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
         onPatch={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))}
-        onConvert={(l) => setNewJob({ open: true, lead: l })} />
+        onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} />
       <JobDrawer job={job} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
+        onEditIntake={(id) => { setJobId(null); setOpp({ lead: null, editId: id, step: 1 }); }}
         onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))}
         onRevise={(id, cats) => patchJob(id, (j) => ({ ...j, revise: cats, log: [...j.log, { at: NOW.toISOString(), text: "ทีมขายปรับหมวดที่ต้องถอดแบบใหม่หลังสำรวจ (Revise)" }] }))}
         onScm={(id, ev: ScmEvent) => patchJob(id, (j) => {
@@ -154,7 +201,6 @@ export function CrmMockScreen() {
             : { ...j, scm: { ...j.scm, readyEta: addWd(now, 7) }, lastTouchAt: now, log: [...j.log, { at: now, text: "SCM แจ้ง: คาดว่าสินค้าครบภายใน 7 วันทำการ" }] };
         })}
         onCancel={(id, reason) => { patchJob(id, (j) => ({ ...j, cancelReason: reason, lastTouchAt: NOW.toISOString(), log: [...j.log, { at: NOW.toISOString(), text: `ยกเลิกงาน: ${reason}` }] })); setToastMsg("ยกเลิกงานแล้ว"); }} />
-      <NewJobDrawer open={newJob.open} lead={newJob.lead} jobs={jobs} toast={setToastMsg} onClose={() => setNewJob({ open: false, lead: null })} onCreate={create} />
       <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} toast={setToastMsg} />
 
       <div className={cn("pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-5 py-2.5 text-[12.5px] font-medium text-white shadow-xl transition-all duration-300 lg:bottom-8", toastMsg ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>

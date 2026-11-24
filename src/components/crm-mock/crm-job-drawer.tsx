@@ -3,26 +3,28 @@ import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task,
+  CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
 import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type ScmEvent = "ordered" | "eta";
 
-export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, toast }: {
+export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, onEditIntake, toast }: {
+  onEditIntake: (id: string) => void;
   job: Job | null; tasks: Task[]; onClose: () => void; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void;
   onRevise: (id: string, cats: Cat[]) => void;
   onScm: (id: string, ev: ScmEvent) => void; onCancel: (id: string, reason: string) => void; toast: (m: string) => void;
 }) {
   return (
     <Drawer open={!!job} onClose={onClose} wide title={job?.customer ?? ""} subtitle={job ? `${job.id} · ${job.opsId} · ${job.province}` : ""}>
-      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} toast={toast} />}
+      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} onEditIntake={onEditIntake} toast={toast} />}
     </Drawer>
   );
 }
 
-function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, toast }: {
+function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntake, toast }: {
+  onEditIntake: (id: string) => void;
   job: Job; task?: Task; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void; onScm: (id: string, ev: ScmEvent) => void;
   onRevise: (id: string, cats: Cat[]) => void;
   onCancel: (id: string, reason: string) => void; toast: (m: string) => void;
@@ -45,7 +47,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, toast }: {
           <span className={cn("rounded-full px-3 py-1 text-[11.5px] font-bold", job.segment === "hbd" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600")}>{SEGMENT_LABEL[job.segment]}</span>
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-[11.5px] font-bold text-indigo-700">{WORK_LABEL[job.work]}</span>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-[11.5px] font-bold text-amber-800">{MODEL_LABEL[job.model]}</span>
-          <span className="ml-auto text-[20px] font-bold tracking-tight text-indigo-700">{baht(job.value)}</span>
+          <span className="ml-auto text-[20px] font-bold tracking-tight text-indigo-700">{valueText(job)}</span>
         </div>
         <p className="mt-2 text-[12px] text-slate-500">
           แผน PT: รับแบบ → ส่งมอบรวม <b className="text-slate-700">{totals.total} วันทำการ</b> · ปิดขาย → ส่งมอบ <b className="text-slate-700">{totals.afterClose} วันทำการ</b>
@@ -84,7 +86,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, toast }: {
         </ol>
       </div>
 
-      <IntakeCard job={job} />
+      <IntakeCard job={job} onEdit={() => onEditIntake(job.id)} />
 
       <TakeoffCard job={job} onRevise={onRevise} />
 

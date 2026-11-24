@@ -2,25 +2,39 @@
 import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { CAT_LABEL, ROUND_LABEL, SVC_LABEL, TERRAIN, dateTh, type Job } from "./crm-mock-data";
+import { CAT_LABEL, ROUND_LABEL, SVC_LABEL, TERRAIN, dateTh, missingOf, type Job } from "./crm-mock-data";
 import { KV, glass } from "./crm-ui";
 
-/** ใบเปิดงาน (Step 1–5) ของ Opp: ย่อเป็นบรรทัดสรุป กดเพื่อดูทั้งหมด */
-export function IntakeCard({ job }: { job: Job }) {
+/** ใบเปิดงาน (Step 1–5) ของ Opp: ย่อเป็นบรรทัดสรุป กดเพื่อดูทั้งหมด · แก้ไขได้ภายหลัง */
+export function IntakeCard({ job, onEdit }: { job: Job; onEdit: () => void }) {
   const [open, setOpen] = useState(false);
   const i = job.intake;
   if (!i) return null;
+  const miss = missingOf(i);
   const group = (t: string) => <div className="mb-0.5 mt-3 text-[11px] font-bold uppercase tracking-wide text-indigo-600 first:mt-0">{t}</div>;
   return (
     <div className={cn(glass, "p-4")}>
-      <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 text-left" aria-expanded={open}>
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><Icon name="description" style={{ fontSize: 18 }} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-bold text-slate-900">ใบเปิดงาน (Job Order)</span>
-          <span className="block truncate text-[11.5px] text-slate-500">{i.btype} · {i.district}, {job.province} · {i.pkg} · แนบ {i.files.length} ไฟล์</span>
-        </span>
-        <Icon name={open ? "expand_less" : "expand_more"} className="text-slate-400" />
-      </button>
+      <div className="flex items-center gap-2">
+        <button onClick={() => setOpen(!open)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={open}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><Icon name="description" style={{ fontSize: 18 }} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] font-bold text-slate-900">ใบเปิดงาน (Job Order)</span>
+              {miss.any && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">ข้อมูลไม่ครบ{miss.s4.length ? " · Step 4" : ""}{miss.s5 ? " · Step 5" : ""}</span>}
+            </span>
+            <span className="block truncate text-[11.5px] text-slate-500">{i.btype} · {i.district || "-"}, {job.province} · {i.pkg} · แนบ {i.files.length} ไฟล์</span>
+          </span>
+          <Icon name={open ? "expand_less" : "expand_more"} className="text-slate-400" />
+        </button>
+        <button onClick={onEdit} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700">
+          <Icon name="edit" style={{ fontSize: 15 }} />แก้ไข
+        </button>
+      </div>
+      {miss.any && (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-1.5 text-[11.5px] text-amber-800">
+          ขาด: {[...miss.s4, ...(miss.s5 ? ["เอกสารแนบ"] : [])].join(", ")}
+        </p>
+      )}
       {open && (
         <div className="mt-3 border-t border-slate-100 pt-3">
           {group("ลูกค้า")}
@@ -30,7 +44,7 @@ export function IntakeCard({ job }: { job: Job }) {
           <KV k="รหัส Lead" v={job.leadId ?? "-"} />
           {group("ข้อมูลขอรับบริการ")}
           <KV k="วันที่ขอรับบริการ" v={dateTh(i.requestDate)} />
-          <KV k="ชื่อร้าน" v={i.shop ? `${i.shop} (${i.shopType ?? "-"})` : "-"} />
+          <KV k="ชื่อร้าน" v={i.shop ? `${i.shop} (${i.shopCode ? `รหัส ${i.shopCode}` : i.shopType ?? "-"})` : "-"} />
           {group("ข้อมูลงาน")}
           <KV k="ประเภท / ลักษณะอาคาร" v={`${i.btype} / ${i.bchar}`} />
           <KV k="จังหวัด / อำเภอ" v={`${job.province} / ${i.district}`} />

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  COLS, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, baht, colOf, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
+  COLS, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, colOf, missingOf, valueText, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
   type Job, type Packet, type Party,
 } from "./crm-mock-data";
 import { Avatar, PartyBadge, btnPrimary, glass, inputCls } from "./crm-ui";
@@ -108,7 +108,7 @@ export function BoardView({ c }: { c: Ctx }) {
                       <td className="px-4 py-3 font-semibold text-indigo-700">{j.id}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{j.customer}<div className="text-[11px] font-normal text-slate-400">{j.province}</div></td>
                       <td className="px-4 py-3 text-slate-600">{SEGMENT_LABEL[j.segment].split(" ")[0]}<div className="text-[11px] text-slate-400">{WORK_LABEL[j.work]}</div></td>
-                      <td className="px-4 py-3 font-semibold">{baht(j.value)}</td>
+                      <td className="px-4 py-3 font-semibold">{valueText(j)}</td>
                       <td className="px-4 py-3 text-slate-700">{i ? i.s.label : j.cancelReason ? <span className="font-semibold text-rose-600">ยกเลิก · {j.cancelReason}</span> : <span className="font-semibold text-emerald-700">จบงาน</span>}</td>
                       <td className="px-4 py-3">{i && <PartyBadge party={i.s.owner} />}</td>
                       <td className={cn("px-4 py-3 text-[12px] font-medium", i && i.late > 0 ? "text-rose-600" : "text-slate-500")}>{i ? `${dateTh(i.due)} · ${dueLabel(i.due)}` : "-"}</td>
@@ -138,7 +138,7 @@ function JobCard({ j, onOpen }: { j: Job; onOpen: () => void }) {
         <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-bold", j.segment === "hbd" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500")}>{j.segment === "hbd" ? "HBD" : "ทั่วไป"}</span>
       </div>
       <div className="mt-2 text-[11.5px] text-slate-600">{WORK_SHORT[j.work]} · {MODEL_LABEL[j.model]}</div>
-      <div className="mt-1 text-[13px] font-bold text-indigo-700">{baht(j.value)}</div>
+      <div className="mt-1 text-[13px] font-bold text-indigo-700">{valueText(j)}</div>
       {i && (
         <div className={cn("mt-2 rounded-lg px-2 py-1.5", i.late > 0 ? "bg-rose-50" : "bg-slate-50")}>
           <div className="flex items-center justify-between gap-2">
@@ -148,6 +148,7 @@ function JobCard({ j, onOpen }: { j: Job; onOpen: () => void }) {
           <div className={cn("mt-0.5 text-[10.5px] font-medium", i.late > 0 ? "text-rose-600" : "text-slate-500")}>{dueLabel(i.due)} · {dateTh(i.due)}</div>
         </div>
       )}
+      {j.intake && !j.cancelReason && missingOf(j.intake).any && <div className="mt-1.5 flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[10.5px] font-semibold text-amber-800"><Icon name="assignment_late" style={{ fontSize: 14 }} />ใบเปิดงานยังไม่ครบ</div>}
       {i?.s.key === "survey" && j.surveyAt && <div className="mt-1.5 flex items-center gap-1 rounded-lg bg-cyan-50 px-2 py-1 text-[10.5px] font-semibold text-cyan-800"><Icon name="event" style={{ fontSize: 14 }} />นัดสำรวจ {dtTh(j.surveyAt)}</div>}
       {scmReady && <div className="mt-1.5 flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[10.5px] font-semibold text-amber-800"><Icon name="inventory_2" style={{ fontSize: 14 }} />สินค้าครบคาด {dateTh(j.scm.readyEta)}</div>}
     </article>
