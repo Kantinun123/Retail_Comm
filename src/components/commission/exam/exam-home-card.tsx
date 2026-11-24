@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon } from "../icon";
+import { ExamCounts } from "./exam-counts";
 import { cn } from "@/lib/utils";
 import { dayTh, deadlineText, fetchExamMine, fetchExamProgress, type ExamProgress, type ExamRoundState } from "@/lib/commission/exam-store";
 
@@ -35,7 +36,7 @@ export function ExamHomeCard({ variant }: { variant: Variant }) {
     if (!mine) return null;
     const r = mine;
     const tone = r.completed ? "border-emerald-200" : r.overdue ? "border-rose-300" : "border-slate-200";
-    const chip = r.completed ? { t: "ทำเสร็จแล้ว", c: "bg-emerald-50 text-emerald-700" } : r.doneCount === 0 ? { t: "ยังไม่ทำ", c: "bg-slate-100 text-slate-600" } : { t: `ทำแล้ว ${r.doneCount}/${r.topicCount}`, c: "bg-amber-50 text-amber-700" };
+    const chip = r.completed ? { t: "ทำเสร็จแล้ว", c: "bg-emerald-50 text-emerald-700" } : r.topics.every((x) => x.status === "todo") ? { t: "ยังไม่ทำ", c: "bg-slate-100 text-slate-600" } : { t: `ผ่านแล้ว ${r.doneCount}/${r.topicCount}`, c: "bg-amber-50 text-amber-700" };
     return (
       <Link href="/app/exam" className={cn("rounded-2xl bg-white border shadow-sm p-3.5 flex items-center gap-3 active:scale-[0.99] transition", tone)}>
         <div className="w-10 h-10 rounded-xl bg-rose-50 text-[#d32029] flex items-center justify-center shrink-0">
@@ -49,6 +50,7 @@ export function ExamHomeCard({ variant }: { variant: Variant }) {
           <p className={cn("text-[10.5px]", !r.completed && (r.overdue ? "text-rose-600 font-semibold" : r.daysLeft <= 3 ? "text-amber-700 font-semibold" : "text-slate-400"), r.completed && "text-slate-400")}>
             {r.completed ? `ผ่านครบ ${r.topicCount} หัวข้อ` : `ส่งภายใน ${dayTh(r.deadlineOn)} · ${deadlineText(r.daysLeft)}`}
           </p>
+          {!r.completed && <ExamCounts topics={r.topics} size="sm" />}
         </div>
         <Icon name="chevron_right" className="text-slate-300" style={{ fontSize: 18 }} />
       </Link>

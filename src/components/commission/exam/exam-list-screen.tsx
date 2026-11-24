@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/commission/session";
 import { dayTh, deadlineText, fetchExamMine, type ExamMine, type ExamRoundState, type ExamTopicState, type TopicStatus } from "@/lib/commission/exam-store";
 import { card } from "../boq/boq-shared";
+import { ExamCounts } from "./exam-counts";
 
 const STATUS: Record<TopicStatus, { label: string; cls: string; icon: string }> = {
   todo: { label: "ยังไม่ทำ", cls: "bg-slate-100 text-slate-600", icon: "radio_button_unchecked" },
@@ -63,8 +64,7 @@ function TopicRow({ round, t }: { round: ExamRoundState; t: ExamTopicState }) {
 }
 
 function RoundCard({ r }: { r: ExamRoundState }) {
-  const pct = r.topicCount ? Math.round((r.doneCount / r.topicCount) * 100) : 0;
-  const state = r.completed ? { label: "ทำเสร็จแล้ว", cls: "bg-emerald-50 text-emerald-700" } : r.doneCount === 0 ? { label: "ยังไม่ทำ", cls: "bg-slate-100 text-slate-600" } : { label: `ทำแล้ว ${r.doneCount}/${r.topicCount} หัวข้อ`, cls: "bg-amber-50 text-amber-700" };
+  const state = r.completed ? { label: "ทำเสร็จแล้ว", cls: "bg-emerald-50 text-emerald-700" } : r.topics.every((x) => x.status === "todo") ? { label: "ยังไม่ทำ", cls: "bg-slate-100 text-slate-600" } : { label: `ผ่านแล้ว ${r.doneCount}/${r.topicCount} หัวข้อ`, cls: "bg-amber-50 text-amber-700" };
   const groups = [...new Set(r.topics.map((t) => t.group))];
   return (
     <section className={cn(card, "overflow-hidden")}>
@@ -78,9 +78,7 @@ function RoundCard({ r }: { r: ExamRoundState }) {
           ส่งภายใน {dayTh(r.deadlineOn)}
           {!r.completed && <span className="font-bold">· {deadlineText(r.daysLeft)}</span>}
         </div>
-        <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
-          <div className={cn("h-full rounded-full transition-all", r.completed ? "bg-emerald-500" : "bg-[#d32029]")} style={{ width: `${pct}%` }} />
-        </div>
+        <ExamCounts topics={r.topics} />
         <p className="text-[11px] text-slate-500 mt-1.5">ต้องผ่านทุกหัวข้อ · เกณฑ์ผ่านหัวข้อละ {r.passPercent}% · สอบซ้ำได้ไม่จำกัดครั้ง</p>
       </div>
       {groups.map((g) => (
