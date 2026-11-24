@@ -76,7 +76,7 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
             </label>
           ))}
           <Field label="บันทึกการคุย"><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={inputCls} placeholder="สรุปสิ่งที่คุยกับลูกค้า" /></Field>
-          {allOk && lead.status !== "qualified" && <p className="flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-700"><Icon name="check_circle" style={{ fontSize: 16 }} />ผ่านครบทุกเงื่อนไข น้องเลขาแนะนำให้เปิด Ops ได้เลย</p>}
+          {allOk && lead.status !== "qualified" && <p className="flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-700"><Icon name="check_circle" style={{ fontSize: 16 }} />ผ่านครบทุกเงื่อนไข น้องเลขาแนะนำให้เปิด Opp ได้เลย</p>}
           {lost && (
             <Field label="เหตุผลที่ Loss">
               <select value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls}>{LOST_REASONS.map((r) => <option key={r}>{r}</option>)}</select>
@@ -89,8 +89,8 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
         <div className="flex flex-wrap gap-2 pb-2">
           <button onClick={failContact} className={btnGhost}><Icon name="phone_missed" style={{ fontSize: 18 }} />ติดต่อไม่ได้ ({tries}/{MAX_CONTACT_TRIES})</button>
           <button onClick={logContact} className={btnGhost}><Icon name="edit_note" style={{ fontSize: 18 }} />บันทึกการติดต่อ</button>
-          {allOk && lead.status !== "qualified" && <button onClick={() => { onPatch(lead.id, { status: "qualified", note, firstContactAt: lead.firstContactAt ?? NOW.toISOString() }); toast("ผ่านการสกรีน รอเปิด Ops"); }} className={btnGhost}>ผ่านเงื่อนไข</button>}
-          <button onClick={() => onConvert({ ...lead, note })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Ops</button>
+          {allOk && lead.status !== "qualified" && <button onClick={() => { onPatch(lead.id, { status: "qualified", note, firstContactAt: lead.firstContactAt ?? NOW.toISOString() }); toast("ผ่านการสกรีน รอเปิด Opp"); }} className={btnGhost}>ผ่านเงื่อนไข</button>}
+          <button onClick={() => onConvert({ ...lead, note })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Opp</button>
           {!lost ? <button onClick={() => setLost(true)} className="rounded-xl px-3.5 py-2.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50">Loss</button>
             : <button onClick={() => { onPatch(lead.id, { status: "lost", lostReason: reason, note, firstContactAt: lead.firstContactAt }); toast("บันทึก Loss แล้ว"); }} className="rounded-xl bg-rose-600 px-3.5 py-2.5 text-[13px] font-bold text-white">ยืนยัน Loss</button>}
         </div>

@@ -3,10 +3,10 @@ import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  CAT_LABEL, DEPOSIT_PCT, DEPOSIT_SCG, MODEL_LABEL, NOW, OWNERS, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday,
-  lateWd, packetsOf, planTotals, stepsOf, template, type Cat, type Job, type Lead, type Model, type Segment, type StepDef, type StepKey, type Task, type Work,
+  CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task,
 } from "./crm-mock-data";
-import { Drawer, Field, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
+import { IntakeCard } from "./crm-intake-card";
+import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type ScmEvent = "ordered" | "eta";
 
@@ -83,6 +83,8 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, toast }: {
           ))}
         </ol>
       </div>
+
+      <IntakeCard job={job} />
 
       <TakeoffCard job={job} onRevise={onRevise} />
 
@@ -288,89 +290,5 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
         )}
       </div>
     </li>
-  );
-}
-
-/* ---------------- เปิด Opp ใหม่ ---------------- */
-export interface NewJobInput { customer: string; phone: string; province: string; segment: Segment; work: Work; model: Model; value: number; owner: string; leadId?: string }
-export function NewJobDrawer({ open, lead, onClose, onCreate }: { open: boolean; lead: Lead | null; onClose: () => void; onCreate: (i: NewJobInput) => void }) {
-  return (
-    <Drawer open={open} onClose={onClose} title="เปิด Opp ใหม่" subtitle={lead ? `จาก Lead ${lead.id}` : "กรอกข้อมูลลูกค้าและประเภทงาน"}>
-      {open && <NewJobBody key={lead?.id ?? "blank"} lead={lead} onCreate={onCreate} onClose={onClose} />}
-    </Drawer>
-  );
-}
-function NewJobBody({ lead, onCreate, onClose }: { lead: Lead | null; onCreate: (i: NewJobInput) => void; onClose: () => void }) {
-  const [f, setF] = useState({ customer: lead?.name ?? "", phone: lead?.phone ?? "", province: lead?.province ?? "", value: "", owner: OWNERS[0] });
-  const [segment, setSegment] = useState<Segment>("general");
-  const [model, setModel] = useState<Model>("he");
-  const [work, setWork] = useState<Work>(/ทรัส|อะเส/.test(lead?.interest ?? "") ? (/อะเส/.test(lead?.interest ?? "") ? "ase" : "truss") : "roof");
-  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
-  const value = parseFloat(f.value.replace(/,/g, "")) || 0;
-  const ok = f.customer.trim() && f.phone.trim() && f.province.trim() && value > 0;
-  const tpl = template(segment, work);
-  const t = planTotals(tpl);
-  const needsRoom = tpl.some((s) => s.owner === "ROOM");
-
-  return (
-    <>
-      {lead && <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-[12.5px] font-medium text-emerald-800"><Icon name="check_circle" style={{ fontSize: 18 }} />ดึงข้อมูลจาก Lead มาให้แล้ว{lead.interest ? ` · "${lead.interest}"` : ""}</div>}
-      {lead && lead.product !== "Roof Install" && <div className="rounded-2xl bg-amber-50 px-4 py-3 text-[12px] text-amber-800">Flow ที่รองรับในตัวอย่างนี้คือ Roof Installation (Project Timeline 01/08/2026) เท่านั้น</div>}
-      <div className={cn(glass, "space-y-3 p-4")}>
-        <h3 className="text-[13px] font-bold text-slate-900">ข้อมูลลูกค้า</h3>
-        <Field label="ชื่อ-สกุล *"><input value={f.customer} onChange={(e) => set("customer", e.target.value)} className={inputCls} /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="เบอร์ติดต่อ *"><input value={f.phone} onChange={(e) => set("phone", e.target.value)} className={inputCls} /></Field>
-          <Field label="จังหวัดหน้างาน *"><input value={f.province} onChange={(e) => set("province", e.target.value)} className={inputCls} /></Field>
-        </div>
-      </div>
-      <div className={cn(glass, "space-y-3 p-4")}>
-        <h3 className="text-[13px] font-bold text-slate-900">กลุ่มลูกค้า</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {(["general", "hbd"] as const).map((s) => (
-            <button key={s} onClick={() => setSegment(s)} className={cn("rounded-xl border p-3 text-left transition", segment === s ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300")}>
-              <div className="text-[12.5px] font-bold text-slate-900">{s === "general" ? "ลูกค้าทั่วไป" : "HBD Focus"}</div>
-              <div className="text-[11px] text-slate-500">{s === "general" ? "มัดจำ → สำรวจ → เสนอราคาหลังสำรวจ → ปิดขาย" : "ปิดขายจากแบบ ไม่มีมัดจำ/สำรวจ"}</div>
-            </button>
-          ))}
-        </div>
-        <h3 className="pt-1 text-[13px] font-bold text-slate-900">โมเดล</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {(["he", "scg"] as const).map((m) => (
-            <button key={m} onClick={() => setModel(m)} className={cn("rounded-xl border p-3 text-left transition", model === m ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300")}>
-              <div className="text-[12.5px] font-bold text-slate-900">{MODEL_LABEL[m]}</div>
-              <div className="text-[11px] text-slate-500">{m === "he" ? `มัดจำ ${DEPOSIT_PCT}% ของราคา` : `มัดจำคงที่ ฿${DEPOSIT_SCG.toLocaleString("en-US")}`}</div>
-            </button>
-          ))}
-        </div>
-        <h3 className="pt-1 text-[13px] font-bold text-slate-900">ประเภทงาน</h3>
-        <div className="space-y-2">
-          {(["roof", "truss", "ase"] as const).map((w) => {
-            const tt = planTotals(template(segment, w));
-            return (
-              <button key={w} onClick={() => setWork(w)} className={cn("flex w-full items-center justify-between rounded-xl border p-3 text-left transition", work === w ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300")}>
-                <span className="text-[12.5px] font-bold text-slate-900">{WORK_LABEL[w]}</span>
-                <span className="text-[11px] text-slate-500">รวม {tt.total} วัน · หลังปิดขาย {tt.afterClose} วัน</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="rounded-xl bg-slate-50 p-3 text-[11.5px] leading-relaxed text-slate-600">
-          <b className="text-slate-700">ลำดับขั้นตอน ({t.total} วันทำการ):</b> {tpl.map((s) => s.label.replace(/ \(.*\)/, "")).join(" → ")}
-          {needsRoom && <div className="mt-1 text-fuchsia-700">งานนี้ต้องส่งข้อมูลให้ห้องแบบ (ขีดแนวอะเส / แบบทรัส) ก่อนเสนอราคา</div>}
-        </div>
-      </div>
-      <div className={cn(glass, "space-y-3 p-4")}>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="มูลค่าประมาณการ (บาท) *"><input inputMode="numeric" value={f.value} onChange={(e) => set("value", e.target.value.replace(/[^\d]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","))} placeholder="เช่น 250,000" className={cn(inputCls, "text-right tabular-nums")} /></Field>
-          <Field label="ผู้ดูแล"><select value={f.owner} onChange={(e) => set("owner", e.target.value)} className={inputCls}>{OWNERS.map((p) => <option key={p}>{p}</option>)}</select></Field>
-        </div>
-        {value > 0 && segment === "general" && <p className="text-[12px] text-slate-500">{model === "scg" ? "มัดจำคงที่ SCG Home" : "มัดจำ 30% (Housing Expert)"} = <b className="text-slate-800">{baht(model === "scg" ? DEPOSIT_SCG : Math.round(value * 0.3))}</b></p>}
-      </div>
-      <div className="flex justify-end gap-2 pb-2">
-        <button onClick={onClose} className={btnGhost}>ยกเลิก</button>
-        <button disabled={!ok} onClick={() => onCreate({ customer: f.customer, phone: f.phone, province: f.province, segment, work, model, value, owner: f.owner, leadId: lead?.id })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Opp</button>
-      </div>
-    </>
   );
 }

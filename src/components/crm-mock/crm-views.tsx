@@ -26,7 +26,7 @@ export function LeadsView({ c }: { c: Ctx }) {
     .filter((l) => (st === "all" || l.status === st) && (!prod || l.product === prod) && (!q || `${l.name}${l.phone}${l.id}${l.province}`.includes(q)))
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   const breach = c.leads.filter((l) => l.status === "waiting" && leadSla(l).state === "breach").length;
-  const chips: { k: LeadStatus | "all"; label: string }[] = [{ k: "all", label: "ทั้งหมด" }, { k: "waiting", label: "รอติดต่อ" }, { k: "contacting", label: "กำลังสกรีน" }, { k: "qualified", label: "รอเปิด Ops" }, { k: "converted", label: "เปิด Ops แล้ว" }, { k: "lost", label: "Loss" }];
+  const chips: { k: LeadStatus | "all"; label: string }[] = [{ k: "all", label: "ทั้งหมด" }, { k: "waiting", label: "รอติดต่อ" }, { k: "contacting", label: "กำลังสกรีน" }, { k: "qualified", label: "รอเปิด Opp" }, { k: "converted", label: "เปิด Opp แล้ว" }, { k: "lost", label: "Loss" }];
 
   return (
     <div className="space-y-4">

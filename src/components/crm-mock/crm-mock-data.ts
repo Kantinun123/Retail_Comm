@@ -149,6 +149,74 @@ export const planTotals = (steps: StepDef[]) => {
   return { total: last, afterClose: last - close };
 };
 
+/* ---------- ใบเปิดงาน (Step 1–5 ตามต้นแบบทีม JV) ---------- */
+export type ShopType = "GT" | "MT";
+export interface Intake {
+  email?: string; ctype: string; fam?: string;
+  requestDate: string; shop?: string; shopType?: ShopType;
+  btype: string; bchar: string; district: string; loc?: string; sea: string; terr: string[];
+  warrSame: boolean; warrName?: string;
+  refJob?: string; svc: string[]; pkgType: "total" | "standard"; pkg: string; det: Cat[]; round: "all" | "top" | "bottom";
+  ase: string; chc: string; st2: boolean; truss?: string; muk?: string; rc?: string; eave: number;
+  tile: string; tileModel: string; color: string; shape?: string; deg?: string; ins: string;
+  files: { name: string; size: string }[];
+}
+export const CTYPES = ["ลูกค้าทั่วไป", "HBD", "VIP"];
+/** GT = ร้านค้าทั่วไป · MT = Modern Trade */
+export const SHOPS: Record<string, ShopType> = { "ร้าน สหชัยรุ่งเรือง จำกัด": "GT", "ยงฮวดการค้า": "GT", "ไทวัสดุ หาดใหญ่": "MT", "โฮมโปร หาดใหญ่": "MT", "SCG Home Experience": "MT" };
+export const PROV: Record<string, string[]> = {
+  "สงขลา": ["หาดใหญ่", "เมืองสงขลา", "สะเดา", "จะนะ"],
+  "กรุงเทพมหานคร": ["บางซื่อ", "จตุจักร", "บางนา", "ลาดพร้าว"],
+  "เชียงใหม่": ["เมืองเชียงใหม่", "สันทราย", "หางดง"],
+  "ภูเก็ต": ["เมืองภูเก็ต", "กะทู้", "ถลาง"],
+  "ขอนแก่น": ["เมืองขอนแก่น", "บ้านไผ่"],
+};
+/** ลูกค้า SCG Family (ข้อมูลสมมติ) */
+export const FAMILY = [
+  { name: "คุณกวี มิ่งขวัญเจริญ", tel: "062-345-6789", fam: "Fam2026000101", ctype: "ลูกค้าทั่วไป", email: "kawee.m@example.com" },
+  { name: "คุณกวีนา ทองดี", tel: "089-555-1212", fam: "Fam2026000345", ctype: "VIP", email: "kaweena.t@example.com" },
+  { name: "คุณสมชาย ใจดี", tel: "081-234-5678", fam: "Fam2026000112", ctype: "HBD", email: "somchai.j@example.com" },
+  { name: "คุณเยาวลักษณ์ เพชรนิล", tel: "062-555-0077", fam: "Fam2026000077", ctype: "HBD", email: "yaowalak.p@example.com" },
+];
+export const BTYPES = ["บ้านเดี่ยว/โครงการ/อาคารขนาดใหญ่", "ทาวน์โฮม", "อาคารพาณิชย์", "โรงงาน/โกดัง"];
+export const BCHARS = ["ที่พักอาศัย", "โรงพยาบาล/อาคารสำนักงาน", "ร้านค้า", "โรงเรียน"];
+export const SEA_OPTS = ["น้อยกว่า 2 กม.", "2 - 5 กม.", "มากกว่า 5 กม."];
+export const TERRAIN: Record<string, string> = {
+  A: "A : หลังคาทั่วไปที่ตั้งอยู่บนพื้นที่ทั่วไป",
+  B: "B : หลังคาซับซ้อน / อาคารขนาดใหญ่ / โค้งโอบลม",
+  C: "C : หลังคาที่สันหลังคาเกิน 18 เมตร / อยู่บนเนินเขา หน้าผา ช่องลม หรือที่ตั้งอยู่บริเวณที่เกิด Dramatic Effects",
+  D: "D : อาคารที่ไม่มีฝ้าเพดาน",
+};
+export const SVC_LABEL: Record<string, string> = { prod: "ประมาณการเฉพาะค่าสินค้า", labor: "ประมาณการเฉพาะค่าแรง", sol: "ประมาณการ Solution (ของรวมแรง)" };
+export const PKG_OPTS = ["Complete Roof (รับประกัน 5 ปี)", "Basic Roof (รับประกัน 1 ปี)"];
+export const ASE_OPTS = ["อะเสกัลวาไนซ์", "อะเสไม้", "อะเสเหล็กกล่อง"];
+export const CHC_OPTS = ["6 นิ้ว และ 8 นิ้ว", "6 นิ้ว", "8 นิ้ว"];
+export const RC_OPTS = ["ใหม่ (ไม่มีหลังคาเดิม)", "รื้อหลังคาเดิม", "ซ่อมบางส่วน"];
+export const TILE_OPTS = ["Prestige (เพรสทีจ)", "Excella", "Neustile", "Cotto Roof"];
+export const TILE_MODEL_OPTS = ["Standard (ธรรมดา)", "Cool", "Cool Plus"];
+export const COLOR_OPTS = ["มิดไนท์เกรย์", "เทาปีกนก", "โอ๊คแดง", "น้ำตาลช็อกโกแลต"];
+export const SHAPE_OPTS = ["ทรงจั่ว", "ทรงปั้นหยา", "ทรงมะนิลา", "ทรงเพิงหมาแหงน"];
+export const INS_OPTS = ["ไม่ใช้", "แผ่นสะท้อนความร้อน", "Ultra Cool InnoGreen"];
+export const ROUND_LABEL = { all: "รวมรอบ (รอบบน+รอบล่าง)", top: "รอบบน", bottom: "รอบล่าง" } as const;
+export const CAT_ORDER: Cat[] = ["ase", "truss", "tile", "fascia"];
+/** กลุ่มลูกค้าที่ใช้เลือก Flow: ประเภทลูกค้า HBD = ปิดขายจากแบบ (ไม่มีมัดจำ/สำรวจ) นอกนั้นเป็นลูกค้าทั่วไป */
+export const segmentOfCtype = (ctype: string): Segment => (ctype === "HBD" ? "hbd" : "general");
+/** ประเภทงานที่ใช้เลือกแม่แบบ PT: เลือกอะเส = อะเส+ทรัส+มุง · เลือกโครงหลังคา = ทรัส+มุง · นอกนั้นมุงอย่างเดียว */
+export const workOfDet = (det: Cat[]): Work => (det.includes("ase") ? "ase" : det.includes("truss") ? "truss" : "roof");
+/** ใบเปิดงานตัวอย่างของงานในข้อมูลตั้งต้น */
+export function sampleIntake(s: { province: string; segment: Segment; work: Work; requestDate: string }): Intake {
+  const det = catsOf(s.work);
+  const roofOnly = s.work === "roof";
+  return {
+    ctype: s.segment === "hbd" ? "HBD" : "ลูกค้าทั่วไป", requestDate: s.requestDate, shop: "ร้าน สหชัยรุ่งเรือง จำกัด", shopType: "GT",
+    btype: BTYPES[0], bchar: BCHARS[0], district: (PROV[s.province] ?? [])[0] ?? "-", loc: "https://maps.app.goo.gl/sample", sea: SEA_OPTS[1], terr: ["B"],
+    warrSame: true, svc: ["sol"], pkgType: roofOnly ? "standard" : "total", pkg: PKG_OPTS[0], det, round: "all",
+    ase: ASE_OPTS[0], chc: CHC_OPTS[0], st2: false, truss: roofOnly ? undefined : "1.20", muk: roofOnly ? undefined : "4", rc: RC_OPTS[0], eave: 2,
+    tile: TILE_OPTS[0], tileModel: TILE_MODEL_OPTS[0], color: COLOR_OPTS[0], shape: SHAPE_OPTS[0], deg: "30", ins: INS_OPTS[2],
+    files: [{ name: "แบบแปลนหลังคา.pdf", size: "1.2 MB" }],
+  };
+}
+
 /* ---------- Job ---------- */
 /** โมเดลธุรกิจ: Housing Expert (ร้านตัวแทน มัดจำ 30%) / SCG Home (มัดจำคงที่ 30,000 บาท) */
 export type Model = "he" | "scg";
@@ -160,7 +228,7 @@ export const catsOf = (w: Work): Cat[] => (w === "roof" ? ["tile", "fascia"] : w
 export interface JobLog { at: string; text: string }
 export interface Job {
   id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; segment: Segment; work: Work;
-  value: number; quote1Value?: number; model: Model; revise?: Cat[]; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
+  value: number; quote1Value?: number; model: Model; revise?: Cat[]; intake?: Intake; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string;
 }
 export const stepsOf = (j: Job) => template(j.segment, j.work);
@@ -297,6 +365,7 @@ function mk(sp: Spec): Job {
     value: sp.value, quote1Value: sp.quote1Value, model: sp.model ?? "he", owner: sp.owner ?? "ฝน", startedAt: subWd(sp.daysIn), done: {}, scm: sp.scm ?? {},
     lastTouchAt: hAgo(sp.touchH ?? 6), log: [],
   };
+  job.intake = sampleIntake({ province: sp.province, segment: sp.segment, work: sp.work, requestDate: dayKey(job.startedAt) });
   if (sp.cancel) { job.cancelReason = sp.cancel; }
   const steps = stepsOf(job);
   for (const s of steps) {

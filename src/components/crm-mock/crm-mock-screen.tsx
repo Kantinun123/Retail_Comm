@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { NOW, PARTY, addWd, buildTasks, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { ChatDrawer } from "./crm-chat";
-import { JobDrawer, NewJobDrawer, type NewJobInput, type ScmEvent } from "./crm-job-drawer";
+import { JobDrawer, type ScmEvent } from "./crm-job-drawer";
+import { NewJobDrawer, type NewJobInput } from "./crm-new-opp";
 import { BoardView, ExchangeView } from "./crm-board";
 import { HomeView } from "./crm-home";
 import { LeadsView, type Ctx, type View } from "./crm-views";
@@ -66,7 +67,7 @@ export function CrmMockScreen() {
     const now = NOW.toISOString();
     const created: Job = {
       id, opsId: id.replace("J-", "OP-"), leadId: i.leadId, customer: i.customer, phone: i.phone, province: i.province, segment: i.segment, work: i.work,
-      value: i.value, model: i.model, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, lastTouchAt: now,
+      value: i.value, model: i.model, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, intake: i.intake, lastTouchAt: now,
       log: [{ at: now, text: i.leadId ? `เปิด Opp จาก Lead ${i.leadId} และรับแบบจากลูกค้า` : "เปิด Opp และรับแบบจากลูกค้า" }],
     };
     setJobs((all) => [created, ...all]);
@@ -153,7 +154,7 @@ export function CrmMockScreen() {
             : { ...j, scm: { ...j.scm, readyEta: addWd(now, 7) }, lastTouchAt: now, log: [...j.log, { at: now, text: "SCM แจ้ง: คาดว่าสินค้าครบภายใน 7 วันทำการ" }] };
         })}
         onCancel={(id, reason) => { patchJob(id, (j) => ({ ...j, cancelReason: reason, lastTouchAt: NOW.toISOString(), log: [...j.log, { at: NOW.toISOString(), text: `ยกเลิกงาน: ${reason}` }] })); setToastMsg("ยกเลิกงานแล้ว"); }} />
-      <NewJobDrawer open={newJob.open} lead={newJob.lead} onClose={() => setNewJob({ open: false, lead: null })} onCreate={create} />
+      <NewJobDrawer open={newJob.open} lead={newJob.lead} jobs={jobs} toast={setToastMsg} onClose={() => setNewJob({ open: false, lead: null })} onCreate={create} />
       <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} toast={setToastMsg} />
 
       <div className={cn("pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-5 py-2.5 text-[12.5px] font-medium text-white shadow-xl transition-all duration-300 lg:bottom-8", toastMsg ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>
