@@ -20,6 +20,8 @@ function TopicRow({ round, t }: { round: ExamRoundState; t: ExamTopicState }) {
   const router = useRouter();
   const s = STATUS[t.status];
   const action = t.status === "passed" ? null : t.status === "in_progress" ? "ทำต่อ" : t.status === "failed" ? "สอบใหม่" : "เริ่มสอบ";
+  // โทนแดงเดียวกัน แต่ต่างน้ำหนัก: เริ่มสอบ = แดงเข้มทึบ / สอบใหม่ = แดงอ่อน / ทำต่อ = ขอบแดง
+  const actionCls = t.status === "failed" ? "bg-rose-100 text-rose-700" : t.status === "in_progress" ? "border border-[#d32029] text-[#d32029] bg-white" : "bg-[#d32029] text-white";
   const detail =
     t.attempts > 0
       ? `สอบ ${t.attempts} ครั้ง${t.passes > 0 ? ` · ผ่านครั้งที่ ${t.firstPassNo}` : ""} · สูงสุด ${t.bestPercent ?? 0}%`
@@ -34,9 +36,9 @@ function TopicRow({ round, t }: { round: ExamRoundState; t: ExamTopicState }) {
         <p className="text-[11px] text-slate-500">{detail}</p>
       </div>
       {action ? (
-        <span className="text-[12px] font-bold text-[#d32029] shrink-0 flex items-center">
+        <span className={cn("text-[12px] font-bold shrink-0 flex items-center rounded-full pl-3 pr-1.5 py-1", actionCls)}>
           {action}
-          <Icon name="chevron_right" style={{ fontSize: 18 }} />
+          <Icon name="chevron_right" style={{ fontSize: 16 }} />
         </span>
       ) : (
         <span className={cn("text-[10.5px] font-bold px-2 py-1 rounded-full shrink-0", s.cls)}>{s.label}</span>

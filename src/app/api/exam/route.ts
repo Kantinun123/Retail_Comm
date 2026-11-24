@@ -29,7 +29,7 @@ export async function GET() {
     activeTopics(sb),
     sb
       .from("exam_attempts")
-      .select("round_id, topic_id, status, passed, percent, seq")
+      .select("round_id, topic_id, status, passed, percent, seq, answers")
       .eq("rep_code", ctx.repCode!)
       .eq("is_test", ctx.isTest)
       .in("round_id", roundIds)
@@ -43,7 +43,9 @@ export async function GET() {
       const submitted = a.filter((x) => x.status === "submitted");
       const passedRows = submitted.filter((x) => x.passed);
       const best = submitted.reduce((m, x) => Math.max(m, Number(x.percent ?? 0)), 0);
-      const status = passedRows.length ? "passed" : a.some((x) => x.status === "in_progress") ? "in_progress" : submitted.length ? "failed" : "todo";
+      // "กำลังทำ" = มีข้อที่ตอบไว้แล้วจริง ๆ ; การสอบที่เปิดไว้เฉย ๆ (ยังไม่ได้ตอบสักข้อ) ไม่นับ -> สอบไม่ผ่านมาแล้วต้องขึ้น "สอบใหม่" ไม่ใช่ "ทำต่อ"
+      const working = a.some((x) => x.status === "in_progress" && x.answers && Object.keys(x.answers as object).length > 0);
+      const status = passedRows.length ? "passed" : working ? "in_progress" : submitted.length ? "failed" : "todo";
       return {
         id: t.id,
         title: t.title,
