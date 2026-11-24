@@ -155,6 +155,7 @@ export interface RankingRow {
   dealerCode: string;
   dealerName: string;
   level: string | null;
+  photoUrl: string | null;
   firstStartAt: string;
   finishedAt: string;
   elapsedSec: number;

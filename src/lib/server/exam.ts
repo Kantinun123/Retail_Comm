@@ -112,10 +112,10 @@ export function cleanAnswers(raw: unknown, questionIds: number[]): Record<string
 
 /** SE ที่ยังทำงานอยู่ (position se) ในร้านที่อยู่ในขอบเขต */
 export async function examinees(sb: Sb, allowed: "all" | string[]) {
-  let q = sb.from("sale_reps").select("rep_code, name, nickname, dealer_code, level").eq("position", "se").eq("is_active", true).not("dealer_code", "is", null).limit(1000);
+  let q = sb.from("sale_reps").select("rep_code, name, nickname, dealer_code, level, photo_url").eq("position", "se").eq("is_active", true).not("dealer_code", "is", null).limit(1000);
   if (allowed !== "all") q = q.in("dealer_code", allowed.length ? allowed : ["-"]);
   const { data } = await q;
-  return (data ?? []) as { rep_code: string; name: string; nickname: string | null; dealer_code: string; level: string | null }[];
+  return (data ?? []) as { rep_code: string; name: string; nickname: string | null; dealer_code: string; level: string | null; photo_url: string | null }[];
 }
 
 /** ประกอบชุดข้อสอบของการสอบครั้งนี้ (ลำดับข้อ/ตัวเลือกตามที่สุ่มไว้) — ไม่ส่งเฉลย */

@@ -22,6 +22,23 @@ const BASIS = [
 
 type Ranked = RankingRow & { rank: number };
 
+/** รูปพนักงานจากข้อมูลพนักงาน ; ไม่มีรูป/โหลดไม่ได้ = ตัวอักษรย่อ */
+function Avatar({ r, size, className }: { r: RankingRow; size: number; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  const box = { width: size, height: size };
+  if (r.photoUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={r.photoUrl} alt={person(r)} onError={() => setFailed(true)} loading="lazy" style={box} className={cn("rounded-full object-cover bg-white shrink-0", className)} />
+    );
+  }
+  return (
+    <div style={box} className={cn("rounded-full flex items-center justify-center font-bold shrink-0", className)}>
+      {initials(r)}
+    </div>
+  );
+}
+
 const person = (r: RankingRow) => (r.nickname ? `${r.name} (${r.nickname})` : r.name);
 // ตัวย่อในวงกลม: ข้ามสระหน้า (เ แ โ ใ ไ) แล้วใช้พยัญชนะตัวแรกพร้อมเครื่องหมายที่ติดกัน (ไม่ตัดกลางตัวอักษร)
 const initials = (r: RankingRow) => {
@@ -139,7 +156,7 @@ export function ExamRankingScreen() {
                       return (
                         <div key={r.repCode} className="flex flex-col items-center justify-end flex-1 min-w-0">
                           <div className="relative mb-1.5">
-                            <div className={cn("w-14 h-14 rounded-full bg-white text-[#a11119] flex items-center justify-center font-bold text-[16px] ring-4 shadow-lg", m.ring)}>{initials(r)}</div>
+                            <Avatar r={r} size={56} className={cn("bg-white text-[#a11119] text-[16px] ring-4 shadow-lg", m.ring)} />
                             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[20px] drop-shadow">{MEDAL[r.rank]}</span>
                           </div>
                           <p className="text-[11px] font-bold text-white text-center truncate max-w-[100px] mt-1.5">{r.nickname || r.name}</p>
@@ -166,7 +183,7 @@ export function ExamRankingScreen() {
                     {ranked.map((r) => (
                       <div key={r.repCode} className={cn("flex items-center gap-3 p-3", r.rank <= 3 && "bg-amber-50/40")}>
                         <div className="w-8 text-center shrink-0">{r.rank <= 3 ? <span className="text-[20px]">{MEDAL[r.rank]}</span> : <span className="tnum text-[13px] font-bold text-slate-400">{r.rank}</span>}</div>
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#d32029] to-[#8f1114] text-white flex items-center justify-center font-bold text-[12px] shrink-0">{initials(r)}</div>
+                        <Avatar r={r} size={40} className="bg-gradient-to-br from-[#d32029] to-[#8f1114] text-white text-[12px]" />
                         <div className="min-w-0 flex-1">
                           <p className="text-[13px] font-bold text-slate-800 truncate">{person(r)}</p>
                           <p className="text-[11px] text-slate-500 truncate">🏪 {r.dealerName}</p>

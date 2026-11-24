@@ -46,6 +46,7 @@ export async function GET(req: Request) {
       dealerCode: rep.dealer_code,
       dealerName: names.get(rep.dealer_code) ?? rep.dealer_code,
       level: rep.level,
+      photoUrl: rep.photo_url,
       firstStartAt: x.first_start,
       finishedAt,
       elapsedSec,
