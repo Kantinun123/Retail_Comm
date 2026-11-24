@@ -26,7 +26,7 @@ function Tile({ n, label, tone }: { n: number | string; label: string; tone: str
   );
 }
 
-function RepCard({ r, topics }: { r: ProgressRep; topics: ExamProgress["topics"] }) {
+function RepCard({ r, topics, showStore = true }: { r: ProgressRep; topics: ExamProgress["topics"]; showStore?: boolean }) {
   const [open, setOpen] = useState(false);
   const state = r.completed ? { t: "ทำเสร็จแล้ว", c: "bg-emerald-50 text-emerald-700" } : r.started ? { t: `ทำแล้ว ${r.doneCount}/${topics.length}`, c: "bg-amber-50 text-amber-700" } : { t: "ยังไม่ทำ", c: "bg-slate-100 text-slate-600" };
   return (
@@ -37,7 +37,7 @@ function RepCard({ r, topics }: { r: ProgressRep; topics: ExamProgress["topics"]
             {r.name}
             {r.nickname ? ` (${r.nickname})` : ""}
           </p>
-          <p className="text-[11px] text-slate-500 truncate">{r.dealerName}{r.level ? ` · Level ${r.level}` : ""}</p>
+          <p className="text-[11px] text-slate-500 truncate">{[showStore ? r.dealerName : "", r.level ? `Level ${r.level}` : ""].filter(Boolean).join(" · ") || "-"}</p>
           <p className="text-[11px] text-slate-500 mt-0.5">สอบ {r.attempts} ครั้ง · สอบผ่าน {r.passes} ครั้ง</p>
         </div>
         <span className={cn("text-[10.5px] font-bold px-2 py-1 rounded-full shrink-0", state.c)}>{state.t}</span>
@@ -61,6 +61,38 @@ function RepCard({ r, topics }: { r: ProgressRep; topics: ExamProgress["topics"]
         </div>
       )}
     </div>
+  );
+}
+
+function StoreGroup({ name, reps, topics, open, onToggle }: { name: string; reps: ProgressRep[]; topics: ExamProgress["topics"]; open: boolean; onToggle: () => void }) {
+  const done = reps.filter((r) => r.completed).length;
+  const doing = reps.filter((r) => !r.completed && r.started).length;
+  const none = reps.length - done - doing;
+  const pct = reps.length ? Math.round((done / reps.length) * 100) : 0;
+  return (
+    <section className={cn(card, "overflow-hidden")}>
+      <button type="button" onClick={onToggle} className="w-full text-left p-3.5 flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-bold text-slate-900 truncate">{name}</p>
+          <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div className={cn("h-full rounded-full", pct === 100 ? "bg-emerald-500" : "bg-[#d32029]")} style={{ width: `${pct}%` }} />
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1">
+            ทำเสร็จ <b className="text-emerald-700">{done}</b>/{reps.length} คน
+            {doing > 0 && <> · กำลังทำ <b className="text-amber-700">{doing}</b></>}
+            {none > 0 && <> · ยังไม่เริ่ม <b className="text-slate-700">{none}</b></>}
+          </p>
+        </div>
+        <Icon name={open ? "expand_less" : "expand_more"} className="text-slate-400" style={{ fontSize: 22 }} />
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 bg-slate-50/60 p-2 space-y-2">
+          {reps.map((r) => (
+            <RepCard key={r.repCode} r={r} topics={topics} showStore={false} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -188,17 +220,19 @@ export function ExamProgressScreen() {
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const [reload, setReload] = useState(0);
+  const [includeTest, setIncludeTest] = useState(false);
+  const [openStores, setOpenStores] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
-    fetchExamProgress(roundId)
+    fetchExamProgress(roundId, includeTest)
       .then((d) => !cancelled && (setData(d), setError("")))
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "โหลดไม่สำเร็จ"));
     return () => {
       cancelled = true;
     };
-  }, [ready, roundId, reload]);
+  }, [ready, roundId, reload, includeTest]);
 
   const reps = useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -209,6 +243,25 @@ export function ExamProgressScreen() {
       return !kw || `${r.name} ${r.nickname ?? ""} ${r.dealerName} ${r.repCode}`.toLowerCase().includes(kw);
     });
   }, [data, filter, q]);
+
+  // จัดกลุ่มตามร้าน : ร้านที่ยังเหลือคนไม่เสร็จมากสุดขึ้นก่อน
+  const stores = useMemo(() => {
+    const m = new Map<string, { code: string; name: string; reps: ProgressRep[] }>();
+    for (const r of reps) {
+      if (!m.has(r.dealerCode)) m.set(r.dealerCode, { code: r.dealerCode, name: r.dealerName, reps: [] });
+      m.get(r.dealerCode)!.reps.push(r);
+    }
+    const remain = (g: { reps: ProgressRep[] }) => g.reps.filter((r) => !r.completed).length;
+    return [...m.values()].sort((a, b) => remain(b) - remain(a) || a.name.localeCompare(b.name, "th"));
+  }, [reps]);
+  const searching = q.trim() !== "";
+  const toggleStore = (code: string) =>
+    setOpenStores((prev) => {
+      const n = new Set(prev);
+      if (n.has(code)) n.delete(code);
+      else n.add(code);
+      return n;
+    });
 
   if (!ready || !session) return null;
   const round = data?.round ?? null;
@@ -274,12 +327,26 @@ export function ExamProgressScreen() {
 
             <Chips options={FILTERS} value={filter} onChange={setFilter} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อ / ร้าน" className={inputCls} />
-            <div className="space-y-2">
-              {reps.map((r) => (
-                <RepCard key={r.repCode} r={r} topics={data!.topics} />
-              ))}
-              {reps.length === 0 && <p className="text-center text-[12px] text-slate-400 py-6">ไม่มีรายการ</p>}
+            <div className="flex items-center justify-between gap-2 text-[11.5px] text-slate-500 px-1">
+              <span>{stores.length} ร้าน · {reps.length} คน</span>
+              {stores.length > 1 && (
+                <button type="button" className="font-semibold text-[#d32029]" onClick={() => setOpenStores(openStores.size ? new Set() : new Set(stores.map((g) => g.code)))}>
+                  {openStores.size ? "ย่อทุกร้าน" : "ขยายทุกร้าน"}
+                </button>
+              )}
             </div>
+            <div className="space-y-2">
+              {stores.map((g) => (
+                <StoreGroup key={g.code} name={g.name} reps={g.reps} topics={data!.topics} open={searching || stores.length === 1 || openStores.has(g.code)} onToggle={() => toggleStore(g.code)} />
+              ))}
+              {stores.length === 0 && <p className="text-center text-[12px] text-slate-400 py-6">ไม่มีรายการ</p>}
+            </div>
+            {data?.role === "admin" && (
+              <label className="flex items-center gap-2 text-[11.5px] text-slate-500 px-1 pt-1">
+                <input type="checkbox" checked={includeTest} onChange={(e) => setIncludeTest(e.target.checked)} className="accent-[#d32029]" />
+                รวมผลสอบของบัญชีทดสอบ (ไว้ลองใช้ ไม่นับในรายงานจริง)
+              </label>
+            )}
           </>
         )}
 

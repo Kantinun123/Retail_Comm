@@ -30,6 +30,7 @@ create table if not exists public.exam_options (
   sort int not null,
   body text not null,
   is_correct boolean not null default false,
+  image_path text,                               -- ตัวเลือกที่เป็นรูป/ไอคอน (path ใน bucket exam-images)
   unique (question_id, sort)
 );
 

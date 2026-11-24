@@ -39,7 +39,7 @@ export interface ExamQuestionView {
   kind: "single" | "multi";
   body: string;
   images: string[];
-  options: { id: number; body: string }[];
+  options: { id: number; body: string; image?: string | null }[];
 }
 
 export interface ExamStart {

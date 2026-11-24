@@ -151,7 +151,11 @@ export function ExamTakeScreen({ roundId, topicId }: { roundId: number; topicId:
                   <span className={cn("mt-0.5 w-5 h-5 shrink-0 grid place-items-center border-2", q.kind === "multi" ? "rounded-md" : "rounded-full", on ? "border-[#d32029] bg-[#d32029] text-white" : "border-slate-300")}>
                     {on && <Icon name="check" style={{ fontSize: 14 }} />}
                   </span>
-                  <span className="text-[13px] text-slate-800 leading-snug">{o.body}</span>
+                  {o.image && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={o.image} alt="ตัวเลือก" className="h-10 w-auto rounded bg-slate-100 p-1" loading="lazy" />
+                  )}
+                  {o.body && <span className="text-[13px] text-slate-800 leading-snug">{o.body}</span>}
                 </button>
               );
             })}

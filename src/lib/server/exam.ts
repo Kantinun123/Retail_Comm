@@ -122,7 +122,7 @@ export async function examinees(sb: Sb, allowed: "all" | string[]) {
 export async function buildAttemptView(sb: Sb, attempt: { question_ids: number[]; option_order: Record<string, number[]> }) {
   const [qs, os] = await Promise.all([
     sb.from("exam_questions").select("id, kind, body, image_paths").in("id", attempt.question_ids),
-    sb.from("exam_options").select("id, question_id, body").in("question_id", attempt.question_ids),
+    sb.from("exam_options").select("id, question_id, body, image_path").in("question_id", attempt.question_ids),
   ]);
   const qMap = new Map((qs.data ?? []).map((q) => [q.id as number, q]));
   const oMap = new Map((os.data ?? []).map((o) => [o.id as number, o]));
@@ -136,7 +136,7 @@ export async function buildAttemptView(sb: Sb, attempt: { question_ids: number[]
         kind: q.kind as "single" | "multi",
         body: q.body as string,
         images: ((q.image_paths as string[] | null) ?? []).map(imageUrl),
-        options: order.map((oid) => oMap.get(oid)).filter(Boolean).map((o) => ({ id: o!.id as number, body: o!.body as string })),
+        options: order.map((oid) => oMap.get(oid)).filter(Boolean).map((o) => ({ id: o!.id as number, body: o!.body as string, image: o!.image_path ? imageUrl(o!.image_path as string) : null })),
       };
     })
     .filter(Boolean);

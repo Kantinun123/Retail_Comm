@@ -80,13 +80,16 @@ function sheetImages(files, sheetIndex) {
     const v = a[0];
     if (!v.includes("<xdr:pic>")) continue;
     const row0 = /<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/.exec(v)?.[1];
+    const pos = /<xdr:from><xdr:col>(\d+)<\/xdr:col><xdr:colOff>(-?\d+)<\/xdr:colOff><xdr:row>\d+<\/xdr:row><xdr:rowOff>(-?\d+)<\/xdr:rowOff>/.exec(v);
+    const sr = /<a:srcRect([^/]*)\/>/.exec(v)?.[1] ?? "";
+    const crop = Object.fromEntries(["l", "t", "r", "b"].map((k) => [k, Number(new RegExp(`${k}="(-?\\d+)"`).exec(sr)?.[1] ?? 0) / 100000]));
     const rid = /r:embed="([^"]+)"/.exec(v)?.[1];
     const tg = rid && rels.get(rid);
     if (row0 === undefined || !tg) continue;
     const media = `xl/${tg.replace(/^\.\.\//, "")}`;
     const ext = media.split(".").pop().toLowerCase();
     if (!files[media]) continue;
-    out.push({ row: Number(row0) + 1, ext, data: files[media] });
+    out.push({ row: Number(row0) + 1, col: Number(pos?.[1] ?? 0), colOff: Number(pos?.[2] ?? 0), rowOff: Number(pos?.[3] ?? 0), crop, ext, data: files[media] });
   }
   return out;
 }
@@ -201,7 +204,11 @@ function parseSolutionNew(rows) {
 }
 
 /** ชีต Roof smart & speedy: ตาราง เลขข้อ | คำถาม | ตัวเลือก (1. 2. 3. ในช่องเดียว) | เฉลย */
-function parseRoofSmart(rows) {
+const DEFAULT_ROW_EMU = 234950; // 18.5pt = ความสูงแถวปกติของชีตนี้ ; รูปที่ rowOff เกินแถว = วางเลื่อนลงแถวถัดไป
+const effRow = (im) => im.row + Math.floor(im.rowOff / DEFAULT_ROW_EMU); // 1-based
+const slotOf = (off) => (off < 700000 ? 1 : off < 1500000 ? 2 : 3);
+
+function parseRoofSmart(rows, imgs = []) {
   const qs = [];
   let section = "";
   for (const row of rows) {
@@ -229,13 +236,27 @@ function parseRoofSmart(rows) {
       marks.push({ k, start: m.index, end: m.index + m[0].length });
       from = m.index + m[0].length;
     }
-    const options = marks.map((m, i) => ({
+    let options = marks.map((m, i) => ({
       body: c.slice(m.end, i + 1 < marks.length ? marks[i + 1].start : c.length).trim(),
       correct: false,
     }));
     const am = /^(\d)\s*(?:\.|$)/.exec(d);
     const ansIdx = am ? Number(am[1]) - 1 : -1;
     if (options[ansIdx]) options[ansIdx].correct = true;
+    // ตัวเลือกเป็นไอคอน: ไอคอนในคอลัมน์ตัวเลือก (C) เรียงตามตำแหน่ง ; เฉลยคือไอคอนในช่องที่ตรงกับเลขเฉลย
+    // และต้องหน้าตาเดียวกับไอคอนในคอลัมน์เฉลย (D) — ไอคอนที่ซ้อน/เกินมาในแถวเดียวกันใส่เป็นตัวเลือกหลอก
+    const textless = options.length === 0 || options.every((o) => !o.body);
+    const mine = imgs.filter((im) => effRow(im) === row.r);
+    const optIcons = mine.filter((im) => im.col === 2).sort((x, y) => x.colOff - y.colOff);
+    const ansIcons = mine.filter((im) => im.col === 3);
+    let iconProblem = "";
+    if (textless && optIcons.length >= 2) {
+      const sameIcon = (x, y) => ["l", "t", "r", "b"].every((k) => Math.abs(x.crop[k] - y.crop[k]) < 0.0005);
+      const target = optIcons.find((im) => slotOf(im.colOff) === ansIdx + 1);
+      if (!target) iconProblem = "หาไอคอนเฉลยในช่องที่ " + (ansIdx + 1) + " ไม่เจอ";
+      else if (!ansIcons.some((a) => sameIcon(a, target))) iconProblem = "ไอคอนเฉลยในไฟล์ไม่ตรงกับตัวเลือกที่ " + (ansIdx + 1);
+      options = optIcons.map((im) => ({ body: "", correct: im === target, image: { ext: im.ext, data: im.data, crop: im.crop } }));
+    }
     qs.push({
       n: qs.length + 1,
       startRow: row.r,
@@ -244,7 +265,7 @@ function parseRoofSmart(rows) {
       body: `${section ? `[${section}] ` : ""}${b}`,
       options,
       stars: options.some((o) => o.correct) ? 1 : 0,
-      imageOptions: options.length > 0 && options.every((o) => !o.body),
+      iconProblem,
     });
   }
   return qs;
@@ -260,18 +281,19 @@ export function parseWorkbook(buf) {
     const rows = sheetRows(ws);
     let qs;
     if (name === "2.Solution Roof บ้านใหม่") qs = parseSolutionNew(rows);
-    else if (name === "2.Roof smart&speedy") qs = parseRoofSmart(rows);
+    else if (name === "2.Roof smart&speedy") qs = parseRoofSmart(rows, sheetImages(files, si + 1));
     else {
       qs = parseBlocks(rows, { bullet: name === "4,5.process&system" });
       if (name === "Proactive") applyTrailingAnswer(qs);
     }
-    const imgs = name === "2.Roof smart&speedy" ? [] : sheetImages(files, si + 1);
+    const imgs = sheetImages(files, si + 1);
     const questions = qs.map((q, i) => {
       const end = q.rangeEnd ?? q.endRow;
-      const images = imgs.filter((im) => im.row >= q.startRow && im.row <= end);
+      const images = name === "2.Roof smart&speedy" ? [] : imgs.filter((im) => im.row >= q.startRow && im.row <= end);
       const problems = [];
-      const emptyOpts = q.options.filter((o) => !o.body).length;
-      if (q.imageOptions || (q.options.length > 0 && emptyOpts === q.options.length)) problems.push("ตัวเลือกเป็นรูปในไฟล์ (อ่านเป็นข้อความไม่ได้)");
+      const emptyOpts = q.options.filter((o) => !o.body && !o.image).length;
+      if (q.iconProblem) problems.push(q.iconProblem);
+      if (q.options.length > 0 && emptyOpts === q.options.length) problems.push("ตัวเลือกเป็นรูปในไฟล์ (อ่านเป็นข้อความไม่ได้)");
       else if (q.options.length < 2) problems.push(`ตัวเลือกไม่ครบ (มี ${q.options.length})`);
       if (!q.options.some((o) => o.correct)) problems.push("ไม่มีเฉลย");
       if (q.conflict) problems.push(q.conflict);
@@ -280,7 +302,7 @@ export function parseWorkbook(buf) {
         kind: q.options.filter((o) => o.correct).length > 1 ? "multi" : "single",
         body: q.body,
         explanation: q.explanation ?? null,
-        options: q.options.map((o) => ({ body: o.body, correct: !!o.correct })),
+        options: q.options.map((o) => ({ body: o.body, correct: !!o.correct, image: o.image ?? null })),
         images: images.map((im) => ({ ext: im.ext, data: im.data })),
         problems,
         srcRow: q.startRow,

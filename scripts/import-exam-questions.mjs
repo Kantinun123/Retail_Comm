@@ -8,6 +8,7 @@
    ============================================================= */
 import { readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp"; // มากับ next (ไม่ได้ประกาศใน package.json) ใช้เฉพาะสคริปต์นี้ ไม่ใช้ใน API
 import { parseWorkbook } from "./lib/exam-parse.mjs";
 
 const APPLY = process.argv.includes("--apply");
@@ -96,9 +97,26 @@ for (const t of topics) {
     oldBySort.delete(q.sort);
     await sb.from("exam_options").delete().eq("question_id", qrow.id);
     if (q.options.length) {
-      const { error: oe } = await sb
-        .from("exam_options")
-        .insert(q.options.map((o, i) => ({ question_id: qrow.id, sort: i + 1, body: o.body, is_correct: o.correct })));
+      const optRows = [];
+      for (let i = 0; i < q.options.length; i++) {
+        const o = q.options[i];
+        let imagePath = null;
+        if (o.image) {
+          // ไอคอนในไฟล์เป็นรูปแถบเครื่องมือที่ถูกครอปด้วย srcRect -> ตัดตามนั้นแล้วขยายให้เห็นชัดบนมือถือ
+          const src = sharp(Buffer.from(o.image.data));
+          const meta = await src.metadata();
+          const c = o.image.crop;
+          const left = Math.round(c.l * meta.width), top = Math.round(c.t * meta.height);
+          const width = Math.max(1, Math.round((1 - c.l - c.r) * meta.width)), height = Math.max(1, Math.round((1 - c.t - c.b) * meta.height));
+          const png = await src.extract({ left, top, width, height }).resize({ height: height * 4, kernel: "lanczos3" }).png().toBuffer();
+          imagePath = `t${String(t.sort).padStart(2, "0")}/q${String(q.sort).padStart(3, "0")}-o${i + 1}.png`;
+          const { error } = await sb.storage.from(BUCKET).upload(imagePath, png, { contentType: "image/png", upsert: true });
+          if (error) throw error;
+          upImages++;
+        }
+        optRows.push({ question_id: qrow.id, sort: i + 1, body: o.body, is_correct: o.correct, image_path: imagePath });
+      }
+      const { error: oe } = await sb.from("exam_options").insert(optRows);
       if (oe) throw oe;
     }
   }
