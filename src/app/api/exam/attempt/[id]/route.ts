@@ -37,6 +37,9 @@ export async function POST(req: Request, { params }: Ctx) {
   if (m.attempt.status !== "in_progress") return NextResponse.json({ ok: false, error: "already_submitted" }, { status: 409 });
   const body = (await req.json().catch(() => null)) as { answers?: unknown } | null;
   const answers = cleanAnswers(body?.answers, m.attempt.question_ids as number[]);
+  // ต้องตอบครบทุกข้อก่อนส่ง (บังคับที่ server ด้วย ไม่พึ่งแค่ปุ่มบนหน้าจอ)
+  const missing = (m.attempt.question_ids as number[]).filter((q) => !(answers[String(q)]?.length));
+  if (missing.length) return NextResponse.json({ ok: false, error: `ตอบยังไม่ครบ เหลืออีก ${missing.length} ข้อ`, missing: missing.length }, { status: 400 });
   const { data: round } = await m.sb.from("exam_rounds").select("pass_percent").eq("id", m.attempt.round_id).single();
   const passPercent = (round?.pass_percent as number | undefined) ?? 80;
   const g = await gradeAttempt(m.sb, m.attempt.question_ids as number[], answers, passPercent);

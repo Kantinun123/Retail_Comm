@@ -55,6 +55,11 @@ export function ExamTakeScreen({ roundId, topicId }: { roundId: number; topicId:
 
   async function submit() {
     if (!exam) return;
+    if (exam.questions.some((x) => !answers[String(x.id)]?.length)) {
+      setError("ต้องตอบให้ครบทุกข้อก่อนจึงจะส่งได้");
+      setConfirming(false);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -117,6 +122,7 @@ export function ExamTakeScreen({ roundId, topicId }: { roundId: number; topicId:
   const answered = exam.questions.filter((x) => answers[String(x.id)]?.length).length;
   const sel = answers[String(q.id)] ?? [];
   const unanswered = total - answered;
+  const firstUnanswered = exam.questions.findIndex((x) => !answers[String(x.id)]?.length);
 
   return (
     <>
@@ -130,6 +136,18 @@ export function ExamTakeScreen({ roundId, topicId }: { roundId: number; topicId:
             <div className="h-full bg-[#d32029]" style={{ width: `${(answered / total) * 100}%` }} />
           </div>
         </div>
+
+        {unanswered > 0 ? (
+          <button type="button" onClick={() => setIdx(firstUnanswered)} className="w-full text-left rounded-xl bg-amber-50 text-amber-800 text-[12px] px-3 py-2 flex items-center gap-2">
+            <Icon name="info" style={{ fontSize: 16 }} />
+            <span className="flex-1">ต้องตอบให้ครบทุกข้อก่อนจึงจะส่งได้ · เหลืออีก <b>{unanswered} ข้อ</b></span>
+            <span className="font-bold shrink-0">ไปข้อที่ยังไม่ตอบ</span>
+          </button>
+        ) : (
+          <p className="rounded-xl bg-emerald-50 text-emerald-800 text-[12px] px-3 py-2 flex items-center gap-2">
+            <Icon name="check_circle" style={{ fontSize: 16 }} /> ตอบครบทุกข้อแล้ว ตรวจทานแล้วกด &quot;ส่งข้อสอบ&quot; ที่ข้อสุดท้ายได้เลย
+          </p>
+        )}
 
         <section className={cn(card, "p-4")}>
           <p className="text-[14px] font-semibold text-slate-900 leading-relaxed whitespace-pre-line">{q.body}</p>
@@ -190,14 +208,13 @@ export function ExamTakeScreen({ roundId, topicId }: { roundId: number; topicId:
             <button type="button" onClick={() => setIdx(idx + 1)} className={cn(btn, "flex-1 bg-slate-900 text-white")}>
               ข้อถัดไป
             </button>
+          ) : unanswered > 0 ? (
+            <button type="button" onClick={() => setIdx(firstUnanswered)} className={cn(btn, "flex-1 bg-amber-500 text-white")}>
+              ไปข้อที่ยังไม่ตอบ (เหลือ {unanswered} ข้อ)
+            </button>
           ) : (
             <button type="button" onClick={() => setConfirming(true)} className={cn(btn, "flex-1 bg-[#d32029] text-white")}>
               ส่งข้อสอบ
-            </button>
-          )}
-          {idx < total - 1 && (
-            <button type="button" onClick={() => setConfirming(true)} className={cn(btn, "border border-[#d32029] text-[#d32029] bg-white")}>
-              ส่ง
             </button>
           )}
         </div>
@@ -208,7 +225,7 @@ export function ExamTakeScreen({ roundId, topicId }: { roundId: number; topicId:
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
             <p className="text-[15px] font-bold text-slate-900">ส่งข้อสอบ?</p>
             <p className="text-[13px] text-slate-600">
-              {unanswered > 0 ? <>ยังไม่ได้ตอบ <b className="text-rose-600">{unanswered} ข้อ</b> (ข้อที่ไม่ตอบนับเป็นผิด)</> : "ตอบครบทุกข้อแล้ว"} · ส่งแล้วแก้ไม่ได้
+              ตอบครบ {total} ข้อแล้ว · ส่งแล้วแก้ไม่ได้ ผลสอบจะแสดงคะแนนทันที
             </p>
             <div className="flex gap-2">
               <button type="button" disabled={busy} onClick={() => setConfirming(false)} className={cn(btn, "flex-1 border border-slate-200 text-slate-700")}>
