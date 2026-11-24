@@ -22,6 +22,8 @@ import {
   remindCoachNow,
   setCountedSubmission,
   setStoreEvalRequired,
+  EXEMPT_REASONS,
+  EXEMPT_OTHER,
   shiftPeriod,
   shortDate,
   type TrackCoach,
@@ -259,13 +261,13 @@ export function EvalTrackingScreen() {
                         </div>
                       )}
                       {reqStores.map((s) => (
-                        <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} canToggle={isAdmin && inProgress} onToggle={(v, why) => toggleRequired(s, v, why)} onPick={(sid) => pickCounted(s, sid)} />
+                        <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} canToggle={inProgress} onToggle={(v, why) => toggleRequired(s, v, why)} onPick={(sid) => pickCounted(s, sid)} />
                       ))}
                       {exemptStores.length > 0 && (
                         <>
                           <p className="pt-1.5 px-0.5 text-[11px] font-bold text-slate-500">ไม่ต้องตรวจ ({exemptStores.length}) · ไม่นับในตัวเลข</p>
                           {exemptStores.map((s) => (
-                            <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} canToggle={isAdmin && inProgress} onToggle={(v, why) => toggleRequired(s, v, why)} onPick={(sid) => pickCounted(s, sid)} />
+                            <StoreRow key={s.code} s={s} inProgress={inProgress} isAdmin={isAdmin} isCoach={isCoach} busy={busy} canToggle={inProgress} onToggle={(v, why) => toggleRequired(s, v, why)} onPick={(sid) => pickCounted(s, sid)} />
                           ))}
                         </>
                       )}
@@ -308,6 +310,7 @@ function StoreRow({
 }) {
   const [askReason, setAskReason] = useState(false);
   const [reason, setReason] = useState("");
+  const [preset, setPreset] = useState<string>("");
   const counted = s.submissions[0];
   const chronic = chronicText(s, inProgress);
   const badge = !s.required
@@ -334,6 +337,12 @@ function StoreRow({
             {!s.required && s.exemptSince ? ` · ปิดตั้งแต่ ${monthLabel(s.exemptSince)}` : ""}
             {!s.required && s.exemptReason ? ` · ${s.exemptReason}` : ""}
           </span>
+          {!s.required && s.exemptBy && (
+            <span className="block text-[10px] text-slate-400">
+              ปิดโดย {s.exemptBy}
+              {s.exemptAt ? ` · ${shortDate(new Date(new Date(s.exemptAt).getTime() + 7 * 3600e3).toISOString().slice(0, 10))}` : ""}
+            </span>
+          )}
         </span>
         <span className={cn("shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold border rounded-full px-2 py-0.5", badge.c)}>
           <Icon name={badge.i} style={{ fontSize: 12 }} />
@@ -345,40 +354,80 @@ function StoreRow({
           </a>
         )}
       </div>
-      {canToggle && !askReason && (
+      {/* ปิด/เปิดการตรวจรายร้าน: Admin ทุกแถว ; Coach / Area เฉพาะร้านที่ยังไม่ตรวจ (ปิด) และร้านที่ปิดไว้ (เปิดคืน) */}
+      {canToggle && !askReason && s.required && (isAdmin || s.status === "missing") && (
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            disabled={busy === `req:${s.code}`}
+            onClick={() => setAskReason(true)}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold disabled:opacity-50",
+              s.status === "missing" ? "border-slate-300 bg-white text-slate-700" : "border-transparent text-slate-500 hover:text-[#a11119]"
+            )}
+          >
+            <Icon name="do_not_disturb_on" style={{ fontSize: 14 }} />
+            ไม่ตรวจร้านนี้
+          </button>
+        </div>
+      )}
+      {canToggle && !askReason && !s.required && (
         <div className="mt-1.5 flex justify-end">
           <button
             type="button"
             disabled={busy === `req:${s.code}`}
-            onClick={() => (s.required ? setAskReason(true) : onToggle(true))}
-            className="text-[10.5px] font-bold text-slate-500 hover:text-[#a11119] inline-flex items-center gap-0.5 disabled:opacity-50"
+            onClick={() => onToggle(true)}
+            className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 disabled:opacity-50"
           >
-            <Icon name={s.required ? "toggle_off" : "toggle_on"} style={{ fontSize: 15 }} />
-            {s.required ? "ปิดการตรวจร้านนี้" : "เปิดการตรวจอีกครั้ง"}
+            <Icon name="toggle_on" style={{ fontSize: 15 }} />
+            เปิดการตรวจอีกครั้ง
           </button>
         </div>
       )}
       {canToggle && askReason && (
-        <div className="mt-2 rounded-lg bg-white border border-slate-200 p-2 space-y-1.5">
-          <p className="text-[11px] text-slate-600">ปิดการตรวจตั้งแต่เดือนนี้ · เดือนก่อนหน้ายังนับตามเดิม</p>
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            maxLength={200}
-            placeholder="เหตุผล (ไม่บังคับ) เช่น ร้านปรับปรุง"
-            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[#d32029]"
-          />
+        <div className="mt-2 rounded-lg bg-white border border-slate-200 p-2.5 space-y-2">
+          <p className="text-[11.5px] font-bold text-slate-800">สาเหตุที่ไม่ตรวจร้านนี้ <span className="text-[#d32029]">*</span></p>
+          <div className="flex flex-wrap gap-1.5">
+            {[...EXEMPT_REASONS, EXEMPT_OTHER].map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setPreset(r)}
+                aria-pressed={preset === r}
+                className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", preset === r ? "border-[#d32029] bg-red-50 text-[#b0141c]" : "border-slate-200 bg-white text-slate-600")}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          {preset === EXEMPT_OTHER && (
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={200}
+              placeholder="พิมพ์สาเหตุ (อย่างน้อย 3 ตัวอักษร)"
+              className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[#d32029]"
+            />
+          )}
+          <p className="text-[10.5px] text-slate-500 leading-snug">
+            มีผลตั้งแต่เดือนนี้ · ร้านจะไม่นับในตัวเลขและไม่ถูกเตือน · เดือนก่อนหน้ายังนับตามเดิม · เปิดการตรวจคืนได้ภายหลัง · ระบบบันทึกชื่อผู้กด
+          </p>
           <div className="flex justify-end gap-1.5">
-            <button type="button" onClick={() => { setAskReason(false); setReason(""); }} className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+            <button type="button" onClick={() => { setAskReason(false); setReason(""); setPreset(""); }} className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600">
               ยกเลิก
             </button>
             <button
               type="button"
-              disabled={busy === `req:${s.code}`}
-              onClick={() => { onToggle(false, reason); setAskReason(false); setReason(""); }}
-              className="rounded-full bg-[#d32029] text-white px-2.5 py-1 text-[11px] font-bold disabled:opacity-50"
+              disabled={busy === `req:${s.code}` || !preset || (preset === EXEMPT_OTHER && reason.trim().length < 3)}
+              onClick={() => {
+                onToggle(false, preset === EXEMPT_OTHER ? reason.trim() : preset);
+                setAskReason(false);
+                setReason("");
+                setPreset("");
+              }}
+              className="rounded-full bg-[#d32029] text-white px-2.5 py-1 text-[11px] font-bold disabled:opacity-40"
             >
-              ยืนยันปิดการตรวจ
+              ยืนยันไม่ตรวจ
             </button>
           </div>
         </div>

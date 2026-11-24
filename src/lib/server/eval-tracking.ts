@@ -36,12 +36,15 @@ export interface TrackStore {
   chronic: boolean;
   /** เดือนล่าสุดที่เคยตรวจ (ก่อนหรือเท่ากับเดือนที่เลือก) */
   lastEvalPeriod: string | null;
-  /** เดือนที่เลือกร้านนี้ต้องตรวจหรือไม่ (false = Admin ปิดการตรวจไว้) */
+  /** เดือนที่เลือกร้านนี้ต้องตรวจหรือไม่ (false = ถูกปิดการตรวจโดย Admin / Area / Coach) */
   required: boolean;
   /** เหตุผลที่ปิดการตรวจ (เมื่อ required = false) */
   exemptReason: string | null;
   /** เดือนที่เริ่มปิดการตรวจ (เมื่อ required = false) */
   exemptSince: string | null;
+  /** ผู้กดปิดการตรวจ + เวลา (ไว้ตรวจสอบย้อนหลัง) */
+  exemptBy: string | null;
+  exemptAt: string | null;
 }
 
 /** ขาดติดกันกี่เดือนถึงนับเป็น "ขาดติดกัน" (เตือนเข้มขึ้น) */
@@ -107,20 +110,34 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
     sb.from("rep_store_assignments").select("rep_code, dealer_code, role_in_store").in("role_in_store", ["coach", "manager"]),
     sb.from("store_eval_lines").select("submission_id, dealer_code, eval_date, inspector, pct, result, is_primary").eq("period", period).not("dealer_code", "is", null),
     sb.from("store_eval_lines").select("dealer_code, period").not("dealer_code", "is", null).order("period", { ascending: false }).limit(5000),
-    sb.from("store_eval_requirements").select("dealer_code, effective_period, required, reason").lte("effective_period", period).order("effective_period", { ascending: true }),
+    sb.from("store_eval_requirements").select("dealer_code, effective_period, required, reason, changed_by, changed_at").lte("effective_period", period).order("effective_period", { ascending: true }),
   ]);
+  // ชื่อผู้กดเปลี่ยนสถานะ (เฉพาะคนที่เกี่ยวข้อง) — ไว้แสดง "ปิดโดย ..." ให้ตรวจสอบย้อนหลังได้
+  const changerIds = [...new Set((reqRows ?? []).map((r) => r.changed_by as string | null).filter((x): x is string => !!x))];
+  const changerNames = new Map<string, string>();
+  if (changerIds.length) {
+    const { data: pf } = await sb.from("profiles").select("id, full_name").in("id", changerIds);
+    for (const p of pf ?? []) if (p.full_name) changerNames.set(p.id as string, p.full_name as string);
+  }
+  type ReqEntry = { p: string; required: boolean; reason: string | null; by: string | null; at: string | null };
   // สถานะต้องตรวจรายเดือน: แถวล่าสุดที่ effective_period <= เดือนนั้น ; ไม่มีแถว = ต้องตรวจ
-  const reqHist = new Map<string, { p: string; required: boolean; reason: string | null }[]>();
+  const reqHist = new Map<string, ReqEntry[]>();
   (reqRows ?? []).forEach((r) =>
     reqHist.set(r.dealer_code as string, [
       ...(reqHist.get(r.dealer_code as string) ?? []),
-      { p: r.effective_period as string, required: r.required === true, reason: (r.reason as string | null) ?? null },
+      {
+        p: r.effective_period as string,
+        required: r.required === true,
+        reason: (r.reason as string | null) ?? null,
+        by: r.changed_by ? changerNames.get(r.changed_by as string) ?? null : null,
+        at: (r.changed_at as string | null) ?? null,
+      },
     ])
   );
-  const reqAt = (code: string, p: string) => {
-    let cur: { p: string; required: boolean; reason: string | null } | null = null;
+  const reqAt = (code: string, p: string): ReqEntry => {
+    let cur: ReqEntry | null = null;
     for (const h of reqHist.get(code) ?? []) if (h.p <= p) cur = h;
-    return cur ?? { p: "", required: true, reason: null };
+    return cur ?? { p: "", required: true, reason: null, by: null, at: null };
   };
   /** จำนวนเดือนที่ต้องตรวจ ในช่วง (from, to] — ข้ามเดือนที่ปิดการตรวจ */
   const requiredMonthsBetween = (code: string, from: string, to: string) => {
@@ -200,6 +217,8 @@ export async function buildTracking(sb: Sb, period: string, scope: string[] | nu
       required: req.required,
       exemptReason: req.required ? null : req.reason,
       exemptSince: req.required ? null : req.p,
+      exemptBy: req.required ? null : req.by,
+      exemptAt: req.required ? null : req.at,
     };
   });
 

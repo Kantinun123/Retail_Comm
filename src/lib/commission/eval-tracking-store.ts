@@ -30,11 +30,14 @@ export interface TrackStore {
   chronic: boolean;
   /** เดือนล่าสุดที่ร้านนี้ถูกตรวจ */
   lastEvalPeriod: string | null;
-  /** เดือนที่ดูร้านนี้ต้องตรวจหรือไม่ (false = Admin ปิดการตรวจไว้) */
+  /** เดือนที่ดูร้านนี้ต้องตรวจหรือไม่ (false = ถูกปิดการตรวจโดย Admin / Area / Coach) */
   required: boolean;
   exemptReason: string | null;
   /** เดือนที่เริ่มปิดการตรวจ */
   exemptSince: string | null;
+  /** ผู้กดปิดการตรวจ + เวลา (ISO) */
+  exemptBy: string | null;
+  exemptAt: string | null;
   submissions: EvalSubmission[];
 }
 export interface TrackCoach {
@@ -81,7 +84,11 @@ export const fetchTracking = (period?: string) => call<Tracking>(`/api/store-eva
 export const setCountedSubmission = (submissionId: string) =>
   call<object>("/api/store-eval/tracking", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionId }) });
 
-/** Admin: เปิด/ปิดการตรวจประเมินของร้าน (มีผลตั้งแต่เดือนนี้) */
+/** สาเหตุที่ไม่ตรวจ (ตัวเลือกสำเร็จรูป) — "อื่นๆ" ให้พิมพ์เอง ; ใช้ข้อความเต็มเป็นค่าที่เก็บ */
+export const EXEMPT_REASONS = ["ร้านปิดชั่วคราว / ปรับปรุงร้าน", "ยกเลิกเป็นตัวแทนแล้ว", "ไม่มี SE ประจำร้าน", "ร้านใหม่ ยังไม่เริ่มดำเนินการ"] as const;
+export const EXEMPT_OTHER = "อื่นๆ";
+
+/** Admin / หัวหน้า Area / Area / Coach (เฉพาะร้านที่ดูแล): เปิด/ปิดการตรวจประเมินของร้าน (มีผลตั้งแต่เดือนนี้) — ปิดต้องระบุสาเหตุ */
 export const setStoreEvalRequired = (dealerCode: string, required: boolean, reason?: string) =>
   call<{ period: string; required: boolean }>("/api/store-eval/requirement", {
     method: "POST",

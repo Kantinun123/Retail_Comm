@@ -73,14 +73,14 @@ export function EvalRequiredCard({ dealerCode }: { dealerCode: string }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={200}
-            placeholder="เหตุผล (ไม่บังคับ) เช่น ร้านปรับปรุง"
+            placeholder="สาเหตุที่ไม่ตรวจ (บังคับ) เช่น ร้านปรับปรุง"
             className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-[#d32029]"
           />
           <div className="flex justify-end gap-1.5">
             <button type="button" onClick={() => { setAsk(false); setReason(""); }} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11.5px] font-bold text-slate-600">
               ยกเลิก
             </button>
-            <button type="button" disabled={busy} onClick={() => save(false)} className="rounded-full bg-[#d32029] text-white px-3 py-1 text-[11.5px] font-bold disabled:opacity-50">
+            <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => save(false)} className="rounded-full bg-[#d32029] text-white px-3 py-1 text-[11.5px] font-bold disabled:opacity-40">
               ยืนยันปิดการตรวจ
             </button>
           </div>
