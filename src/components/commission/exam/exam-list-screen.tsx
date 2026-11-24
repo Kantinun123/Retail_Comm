@@ -1,6 +1,7 @@
 "use client";
 /* ข้อสอบ Competency ของพนักงานขาย (SE): รอบสอบที่เปิด + สถานะรายหัวข้อ (ยังไม่ทำ / กำลังทำ / ยังไม่ผ่าน / ผ่านแล้ว) */
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "../icon";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ const STATUS: Record<TopicStatus, { label: string; cls: string; icon: string }> 
 };
 
 function TopicRow({ round, t }: { round: ExamRoundState; t: ExamTopicState }) {
+  const router = useRouter();
   const s = STATUS[t.status];
   const action = t.status === "passed" ? null : t.status === "in_progress" ? "ทำต่อ" : t.status === "failed" ? "สอบใหม่" : "เริ่มสอบ";
   const detail =
@@ -42,7 +44,15 @@ function TopicRow({ round, t }: { round: ExamRoundState; t: ExamTopicState }) {
     </div>
   );
   return action ? (
-    <Link href={`/app/exam/take/${round.id}/${t.id}`} className="block hover:bg-red-50/40 transition">
+    // ?v= ทำให้ทุกครั้งที่กดเริ่ม/สอบใหม่เป็นหน้าใหม่ ไม่ย้อนไปใช้สถานะหน้าเดิมที่ Next เก็บไว้ (ไม่งั้นผลสอบครั้งก่อนค้างอยู่)
+    <Link
+      href={`/app/exam/take/${round.id}/${t.id}`}
+      onClick={(e) => {
+        e.preventDefault();
+        router.push(`/app/exam/take/${round.id}/${t.id}?v=${Date.now()}`);
+      }}
+      className="block hover:bg-red-50/40 transition"
+    >
       {inner}
     </Link>
   ) : (
