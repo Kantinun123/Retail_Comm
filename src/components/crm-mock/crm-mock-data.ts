@@ -57,21 +57,34 @@ const subWd = (n: number, hour = 9) => {
 };
 
 /* ---------- Lead ---------- */
-export type LeadStatus = "waiting" | "contacting" | "qualified" | "converted" | "lost";
+export type LeadStatus = "waiting" | "contacting" | "qualified" | "converted" | "dealer" | "lost";
+export type DealerStep = "sent" | "accepted" | "quoted" | "won" | "lost";
 export interface Lead {
   id: string; name: string; phone: string; product: string; channel: string; province: string;
   createdAt: string; firstContactAt?: string; status: LeadStatus; note?: string; lostReason?: string; interest?: string; tries?: number;
+  /** สายสินค้า: ส่งให้ร้านทำใบเสนอราคาในระบบร้าน */
+  dealerStore?: string; dealerStep?: DealerStep; dealerAmount?: number; sentAt?: string;
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
-export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral"];
+export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral", "ลูกค้าเดิม"];
 export const OWNERS = ["ฝน", "บอส", "มิ้น"];
 export const LEAD_STATUS: Record<LeadStatus, { label: string; cls: string }> = {
   waiting: { label: "รอติดต่อ", cls: "bg-amber-100 text-amber-800" },
   contacting: { label: "กำลังสกรีน", cls: "bg-sky-100 text-sky-800" },
   qualified: { label: "รอเปิด Opp", cls: "bg-violet-100 text-violet-800" },
   converted: { label: "เปิด Opp แล้ว", cls: "bg-emerald-100 text-emerald-800" },
+  dealer: { label: "ส่งให้ร้านแล้ว", cls: "bg-fuchsia-100 text-fuchsia-800" },
   lost: { label: "Loss", cls: "bg-rose-100 text-rose-700" },
 };
+export const DEALER_STEP: Record<DealerStep, { label: string; cls: string }> = {
+  sent: { label: "รอร้านรับ", cls: "bg-fuchsia-50 text-fuchsia-700" },
+  accepted: { label: "ร้านรับแล้ว", cls: "bg-sky-50 text-sky-700" },
+  quoted: { label: "ร้านเสนอราคาแล้ว", cls: "bg-violet-50 text-violet-700" },
+  won: { label: "ร้านปิดขาย", cls: "bg-emerald-100 text-emerald-800" },
+  lost: { label: "ร้านแจ้ง Loss", cls: "bg-rose-50 text-rose-700" },
+};
+export const DEALER_STORES = ["ร้านอุดรวัสดุ", "ร้านขอนแก่นโฮม", "ร้านหาดใหญ่โฮม", "ร้านภูเก็ตวัสดุ", "ร้านชลบุรีโฮม", "ร้านเชียงใหม่ซีเมนต์"];
+export const DEALER_LOST = ["ลูกค้าต้องการเปรียบเทียบราคาเท่านั้น", "ยังไม่ตัดสินใจ รอพิจารณา", "ยังไม่มีแผนต่อเติมในช่วงนี้", "ราคาสูง ซื้อ SCG ที่ร้านอื่น", "ราคาสูง เปลี่ยนยี่ห้ออื่น", "สินค้าไม่พร้อมขาย ซื้อ SCG ที่ร้านอื่น", "สินค้าไม่พร้อมขาย เปลี่ยนยี่ห้ออื่น", "ไม่ตรงกับความต้องการลูกค้า"];
 export const LOST_REASONS = ["งบประมาณไม่ถึง", "ยังไม่พร้อมต่อเติม", "อยู่นอกพื้นที่บริการ", "ติดต่อไม่ได้", "เลือกผู้ให้บริการอื่น"];
 
 /* ---------- หน่วยงาน ---------- */
@@ -365,6 +378,9 @@ export function seedLeads(): Lead[] {
     { id: "L-2611-006", name: "คุณอนันต์ ทองดี", phone: "083-555-6620", product: "Roof Install", channel: "Home Online", province: "กรุงเทพมหานคร", createdAt: hAgo(72), firstContactAt: hAgo(71), status: "qualified", note: "ผ่านเงื่อนไขรับงาน พร้อมให้สำรวจ", interest: "เปลี่ยนกระเบื้องหลังคา" },
     { id: "L-2611-007", name: "คุณพิมพ์ใจ รักไทย", phone: "082-555-2231", product: "Roof Install", channel: "Contact Center", province: "สงขลา", createdAt: hAgo(100), firstContactAt: hAgo(98), status: "qualified", note: "งบ 3-4 แสน ต้องการเริ่มก่อนสิ้นปี", interest: "โรงจอดรถ + ตัวบ้าน ต้องมีอะเสและทรัส" },
     { id: "L-2611-008", name: "คุณวีระ สุขสบาย", phone: "080-555-1177", product: "Home Automation", channel: "LINE OA", province: "ชลบุรี", createdAt: hAgo(120), firstContactAt: hAgo(118), status: "lost", lostReason: "งบประมาณไม่ถึง", interest: "ระบบบ้านอัจฉริยะ" },
+    { id: "L-2611-016", name: "คุณมาลี สุขใจ", phone: "081-555-4416", product: "กระเบื้องหลังคา (สินค้า)", channel: "Home Online", province: "ภูเก็ต", createdAt: hAgo(5), firstContactAt: hAgo(4), status: "dealer", dealerStore: "ร้านภูเก็ตวัสดุ", dealerStep: "sent", sentAt: hAgo(3), interest: "กระเบื้อง 120 ตร.ม. ไม่ต้องการแบบ" },
+    { id: "L-2611-012", name: "คุณมานะ พงษ์ไทย", phone: "089-555-1212", product: "รางน้ำฝน (สินค้า)", channel: "LINE OA", province: "ชลบุรี", createdAt: hAgo(40), firstContactAt: hAgo(39), status: "dealer", dealerStore: "ร้านชลบุรีโฮม", dealerStep: "quoted", dealerAmount: 48200, sentAt: hAgo(38), interest: "รางน้ำรอบบ้าน" },
+    { id: "L-2611-011", name: "คุณวิไล รักดี", phone: "085-555-1111", product: "ฝ้าเพดาน (สินค้า)", channel: "Walk-in", province: "เชียงใหม่", createdAt: hAgo(90), firstContactAt: hAgo(89), status: "dealer", dealerStore: "ร้านเชียงใหม่ซีเมนต์", dealerStep: "won", dealerAmount: 36500, sentAt: hAgo(88), interest: "ฝ้าเพดานห้องนั่งเล่น" },
   ];
 }
 

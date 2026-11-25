@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { LEAD_STATUS, LOST_REASONS, MAX_CONTACT_TRIES, NOW, agoText, dtTh, slaHoursOf, type Lead, type Task } from "./crm-mock-data";
+import { DEALER_LOST, DEALER_STEP, DEALER_STORES, LEAD_STATUS, LOST_REASONS, MAX_CONTACT_TRIES, NOW, agoText, dtTh, slaHoursOf, type Lead, type Task } from "./crm-mock-data";
 import { Avatar, Drawer, Field, KV, SlaBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 /* ---------------- Lead ---------------- */
@@ -20,6 +20,9 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
   const [checks, setChecks] = useState({ budget: false, area: false, ready: false });
   const [lost, setLost] = useState(false);
   const [reason, setReason] = useState(LOST_REASONS[0]);
+  const [store, setStore] = useState(DEALER_STORES[0]);
+  const [amount, setAmount] = useState("");
+  const [dReason, setDReason] = useState(DEALER_LOST[0]);
   const allOk = checks.budget && checks.area && checks.ready;
   const open = lead.status === "waiting" || lead.status === "contacting" || lead.status === "qualified";
   const tries = lead.tries ?? 0;
@@ -64,6 +67,9 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
         <KV k="ติดต่อครั้งแรก" v={lead.firstContactAt ? dtTh(lead.firstContactAt) : "ยังไม่ติดต่อ"} />
         <KV k="SLA" v={<span className="flex items-center justify-end gap-2"><span className="text-[11px] text-slate-400">เป้า {slaHoursOf(lead.channel)} ชม.</span><SlaBadge lead={lead} /></span>} />
         {lead.interest && <KV k="ความต้องการ" v={lead.interest} />}
+        {lead.dealerStore && <KV k="ร้านที่รับ" v={lead.dealerStore} />}
+        {lead.dealerStep && <KV k="สถานะที่ร้านแจ้ง" v={<span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", DEALER_STEP[lead.dealerStep].cls)}>{DEALER_STEP[lead.dealerStep].label}</span>} />}
+        {lead.dealerAmount !== undefined && <KV k="ยอดใบเสนอราคาร้าน" v={`฿${lead.dealerAmount.toLocaleString("en-US")}`} />}
         {lead.lostReason && <KV k="เหตุผล Loss" v={lead.lostReason} />}
       </div>
 
@@ -82,6 +88,38 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
               <select value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls}>{LOST_REASONS.map((r) => <option key={r}>{r}</option>)}</select>
             </Field>
           )}
+        </div>
+      )}
+
+      {open && (
+        <div className={cn(glass, "space-y-3 p-4")}>
+          <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-slate-900"><Icon name="storefront" style={{ fontSize: 18 }} />ลูกค้าสนใจเฉพาะสินค้า ไม่ต้องการแบบ</h3>
+          <p className="text-[12px] text-slate-500">ส่งให้ร้านทำใบเสนอราคาในระบบร้าน แล้วร้านจะส่งสถานะและผล Win / Loss กลับมาที่นี่</p>
+          <div className="flex flex-wrap gap-2">
+            <select value={store} onChange={(e) => setStore(e.target.value)} className={cn(inputCls, "w-auto")}>{DEALER_STORES.map((s) => <option key={s}>{s}</option>)}</select>
+            <button onClick={() => { onPatch(lead.id, { status: "dealer", dealerStep: "sent", dealerStore: store, sentAt: NOW.toISOString(), note, firstContactAt: lead.firstContactAt ?? NOW.toISOString() }); toast(`ส่งให้ ${store} แล้ว`); }} className={btnGhost}><Icon name="send" style={{ fontSize: 18 }} />ส่งให้ร้าน</button>
+          </div>
+        </div>
+      )}
+
+      {lead.status === "dealer" && lead.dealerStep && lead.dealerStep !== "won" && (
+        <div className="space-y-3 rounded-2xl border border-dashed border-fuchsia-300 bg-fuchsia-50/50 p-4">
+          <h3 className="text-[13px] font-bold text-fuchsia-800">จำลองร้านตอบกลับ (เดโม)</h3>
+          <p className="text-[12px] text-slate-500">ของจริงข้อมูลนี้ส่งมาจากระบบร้านค้าเอง ตอนนี้กดจำลองเพื่อดูการเปลี่ยนสถานะ</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {lead.dealerStep === "sent" && <button onClick={() => { onPatch(lead.id, { dealerStep: "accepted" }); toast("ร้านรับ Lead แล้ว"); }} className={btnGhost}>ร้านรับแล้ว</button>}
+            {(lead.dealerStep === "sent" || lead.dealerStep === "accepted") && (
+              <>
+                <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="ยอดใบเสนอราคา" className={cn(inputCls, "w-40")} />
+                <button disabled={!amount} onClick={() => { onPatch(lead.id, { dealerStep: "quoted", dealerAmount: Number(amount) }); toast("ร้านเสนอราคาแล้ว"); }} className={cn(btnGhost, !amount && "opacity-50")}>ร้านเสนอราคา</button>
+              </>
+            )}
+            {lead.dealerStep === "quoted" && <button onClick={() => { onPatch(lead.id, { dealerStep: "won" }); toast("ร้านปิดขายแล้ว Lead = Won"); }} className={btnPrimary}>ร้านปิดขาย (Win)</button>}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={dReason} onChange={(e) => setDReason(e.target.value)} className={cn(inputCls, "w-auto max-w-full")}>{DEALER_LOST.map((r) => <option key={r}>{r}</option>)}</select>
+            <button onClick={() => { onPatch(lead.id, { status: "lost", dealerStep: "lost", lostReason: `Lost - ${dReason}` }); toast("ร้านแจ้ง Loss แล้ว"); }} className="rounded-xl bg-rose-600 px-3.5 py-2.5 text-[13px] font-bold text-white">ร้านแจ้ง Loss</button>
+          </div>
         </div>
       )}
 
