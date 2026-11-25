@@ -5,9 +5,11 @@
    - gross = Total_commission [R] ; net = gross * 0.97 (หัก 3%)
    - Detail Commission.xlsx -> commission_product_payouts (period/paid_date/gross/wht/net)
    - idempotent: ลบทั้ง 2 ตารางก่อน insert
+   - --period YYYY-MM[,YYYY-MM]: นำเข้าเฉพาะเดือนที่ระบุ (ลบ/เพิ่มเฉพาะเดือนนั้น, ไม่แตะ payouts และเดือนอื่น)
+   - หลัง apply ต้องรัน node scripts/backfill-rep-code.mjs --apply (เติม rep_code ให้หน้าพนักงานรายคน)
 
-   DRY RUN: node scripts/import-commission-product.mjs
-   APPLY:   node scripts/import-commission-product.mjs --apply
+   DRY RUN: node scripts/import-commission-product.mjs [--period 2026-09]
+   APPLY:   node scripts/import-commission-product.mjs --apply [--period 2026-09]
 */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -15,6 +17,9 @@ import * as XLSX from "xlsx";
 import { createClient } from "@supabase/supabase-js";
 
 const APPLY = process.argv.includes("--apply");
+const pIdx = process.argv.indexOf("--period");
+const PERIODS = pIdx > 0 ? new Set(String(process.argv[pIdx + 1] ?? "").split(",").map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}$/.test(s))) : null;
+if (PERIODS && !PERIODS.size) { console.error("--period ต้องเป็น YYYY-MM"); process.exit(1); }
 const DIR = "commission-app/Product DI 2026";
 const DETAIL = "Detail Commission.xlsx";
 const MONTH = { Jan:"01",Feb:"02",Mar:"03",Apr:"04",May:"05",Jun:"06",Jul:"07",Aug:"08",Sep:"09" };
@@ -57,6 +62,7 @@ for (const f of files) {
     const dealerCode = str(row[G("DealerCode")]);
     const period = `${row[G("SalesYear")] ?? 2026}-${String(row[G("SalesMonth")] ?? "").padStart(2,"0")}`;
     if (!dealerCode || !/^\d{4}-\d{2}$/.test(period)) continue;
+    if (PERIODS && !PERIODS.has(period)) continue;
     const gross = num(row[G("Total_commission [R]")]) ?? 0;
     const rec = {
       period,
@@ -138,6 +144,27 @@ if (!APPLY) {
 }
 
 /* ---- APPLY ---- */
+if (PERIODS) {
+  // เฉพาะเดือนที่ระบุ: ต้องมีแถวครบทุกเดือนที่ขอ ไม่งั้นหยุด (กันลบเดือนนั้นทิ้งโดยไม่มีของใหม่)
+  const got = new Set(rows.map((r) => r.period));
+  const missing = [...PERIODS].filter((p) => !got.has(p));
+  if (missing.length) { console.error(`ไม่พบข้อมูลเดือน ${missing.join(", ")} ในไฟล์ — ไม่นำเข้า`); process.exit(1); }
+  console.log(`\nAPPLY: แทนที่เฉพาะเดือน ${[...PERIODS].join(", ")} (${rows.length} แถว) ; payouts ไม่แตะ`);
+  const { data: maxRow } = await sb.from("commission_product_lines").select("id").order("id", { ascending: false }).limit(1).maybeSingle();
+  const maxBefore = maxRow?.id ?? 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await sb.from("commission_product_lines").insert(rows.slice(i, i + 500));
+    if (error) {
+      await sb.from("commission_product_lines").delete().in("period", [...PERIODS]).gt("id", maxBefore); // ย้อนแถวใหม่ ของเดิมยังอยู่
+      console.error("lines insert ล้มเหลว:", error.message); process.exit(1);
+    }
+    process.stdout.write(`\r  lines ${Math.min(i + 500, rows.length)}/${rows.length}`);
+  }
+  const { error: dErr } = await sb.from("commission_product_lines").delete().in("period", [...PERIODS]).lte("id", maxBefore);
+  if (dErr) { console.error("\nลบแถวเดิมไม่สำเร็จ:", dErr.message); process.exit(1); }
+  console.log(`\nDONE lines=${rows.length} (เดือน ${[...PERIODS].join(", ")})`);
+  process.exit(0);
+}
 console.log("\nAPPLY: ล้าง 2 ตารางแล้ว insert ใหม่...");
 await sb.from("commission_product_lines").delete().neq("id", 0);
 await sb.from("commission_product_payouts").delete().neq("id", 0);

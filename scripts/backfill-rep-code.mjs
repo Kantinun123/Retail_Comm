@@ -16,7 +16,10 @@ const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_
 const norm=(s)=>String(s??"").replace(/\s+/g,"").toLowerCase().trim();
 
 async function pageAll(table, cols, filter) {
-  const out=[]; for(let from=0;;from+=1000){ let q=sb.from(table).select(cols).range(from,from+999); if(filter)q=filter(q); const{data,error}=await q; if(error){console.error(table,error.message);process.exit(1);} out.push(...data); if(data.length<1000)break; } return out;
+  // keyset ตาม id (ต้องมี id ใน cols) — offset โดยไม่เรียงลำดับทำให้ข้าม/ซ้ำแถวเมื่อตารางใหญ่
+  const withId = cols.split(",").map((c)=>c.trim()).includes("id");
+  if(!withId){ const out=[]; for(let from=0;;from+=1000){ let q=sb.from(table).select(cols).order(cols.split(",")[0].trim()).range(from,from+999); if(filter)q=filter(q); const{data,error}=await q; if(error){console.error(table,error.message);process.exit(1);} out.push(...data); if(data.length<1000)break; } return out; }
+  const out=[]; let last=0; for(;;){ let q=sb.from(table).select(cols).gt("id",last).order("id").limit(1000); if(filter)q=filter(q); const{data,error}=await q; if(error){console.error(table,error.message);process.exit(1);} out.push(...data); if(data.length<1000)break; last=data[data.length-1].id; } return out;
 }
 
 /* ---- sale_reps -> lookup maps ---- */
