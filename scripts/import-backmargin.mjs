@@ -8,6 +8,12 @@
    DRY RUN (ค่าเริ่มต้น): node scripts/import-backmargin.mjs
      -> รายงานแถว/เดือน + ยอดรวม + ร้านที่ไม่ match dealers (ไม่เขียน DB)
    ลงจริง: node scripts/import-backmargin.mjs --apply
+
+   นำเข้าเฉพาะไฟล์ที่ชื่อขึ้นต้นด้วยข้อความที่ระบุ (ไม่ลบ/ใส่ซ้ำเดือนอื่น) — ใช้ตอนเพิ่มไฟล์เดือนใหม่:
+     node scripts/import-backmargin.mjs --only=OCT_            (dry-run)
+     node scripts/import-backmargin.mjs --only=OCT_ --apply
+   (ข้อควรระวัง: ถ้าใช้ --only กับไฟล์ที่เป็นเดือนขายเดียวกับไฟล์อื่นที่มีอยู่แล้ว เช่น Revise FEB + Add1/Add2
+    ต้องระบุให้ครบทุกไฟล์ของเดือนนั้น ไม่งั้นข้อมูลของไฟล์ที่ไม่ได้ระบุในเดือนนั้นจะถูกลบ)
 */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,6 +21,7 @@ import * as XLSX from "xlsx";
 import { createClient } from "@supabase/supabase-js";
 
 const APPLY = process.argv.includes("--apply");
+const ONLY = (process.argv.find((a) => a.startsWith("--only=")) ?? "").slice("--only=".length).trim().toLowerCase();
 const DIR = "commission-app/back margin 2026";
 
 /* ---- env ---- */
@@ -75,8 +82,12 @@ const knownDealers = new Set((dealerRows ?? []).map((d) => d.code));
    แต่ละไฟล์ SalesMonth เดือนเดียว -> ใช้ sales_period จากแถวตรง ๆ
    ข้าม: temp Excel (~$) และไฟล์ data(22) (สรุปยอดจ่าย คนละ format) */
 const files = readdirSync(DIR).filter(
-  (f) => f.endsWith(".xlsx") && !f.startsWith("~$") && !f.toLowerCase().startsWith("data (")
+  (f) => f.endsWith(".xlsx") && !f.startsWith("~$") && !f.toLowerCase().startsWith("data (") && (!ONLY || f.toLowerCase().startsWith(ONLY))
 );
+if (ONLY && files.length === 0) {
+  console.error(`ไม่พบไฟล์ที่ชื่อขึ้นต้นด้วย "${ONLY}" ใน ${DIR}`);
+  process.exit(1);
+}
 
 console.log(`${APPLY ? "APPLY" : "DRY RUN"} | ไฟล์ที่จะนำเข้า: ${files.length}`);
 console.log("dealers ในระบบ:", knownDealers.size, "\n");
@@ -188,6 +199,8 @@ for (const f of files) {
     if (firstCol) {
       let summaryTotal = 0;
       for (let k = firstCol.rr + 1; k < sumRows.length; k++) {
+        // แถว Grand Total ของ pivot คือยอดรวมอยู่แล้ว — ห้ามบวกซ้ำ (เคยทำให้ยอด Summary เป็น 2 เท่า)
+        if ((sumRows[k] ?? []).slice(0, firstCol.cc).some((x) => /^grand total$/i.test(String(x ?? "").trim()))) continue;
         const v = Number(sumRows[k][firstCol.cc]);
         if (Number.isFinite(v)) summaryTotal += v;
       }
