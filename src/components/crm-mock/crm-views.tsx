@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
 import { DEALER_STEP, LEAD_STATUS, NOW, PRODUCTS, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
 import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
-export type View = "home" | "leads" | "board" | "exchange";
+export type View = "home" | "leads" | "board" | "exchange" | "report";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;
-  addLead: () => void; newJob: () => void; newSurvey: (lead?: Lead) => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
+  readOnly: boolean; addLead: () => void; newJob: () => void; newSurvey: (lead?: Lead) => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
 }
 
 /* ---------------- Leads ---------------- */
@@ -55,7 +55,7 @@ export function LeadsView({ c }: { c: Ctx }) {
               <button key={k} onClick={() => setMode(k)} className={cn("inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[12px] font-semibold", mode === k ? "bg-indigo-600 text-white" : "text-slate-600")}><Icon name={ic} style={{ fontSize: 16 }} />{label}</button>
             ))}
           </div>
-          <button onClick={c.addLead} className={btnPrimary}><Icon name="add" style={{ fontSize: 18 }} />เพิ่ม Lead</button>
+          {!c.readOnly && <button onClick={c.addLead} className={btnPrimary}><Icon name="add" style={{ fontSize: 18 }} />เพิ่ม Lead</button>}
         </div>
       </div>
       <div className={cn(glass, "flex flex-wrap items-center gap-x-5 gap-y-2 p-3")}>

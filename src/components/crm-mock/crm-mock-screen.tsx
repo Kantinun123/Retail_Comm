@@ -15,6 +15,7 @@ import { NewOppPage, type NewJobInput } from "./crm-new-opp";
 import { BoardView, ExchangeView } from "./crm-board";
 import { HomeView } from "./crm-home";
 import { LeadsView, type Ctx, type View } from "./crm-views";
+import { ReportView, RoleBar, type Role } from "./crm-report";
 import { grad } from "./crm-ui";
 
 const NAV: { key: View; label: string; icon: string }[] = [
@@ -22,6 +23,12 @@ const NAV: { key: View; label: string; icon: string }[] = [
   { key: "leads", label: "Leads", icon: "person_search" },
   { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
   { key: "exchange", label: "เชื่อมข้อมูล", icon: "sync_alt" },
+];
+
+const NAV_RO: { key: View; label: string; icon: string }[] = [
+  { key: "report", label: "รายงานทีม", icon: "monitoring" },
+  { key: "leads", label: "Leads", icon: "person_search" },
+  { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
 ];
 
 type OppState = { lead: Lead | null; editId: string | null; step: 1 | 4 | 5 };
@@ -37,7 +44,9 @@ function completeStep(j: Job, key: StepKey, extra?: { surveyAt?: string }): Job 
 
 export function CrmMockScreen() {
   const sp = useSearchParams();
-  const [view, setView] = useState<View>((sp.get("v") as View) ?? "home");
+  const [role, setRole] = useState<Role>(() => (["coach", "area", "dealer"].includes(sp.get("role") ?? "") ? (sp.get("role") as Role) : "se"));
+  const readOnly = role !== "se";
+  const [view, setView] = useState<View>((sp.get("v") as View) ?? (readOnly ? "report" : "home"));
   const [leads, setLeads] = useState<Lead[]>(() => seedLeads());
   const [jobs, setJobs] = useState<Job[]>(() => seedJobs());
   const [leadId, setLeadId] = useState<string | null>(sp.get("lead"));
@@ -67,6 +76,14 @@ export function CrmMockScreen() {
   const job = jobs.find((j) => j.id === jobId) ?? null;
   const patchJob = (id: string, fn: (j: Job) => Job) => setJobs((all) => all.map((j) => (j.id === id ? fn(j) : j)));
 
+  const changeRole = (r: Role) => {
+    dirtyRef.current = false;
+    setOpp(null); setLeadId(null); setJobId(null); setAddingLead(false); setSurvey(null);
+    setRole(r);
+    setView(r === "se" ? "home" : "report");
+  };
+  const nav = readOnly ? NAV_RO : NAV;
+  const roView = (what: string) => setToastMsg(`มุมมองนี้อ่านอย่างเดียว เปิดรายละเอียด${what}ได้เฉพาะพนักงานขาย`);
   const goView = (v: View) => {
     if (opp && dirtyRef.current && !window.confirm("ข้อมูลที่กรอกไว้ยังไม่ได้บันทึก ต้องการออกจากหน้านี้ไหม?")) return;
     dirtyRef.current = false;
@@ -87,8 +104,8 @@ export function CrmMockScreen() {
   };
 
   const ctx: Ctx = {
-    leads, jobs, tasks, toast: setToastMsg, go: goView,
-    openLead: setLeadId, openJob: setJobId, openTask, ask: () => setChat(true),
+    leads, jobs, tasks, toast: setToastMsg, go: goView, readOnly,
+    openLead: (id) => (readOnly ? roView(" Lead") : setLeadId(id)), openJob: (id) => (readOnly ? roView("งาน") : setJobId(id)), openTask, ask: () => setChat(true),
     addLead: () => setAddingLead(true),
     newSurvey: (l) => { setLeadId(null); setSurvey({ lead: l ?? null }); },
     newJob: () => setOpp({ lead: null, editId: null, step: 1 }),
@@ -166,7 +183,7 @@ export function CrmMockScreen() {
           </div>
         </div>
         <nav className="space-y-1">
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <button key={n.key} onClick={() => goView(n.key)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition", isActive(n.key) ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "text-slate-600 hover:bg-indigo-50")}>
               <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
               {n.key === "home" && urgent > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{urgent}</span>}
@@ -190,6 +207,7 @@ export function CrmMockScreen() {
 
       <main className="relative z-10 px-4 pb-28 pt-5 md:px-8 lg:ml-64 lg:pb-10">
         <div className="mx-auto max-w-[1400px]">
+          <RoleBar role={role} onChange={changeRole} />
           {opp ? (
             <NewOppPage key={`${opp.editId ?? "new"}-${opp.lead?.id ?? ""}`} lead={opp.lead} editJob={opp.editId ? jobs.find((j) => j.id === opp.editId) ?? null : null} jobs={jobs}
               initialStep={opp.step} onDirty={onDirty} toast={setToastMsg} onSave={save}
@@ -200,13 +218,14 @@ export function CrmMockScreen() {
               {view === "leads" && <LeadsView c={ctx} />}
               {view === "board" && <BoardView c={ctx} />}
               {view === "exchange" && <ExchangeView c={ctx} />}
+              {view === "report" && readOnly && <ReportView role={role as Exclude<Role, "se">} c={ctx} />}
             </>
           )}
         </div>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/70 bg-white/90 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-xl lg:hidden">
-        {NAV.map((n) => (
+        {nav.map((n) => (
           <button key={n.key} onClick={() => goView(n.key)} className={cn("flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
             <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
           </button>

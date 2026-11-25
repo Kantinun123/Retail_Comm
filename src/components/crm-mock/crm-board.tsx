@@ -54,8 +54,8 @@ export function BoardView({ c }: { c: Ctx }) {
               </button>
             ))}
           </div>
-          <button onClick={() => c.newSurvey()} className={btnGhost}><Icon name="pin_drop" style={{ fontSize: 18 }} />เปิด Opp สำรวจ</button>
-          <button onClick={c.newJob} className={btnPrimary}><Icon name="add" style={{ fontSize: 18 }} />เปิด Opp ใหม่</button>
+          {!c.readOnly && <button onClick={() => c.newSurvey()} className={btnGhost}><Icon name="pin_drop" style={{ fontSize: 18 }} />เปิด Opp สำรวจ</button>}
+          {!c.readOnly && <button onClick={c.newJob} className={btnPrimary}><Icon name="add" style={{ fontSize: 18 }} />เปิด Opp ใหม่</button>}
         </div>
       </div>
 
