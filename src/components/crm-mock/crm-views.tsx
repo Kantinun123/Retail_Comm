@@ -2,14 +2,14 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { DEALER_STEP, LEAD_STATUS, PRODUCTS, agoText, dtTh, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
-import { Avatar, SlaBadge, glass, inputCls } from "./crm-ui";
+import { DEALER_STEP, LEAD_STATUS, NOW, PRODUCTS, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
+import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type View = "home" | "leads" | "board" | "exchange";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;
-  newJob: () => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
+  addLead: () => void; newJob: () => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
 }
 
 /* ---------------- Leads ---------------- */
@@ -18,15 +18,28 @@ export function LeadsView({ c }: { c: Ctx }) {
   const [st, setSt] = useState<LeadStatus | "all">("all");
   const [prod, setProd] = useState("");
   const [mode, setMode] = useState<"board" | "list">("board");
+  const [flt, setFlt] = useState<"" | "sla" | "visit" | "stale">("");
   const counts = useMemo(() => {
     const m: Record<string, number> = { all: c.leads.length };
     for (const l of c.leads) m[l.status] = (m[l.status] ?? 0) + 1;
     return m;
   }, [c.leads]);
+  const today = dayKey(NOW.toISOString());
+  const visitDay = (l: Lead) => { const v = l.visitAt ?? (l.channel === "Walk-in" ? l.createdAt : undefined); return v ? dayKey(v) : ""; };
+  const isSla = (l: Lead) => l.status === "waiting" && leadSla(l).state === "breach";
+  const isVisit = (l: Lead) => visitDay(l) === today;
+  const isStale = (l: Lead) => l.status === "qualified" && hoursSince(l.createdAt) > 72;
   const rows = c.leads
-    .filter((l) => (st === "all" || l.status === st) && (!prod || l.product === prod) && (!q || `${l.name}${l.phone}${l.id}${l.province}`.includes(q)))
+    .filter((l) => (!flt || (flt === "sla" ? isSla(l) : flt === "visit" ? isVisit(l) : isStale(l))) && (st === "all" || l.status === st) && (!prod || l.product === prod) && (!q || `${l.name}${l.phone}${l.id}${l.province}`.includes(q)))
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-  const breach = c.leads.filter((l) => l.status === "waiting" && leadSla(l).state === "breach").length;
+  const breach = c.leads.filter(isSla).length;
+  const nToday = c.leads.filter((l) => dayKey(l.createdAt) === today).length;
+  const nMonth = c.leads.filter((l) => dayKey(l.createdAt).slice(0, 7) === today.slice(0, 7)).length;
+  const strip = [
+    { k: "sla" as const, label: "เกิน SLA", n: breach, icon: "alarm", tone: "text-rose-700 bg-rose-50 border-rose-200" },
+    { k: "visit" as const, label: "เข้าร้านวันนี้", n: c.leads.filter(isVisit).length, icon: "storefront", tone: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    { k: "stale" as const, label: "รอเปิด Opp เกิน 3 วัน", n: c.leads.filter(isStale).length, icon: "hourglass_top", tone: "text-violet-700 bg-violet-50 border-violet-200" },
+  ];
   const chips: { k: LeadStatus | "all"; label: string }[] = [{ k: "all", label: "ทั้งหมด" }, { k: "waiting", label: "รอติดต่อ" }, { k: "contacting", label: "กำลังสกรีน" }, { k: "qualified", label: "รอเปิด Opp" }, { k: "converted", label: "เปิด Opp แล้ว" }, { k: "lost", label: "Loss" }];
 
   return (
@@ -42,7 +55,20 @@ export function LeadsView({ c }: { c: Ctx }) {
               <button key={k} onClick={() => setMode(k)} className={cn("inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[12px] font-semibold", mode === k ? "bg-indigo-600 text-white" : "text-slate-600")}><Icon name={ic} style={{ fontSize: 16 }} />{label}</button>
             ))}
           </div>
-        {breach > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1.5 text-[12px] font-bold text-rose-700"><Icon name="alarm" style={{ fontSize: 16 }} />เกิน SLA {breach} ราย</span>}
+          <button onClick={c.addLead} className={btnPrimary}><Icon name="add" style={{ fontSize: 18 }} />เพิ่ม Lead</button>
+        </div>
+      </div>
+      <div className={cn(glass, "flex flex-wrap items-center gap-x-5 gap-y-2 p-3")}>
+        <div className="flex items-center gap-4 text-[12px] text-slate-500">
+          <span><b className="text-[16px] text-slate-900">{nToday}</b> Lead วันนี้</span>
+          <span><b className="text-[16px] text-slate-900">{nMonth}</b> เดือนนี้</span>
+          <span><b className="text-[16px] text-slate-900">{c.leads.length}</b> สะสม</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {strip.map((s) => (
+            <button key={s.k} onClick={() => setFlt(flt === s.k ? "" : s.k)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold transition", s.tone, flt === s.k && "ring-2 ring-indigo-400")}><Icon name={s.icon} style={{ fontSize: 16 }} />{s.label} {s.n}</button>
+          ))}
+          {flt && <button onClick={() => setFlt("")} className="px-2 text-[12px] font-semibold text-slate-500 underline">ล้างตัวกรอง</button>}
         </div>
       </div>
       <div className={cn(glass, "space-y-3 p-3 md:p-4")}>
@@ -56,13 +82,13 @@ export function LeadsView({ c }: { c: Ctx }) {
             {PRODUCTS.map((p) => <option key={p}>{p}</option>)}
           </select>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {mode === "list" && <div className="flex flex-wrap gap-2">
           {chips.map((ch) => (
             <button key={ch.k} onClick={() => setSt(ch.k)} className={cn("rounded-full border px-3 py-1.5 text-[12px] font-semibold transition", st === ch.k ? "border-indigo-600 bg-indigo-600 text-white shadow" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300")}>
               {ch.label} <span className={st === ch.k ? "text-white/70" : "text-slate-400"}>{counts[ch.k] ?? 0}</span>
             </button>
           ))}
-        </div>
+        </div>}
       </div>
       {mode === "board" && <LeadBoard c={c} rows={rows} />}
       {mode === "list" && (

@@ -7,6 +7,7 @@ import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
+import { AddLeadDrawer } from "./crm-add-lead";
 import { ChatDrawer } from "./crm-chat";
 import { JobDrawer, type ScmEvent } from "./crm-job-drawer";
 import { NewOppPage, type NewJobInput } from "./crm-new-opp";
@@ -41,6 +42,7 @@ export function CrmMockScreen() {
   const [leadId, setLeadId] = useState<string | null>(sp.get("lead"));
   const [jobId, setJobId] = useState<string | null>(sp.get("job"));
   const [chat, setChat] = useState(sp.get("chat") === "1");
+  const [addingLead, setAddingLead] = useState(false);
   const [opp, setOpp] = useState<OppState | null>(() => {
     const st = Number(sp.get("step"));
     const step = (st === 4 ? 4 : st === 5 ? 5 : 1) as 1 | 4 | 5;
@@ -85,9 +87,11 @@ export function CrmMockScreen() {
   const ctx: Ctx = {
     leads, jobs, tasks, toast: setToastMsg, go: goView,
     openLead: setLeadId, openJob: setJobId, openTask, ask: () => setChat(true),
+    addLead: () => setAddingLead(true),
     newJob: () => setOpp({ lead: null, editId: null, step: 1 }),
   };
 
+  const nextLeadId = () => `L-2611-${String(30 + leads.length).padStart(3, "0")}`;
   const save = (i: NewJobInput, draft: boolean, editId: string | null) => {
     const now = NOW.toISOString();
     if (editId) {
@@ -109,6 +113,12 @@ export function CrmMockScreen() {
     };
     setJobs((all) => [created, ...all]);
     if (i.leadId) setLeads((all) => all.map((l) => (l.id === i.leadId ? { ...l, status: "converted" } : l)));
+    else {
+      /* เปิด Opp ตรงโดยไม่ผ่าน Lead: สร้าง Lead ให้อัตโนมัติ เพื่อให้ทุก Opp มีต้นทาง */
+      const lid = nextLeadId();
+      created.leadId = lid;
+      setLeads((all) => [{ id: lid, name: i.customer, phone: i.phone, product: "Roof Install", channel: "ลูกค้าเดิม", province: i.province, createdAt: now, firstContactAt: now, status: "converted", note: "สร้างอัตโนมัติจากการเปิด Opp โดยตรง" }, ...all]);
+    }
     dirtyRef.current = false;
     setOpp(null);
     setLeadId(null);
@@ -144,7 +154,6 @@ export function CrmMockScreen() {
               {n.key === "home" && urgent > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{urgent}</span>}
             </button>
           ))}
-          <button onClick={() => { setLeadId(null); setOpp({ lead: null, editId: null, step: 1 }); }} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition", opp && !opp.editId ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "text-slate-600 hover:bg-indigo-50")}><Icon name="add_circle" fill={!!opp && !opp.editId} />เปิด Opp ใหม่</button>
         </nav>
         <div className="mt-6 space-y-1.5 px-2">
           <div className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">หน่วยงานที่เชื่อมต่อ</div>
@@ -201,6 +210,8 @@ export function CrmMockScreen() {
             : { ...j, scm: { ...j.scm, readyEta: addWd(now, 7) }, lastTouchAt: now, log: [...j.log, { at: now, text: "SCM แจ้ง: คาดว่าสินค้าครบภายใน 7 วันทำการ" }] };
         })}
         onCancel={(id, reason) => { patchJob(id, (j) => ({ ...j, cancelReason: reason, lastTouchAt: NOW.toISOString(), log: [...j.log, { at: NOW.toISOString(), text: `ยกเลิกงาน: ${reason}` }] })); setToastMsg("ยกเลิกงานแล้ว"); }} />
+      <AddLeadDrawer open={addingLead} onClose={() => setAddingLead(false)} nextId={nextLeadId()}
+        onAdd={(l) => { setLeads((all) => [l, ...all]); setView("leads"); setToastMsg(`เพิ่ม Lead ${l.id} แล้ว`); }} />
       <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} toast={setToastMsg} />
 
       <div className={cn("pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-5 py-2.5 text-[12.5px] font-medium text-white shadow-xl transition-all duration-300 lg:bottom-8", toastMsg ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>

@@ -63,7 +63,7 @@ export interface Lead {
   id: string; name: string; phone: string; product: string; channel: string; province: string;
   createdAt: string; firstContactAt?: string; status: LeadStatus; note?: string; lostReason?: string; interest?: string; tries?: number;
   /** สายสินค้า: ส่งให้ร้านทำใบเสนอราคาในระบบร้าน */
-  dealerStore?: string; dealerStep?: DealerStep; dealerAmount?: number; sentAt?: string;
+  visitAt?: string; dealerStore?: string; dealerStep?: DealerStep; dealerAmount?: number; sentAt?: string;
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
 export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral", "ลูกค้าเดิม"];
