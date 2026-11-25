@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { DEALER_STEP, LEAD_STATUS, NOW, PRODUCTS, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
 import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
-export type View = "home" | "leads" | "board" | "exchange" | "report";
+export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;

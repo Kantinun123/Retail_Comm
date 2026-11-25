@@ -8,16 +8,17 @@ import { Drawer, Field, btnPrimary, inputCls } from "./crm-ui";
 
 export interface SurveyInput { customer: string; phone: string; province: string; model: Model; owner: string; scope: string; leadId?: string }
 
-export function NewSurveyDrawer({ open, lead, onClose, onCreate }: { open: boolean; lead: Lead | null; onClose: () => void; onCreate: (i: SurveyInput) => void }) {
+export type SurveyPrefill = { customer: string; phone: string; province: string; scope: string };
+export function NewSurveyDrawer({ open, lead, prefill, onClose, onCreate }: { open: boolean; lead: Lead | null; prefill?: SurveyPrefill; onClose: () => void; onCreate: (i: SurveyInput) => void }) {
   return (
     <Drawer open={open} onClose={onClose} title="เปิด Opp ชนิดสำรวจ" subtitle={lead ? `จาก Lead ${lead.id} · ${lead.name}` : "Smart Solution / BA · เก็บค่าสำรวจก่อนส่งทีมสำรวจ"}>
-      {open && <Body key={lead?.id ?? "new"} lead={lead} onCreate={onCreate} />}
+      {open && <Body key={lead?.id ?? prefill?.scope ?? "new"} lead={lead} prefill={prefill} onCreate={onCreate} />}
     </Drawer>
   );
 }
 
-function Body({ lead, onCreate }: { lead: Lead | null; onCreate: (i: SurveyInput) => void }) {
-  const [f, setF] = useState({ customer: lead?.name ?? "", phone: lead?.phone ?? "", province: lead?.province ?? "", model: "he" as Model, owner: OWNERS[0], scope: lead?.interest ?? "" });
+function Body({ lead, prefill, onCreate }: { lead: Lead | null; prefill?: SurveyPrefill; onCreate: (i: SurveyInput) => void }) {
+  const [f, setF] = useState({ customer: prefill?.customer ?? lead?.name ?? "", phone: prefill?.phone ?? lead?.phone ?? "", province: prefill?.province ?? lead?.province ?? "", model: "he" as Model, owner: OWNERS[0], scope: prefill?.scope ?? lead?.interest ?? "" });
   const ok = f.customer.trim() && f.phone.trim() && f.province.trim() && f.scope.trim();
   return (
     <>

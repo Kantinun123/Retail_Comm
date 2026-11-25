@@ -268,11 +268,32 @@ export const MODEL_LABEL: Record<Model, string> = { he: "Housing Expert", scg: "
 export type Cat = "ase" | "truss" | "tile" | "fascia";
 export const CAT_LABEL: Record<Cat, string> = { ase: "อะเส (ขีดแนวอะเส)", truss: "โครงทรัส", tile: "กระเบื้อง", fascia: "เชิงชาย" };
 export const catsOf = (w: Work): Cat[] => (w === "survey" ? [] : w === "roof" ? ["tile", "fascia"] : w === "truss" ? ["truss", "tile", "fascia"] : ["ase", "truss", "tile", "fascia"]);
+export interface Csat { avg: number; nps: number; comment?: string; at: string }
+export interface CsatRound { sentAt?: string; done?: Csat }
+export interface Right { id: string; name: string; expiresAt: string; usedAt?: string }
+/** ชุดสิทธิพิเศษที่มอบหลังลูกค้าตอบแบบประเมินรอบ 1 (ค่าสมมติ อายุตามจำนวนวัน) */
+export const RIGHT_TEMPLATES = [
+  { name: "ส่วนลดล้างแอร์ 15%", days: 90 },
+  { name: "สำรวจต่อเติมโรงจอดรถ ราคาพิเศษ", days: 60 },
+  { name: "สำรวจรางน้ำฝน ราคาพิเศษ", days: 60 },
+];
+/** คำถาม CSAT ตามต้นแบบ JV (2 รอบ) */
+export const CSAT_Q = {
+  r1: ["ความรวดเร็วในการติดต่อและนัดหมาย", "ความชัดเจนของใบเสนอราคาและคำแนะนำ", "ความเหมาะสมของราคาและเงื่อนไข"],
+  r2: ["คุณภาพงานติดตั้ง", "ความตรงต่อเวลาตามแผนงาน", "ความสะอาดเรียบร้อยหลังติดตั้งและการส่งมอบ"],
+};
+export const addDays = (iso: string, n: number) => new Date(new Date(iso).getTime() + n * 86400e3).toISOString();
+export function rightState(r: Right): "ok" | "soon" | "used" | "expired" {
+  if (r.usedAt) return "used";
+  const left = (new Date(r.expiresAt).getTime() - NOW.getTime()) / 86400e3;
+  return left < 0 ? "expired" : left <= 14 ? "soon" : "ok";
+}
 export interface JobLog { at: string; text: string }
 export interface Job {
   id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; segment: Segment; work: Work;
   value: number; quote1Value?: number; model: Model; revise?: Cat[]; intake?: Intake; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
   /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
+  csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[];
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string;
 }
 export const stepsOf = (j: Job) => template(j.segment, j.work);
@@ -434,6 +455,18 @@ function mk(sp: Spec): Job {
 }
 
 export function seedJobs(): Job[] {
+  const js = seedJobsRaw();
+  const done = (avg: number, nps: number, comment: string, h: number) => ({ done: { avg, nps, comment, at: hAgo(h) } });
+  const a = js.find((j) => j.id === "J-2611-0111");
+  if (a) {
+    a.csat = { r1: done(4.5, 9, "ทีมงานให้คำแนะนำดี อธิบายใบเสนอราคาชัดเจน", 900), r2: done(4.9, 10, "ติดตั้งเรียบร้อยตรงเวลา", 100) };
+    a.rights = RIGHT_TEMPLATES.map((t, i) => ({ id: `${a.id}-R${i + 1}`, name: t.name, expiresAt: addDays(hAgo(900), t.days), usedAt: i === 0 ? hAgo(300) : undefined }));
+  }
+  const b = js.find((j) => j.id === "J-2611-0110");
+  if (b) b.csat = { r1: { sentAt: hAgo(30) } };
+  return js;
+}
+function seedJobsRaw(): Job[] {
   return [
     mk({ id: "J-2611-0113", customer: "คุณสมศักดิ์ ใจเย็น", phone: "081-555-0113", province: "สงขลา", segment: "general", work: "truss", value: 486000, at: "ase_mark", daysIn: 4, touchH: 30, draft: true }),
     mk({ id: "J-2611-0101", customer: "คุณจันทร์เพ็ญ สายสุด", phone: "089-555-0101", province: "ขอนแก่น", segment: "general", work: "roof", value: 168000, at: "quote1", daysIn: 2, touchH: 20 }),

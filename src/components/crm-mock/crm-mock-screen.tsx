@@ -16,12 +16,14 @@ import { BoardView, ExchangeView } from "./crm-board";
 import { HomeView } from "./crm-home";
 import { LeadsView, type Ctx, type View } from "./crm-views";
 import { ReportView, RoleBar, type Role } from "./crm-report";
+import { Customer360Drawer, CustomersView } from "./crm-customer";
 import { grad } from "./crm-ui";
 
 const NAV: { key: View; label: string; icon: string }[] = [
   { key: "home", label: "หน้าหลัก", icon: "space_dashboard" },
   { key: "leads", label: "Leads", icon: "person_search" },
   { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
+  { key: "customers", label: "ลูกค้า 360", icon: "groups" },
   { key: "exchange", label: "เชื่อมข้อมูล", icon: "sync_alt" },
 ];
 
@@ -53,7 +55,8 @@ export function CrmMockScreen() {
   const [jobId, setJobId] = useState<string | null>(sp.get("job"));
   const [chat, setChat] = useState(sp.get("chat") === "1");
   const [addingLead, setAddingLead] = useState(false);
-  const [survey, setSurvey] = useState<{ lead: Lead | null } | null>(null);
+  const [custPhone, setCustPhone] = useState<string | null>(null);
+  const [survey, setSurvey] = useState<{ lead: Lead | null; prefill?: { customer: string; phone: string; province: string; scope: string }; right?: { jobId: string; rightId: string } } | null>(null);
   const [opp, setOpp] = useState<OppState | null>(() => {
     const st = Number(sp.get("step"));
     const step = (st === 4 ? 4 : st === 5 ? 5 : 1) as 1 | 4 | 5;
@@ -123,6 +126,10 @@ export function CrmMockScreen() {
     setJobs((all) => [created, ...all]);
     if (i.leadId) setLeads((all) => all.map((l) => (l.id === i.leadId ? { ...l, status: "converted" } : l)));
     else setLeads((all) => [{ id: lid, name: i.customer, phone: i.phone, product: "Smart Solution", channel: "ลูกค้าเดิม", province: i.province, createdAt: now, firstContactAt: now, status: "converted", note: "สร้างอัตโนมัติจากการเปิด Opp โดยตรง" }, ...all]);
+    if (survey?.right) {
+      const { jobId: rj, rightId } = survey.right;
+      patchJob(rj, (j) => ({ ...j, rights: (j.rights ?? []).map((r) => (r.id === rightId ? { ...r, usedAt: now } : r)), log: [...j.log, { at: now, text: `ลูกค้าใช้สิทธิ์พิเศษ เปิด Opp ${id}` }] }));
+    }
     setSurvey(null); setView("board"); setJobId(id);
     setToastMsg(`เปิด Opp สำรวจ ${id} แล้ว ขั้นต่อไป: เก็บค่าสำรวจและส่งงานให้ทีมสำรวจ`);
   };
@@ -218,6 +225,7 @@ export function CrmMockScreen() {
               {view === "leads" && <LeadsView c={ctx} />}
               {view === "board" && <BoardView c={ctx} />}
               {view === "exchange" && <ExchangeView c={ctx} />}
+              {view === "customers" && !readOnly && <CustomersView jobs={jobs} openCustomer={setCustPhone} />}
               {view === "report" && readOnly && <ReportView role={role as Exclude<Role, "se">} c={ctx} />}
             </>
           )}
@@ -236,7 +244,7 @@ export function CrmMockScreen() {
       <LeadDrawer lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
         onPatch={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))}
         onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} onConvertSurvey={(l) => ctx.newSurvey(l)} />
-      <JobDrawer job={job} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
+      <JobDrawer job={job} onPatchJob={patchJob} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
         onEditIntake={(id) => { setJobId(null); setOpp({ lead: null, editId: id, step: 1 }); }}
         onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))}
         onRevise={(id, cats) => patchJob(id, (j) => ({ ...j, revise: cats, log: [...j.log, { at: NOW.toISOString(), text: "ทีมขายปรับหมวดที่ต้องถอดแบบใหม่หลังสำรวจ (Revise)" }] }))}
@@ -249,7 +257,9 @@ export function CrmMockScreen() {
         onCancel={(id, reason) => { patchJob(id, (j) => ({ ...j, cancelReason: reason, lastTouchAt: NOW.toISOString(), log: [...j.log, { at: NOW.toISOString(), text: `ยกเลิกงาน: ${reason}` }] })); setToastMsg("ยกเลิกงานแล้ว"); }} />
       <AddLeadDrawer open={addingLead} onClose={() => setAddingLead(false)} nextId={nextLeadId()}
         onAdd={(l) => { setLeads((all) => [l, ...all]); setView("leads"); setToastMsg(`เพิ่ม Lead ${l.id} แล้ว`); }} />
-      <NewSurveyDrawer open={!!survey} lead={survey?.lead ?? null} onClose={() => setSurvey(null)} onCreate={createSurvey} />
+      <NewSurveyDrawer open={!!survey} lead={survey?.lead ?? null} prefill={survey?.prefill} onClose={() => setSurvey(null)} onCreate={createSurvey} />
+      <Customer360Drawer phone={custPhone} jobs={jobs} onClose={() => setCustPhone(null)} openJob={(id) => { setCustPhone(null); setJobId(id); }}
+        onUseRight={(j, r) => { setCustPhone(null); setSurvey({ lead: null, prefill: { customer: j.customer, phone: j.phone, province: j.province, scope: r.name }, right: { jobId: j.id, rightId: r.id } }); }} />
       <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} toast={setToastMsg} />
 
       <div className={cn("pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-5 py-2.5 text-[12.5px] font-medium text-white shadow-xl transition-all duration-300 lg:bottom-8", toastMsg ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>

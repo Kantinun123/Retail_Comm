@@ -6,11 +6,13 @@ import {
   CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
+import { CsatCard } from "./crm-customer";
 import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type ScmEvent = "ordered" | "eta";
 
-export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, onEditIntake, toast }: {
+export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, toast }: {
+  onPatchJob: (id: string, fn: (j: Job) => Job) => void;
   onEditIntake: (id: string) => void;
   job: Job | null; tasks: Task[]; onClose: () => void; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void;
   onRevise: (id: string, cats: Cat[]) => void;
@@ -18,12 +20,13 @@ export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, on
 }) {
   return (
     <Drawer open={!!job} onClose={onClose} wide title={job?.customer ?? ""} subtitle={job ? `${job.id} · ${job.opsId} · ${job.province}` : ""}>
-      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} onEditIntake={onEditIntake} toast={toast} />}
+      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} onEditIntake={onEditIntake} onPatchJob={onPatchJob} toast={toast} />}
     </Drawer>
   );
 }
 
-function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntake, toast }: {
+function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, toast }: {
+  onPatchJob: (id: string, fn: (j: Job) => Job) => void;
   onEditIntake: (id: string) => void;
   job: Job; task?: Task; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void; onScm: (id: string, ev: ScmEvent) => void;
   onRevise: (id: string, cats: Cat[]) => void;
@@ -85,6 +88,8 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
           ))}
         </ol>
       </div>
+
+      {job.done.close && <CsatCard job={job} onPatch={onPatchJob} toast={toast} />}
 
       {job.work !== "survey" && <IntakeCard job={job} onEdit={() => onEditIntake(job.id)} />}
 
