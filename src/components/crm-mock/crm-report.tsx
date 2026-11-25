@@ -18,14 +18,16 @@ export const ROLES: { k: Role; label: string; icon: string; scope: string }[] = 
 export function RoleBar({ role, onChange }: { role: Role; onChange: (r: Role) => void }) {
   const cur = ROLES.find((r) => r.k === role) ?? ROLES[0];
   return (
-    <div className={cn(glass, "mb-4 flex flex-wrap items-center gap-2 p-2.5")}>
-      <span className="px-2 text-[11.5px] font-semibold text-slate-500">ดูในมุมมองของ</span>
-      {ROLES.map((r) => (
-        <button key={r.k} onClick={() => onChange(r.k)} className={cn("inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12.5px] font-semibold transition", r.k === role ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "bg-white/70 text-slate-600 hover:bg-indigo-50")}>
-          <Icon name={r.icon} style={{ fontSize: 17 }} />{r.label}
-        </button>
-      ))}
-      <span className="ml-auto text-[11px] text-slate-400">{cur.scope} · เดโมสลับได้ ของจริงตามบัญชีที่ login</span>
+    <div className={cn(glass, "mb-4 overflow-x-auto p-2.5")}>
+      <div className="flex min-w-max items-center gap-2">
+        <span className="px-2 text-[11.5px] font-semibold text-slate-500 whitespace-nowrap">ดูในมุมมองของ</span>
+        {ROLES.map((r) => (
+          <button key={r.k} onClick={() => onChange(r.k)} className={cn("inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12.5px] font-semibold transition whitespace-nowrap", r.k === role ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "bg-white/70 text-slate-600 hover:bg-indigo-50")}>
+            <Icon name={r.icon} style={{ fontSize: 17 }} />{r.label}
+          </button>
+        ))}
+        <span className="ml-4 text-[11px] text-slate-400 whitespace-nowrap">{cur.scope} · เดโมสลับได้</span>
+      </div>
     </div>
   );
 }

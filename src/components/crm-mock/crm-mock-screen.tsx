@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerOfLead, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
 import { AreasView } from "./crm-areas";
@@ -78,9 +78,12 @@ export function CrmMockScreen() {
 
   /* ร้านที่รับงาน/พนักงานขายคำนวณจากตารางพื้นที่ (ไม่เก็บในข้อมูล) ; โค้ช/ร้านค้าเห็นเฉพาะร้านในขอบเขต */
   const scope = role === "coach" || role === "dealer" ? ROLE_STORES[role] : null;
-  const dLeads = useMemo(() => leads.map((l) => ({ ...l, store: assignStore(coverage, l.province, l.district).store ?? undefined, owner: ownerOfLead(l.id) })), [leads, coverage]);
+  const dLeads = useMemo(() => leads.map((l) => ({ ...l, store: assignStore(coverage, l.province, l.district).store ?? undefined, owner: l.owner ?? ownerForProv(l.province) })), [leads, coverage]);
   const dJobs = useMemo(() => jobs.map((j) => ({ ...j, store: assignStore(coverage, j.province).store ?? undefined })), [jobs, coverage]);
-  const vLeads = readOnly && scope ? dLeads.filter((l) => l.store && scope.includes(l.store)) : dLeads;
+  const dealerStore = scope?.length === 1 ? scope[0] : null;
+  const dealerLeads = dealerStore ? dLeads.filter((l) => l.status === "dealer" && l.dealerStore === dealerStore) : [];
+  const dealerLeadIds = new Set(dealerLeads.map((l) => l.id));
+  const vLeads = readOnly && scope ? dLeads.filter((l) => (l.store && scope.includes(l.store)) || dealerLeadIds.has(l.id)) : dLeads;
   const vJobs = readOnly && scope ? dJobs.filter((j) => j.store && scope.includes(j.store)) : dJobs;
   const roleStores = role === "area" ? [...new Set(coverage.map((c) => c.store))] : scope ?? [];
   const tasks = useMemo(() => buildTasks(leads, jobs), [leads, jobs]);
@@ -244,15 +247,18 @@ export function CrmMockScreen() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/70 bg-white/90 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-xl lg:hidden">
-        {nav.map((n) => (
+        {(readOnly ? NAV_RO : NAV.slice(0, 3)).map((n) => (
           <button key={n.key} onClick={() => goView(n.key)} className={cn("flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
             <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
           </button>
         ))}
+        {!readOnly && (
+          <button onClick={() => goView("customers")} className={cn("flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold", isActive("customers") ? "text-indigo-600" : "text-slate-400")}><Icon name="groups" fill={isActive("customers")} />ลูกค้า 360</button>
+        )}
         <button onClick={() => setChat(true)} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold text-violet-600"><Icon name="auto_awesome" />น้องเลขา</button>
       </nav>
 
-      <LeadDrawer lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
+      <LeadDrawer isDealerView={role === "dealer"} lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
         onPatch={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))}
         onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} onConvertSurvey={(l) => ctx.newSurvey(l)} />
       <JobDrawer job={job} onPatchJob={patchJob} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}

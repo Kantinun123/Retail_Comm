@@ -6,16 +6,16 @@ import { DEALER_LOST, DEALER_STEP, DEALER_STORES, LEAD_STATUS, LOST_REASONS, MAX
 import { Avatar, Drawer, Field, KV, SlaBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 /* ---------------- Lead ---------------- */
-export function LeadDrawer({ lead, tasks, onClose, onPatch, onConvert, onConvertSurvey, toast }: {
-  lead: Lead | null; tasks: Task[]; onClose: () => void; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; toast: (m: string) => void;
+export function LeadDrawer({ lead, tasks, onClose, onPatch, onConvert, onConvertSurvey, isDealerView, toast }: {
+  lead: Lead | null; tasks: Task[]; onClose: () => void; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; isDealerView?: boolean; toast: (m: string) => void;
 }) {
   return (
     <Drawer open={!!lead} onClose={onClose} title={lead?.name ?? ""} subtitle={lead ? `${lead.id} · ${lead.province}` : ""}>
-      {lead && <LeadBody key={lead.id} lead={lead} task={tasks.find((t) => t.ref.id === lead.id)} onPatch={onPatch} onConvert={onConvert} onConvertSurvey={onConvertSurvey} toast={toast} />}
+      {lead && <LeadBody key={lead.id} lead={lead} task={tasks.find((t) => t.ref.id === lead.id)} onPatch={onPatch} onConvert={onConvert} onConvertSurvey={onConvertSurvey} isDealerView={isDealerView} toast={toast} />}
     </Drawer>
   );
 }
-function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, toast }: { lead: Lead; task?: Task; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; toast: (m: string) => void }) {
+function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerView, toast }: { lead: Lead; task?: Task; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; isDealerView?: boolean; toast: (m: string) => void }) {
   const [note, setNote] = useState(lead.note ?? "");
   const [checks, setChecks] = useState({ budget: false, area: false, ready: false });
   const [lost, setLost] = useState(false);
@@ -23,6 +23,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, toast }: { 
   const [store, setStore] = useState(DEALER_STORES[0]);
   const [amount, setAmount] = useState("");
   const [dReason, setDReason] = useState(DEALER_LOST[0]);
+  const [dAmount, setDAmount] = useState("");
   const allOk = checks.budget && checks.area && checks.ready;
   const open = lead.status === "waiting" || lead.status === "contacting" || lead.status === "qualified";
   const tries = lead.tries ?? 0;
@@ -67,7 +68,28 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, toast }: { 
         <KV k="ติดต่อครั้งแรก" v={lead.firstContactAt ? dtTh(lead.firstContactAt) : "ยังไม่ติดต่อ"} />
         <KV k="SLA" v={<span className="flex items-center justify-end gap-2"><span className="text-[11px] text-slate-400">เป้า {slaHoursOf(lead.channel)} ชม.</span><SlaBadge lead={lead} /></span>} />
         {lead.interest && <KV k="ความต้องการ" v={lead.interest} />}
-        {lead.dealerStore && <KV k="ร้านที่รับ" v={lead.dealerStore} />}
+        {isDealerView && lead.status === "dealer" && (
+        <div className="space-y-3 rounded-2xl border border-fuchsia-300 bg-fuchsia-50/60 p-4">
+          <h3 className="text-[13px] font-bold text-fuchsia-800">ตอบกลับ SE (มุมมองร้านค้า)</h3>
+          {lead.dealerStep === "sent" && (
+            <button onClick={() => { onPatch(lead.id, { dealerStep: "accepted" }); toast("รับ Lead แล้ว SE รับทราบ"); }} className={btnPrimary}><Icon name="check_circle" style={{ fontSize: 18 }} />รับ Lead</button>
+          )}
+          {(lead.dealerStep === "sent" || lead.dealerStep === "accepted") && (
+            <div className="flex flex-wrap items-center gap-2">
+              <input value={dAmount} onChange={(e) => setDAmount(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="ยอดใบเสนอราคา" className={cn(inputCls, "w-44")} />
+              <button disabled={!dAmount} onClick={() => { onPatch(lead.id, { dealerStep: "quoted", dealerAmount: Number(dAmount) }); toast("เสนอราคาแล้ว SE รับทราบ"); }} className={cn(btnGhost, !dAmount && "opacity-50")}>ส่งใบเสนอราคา</button>
+            </div>
+          )}
+          {lead.dealerStep === "quoted" && (
+            <button onClick={() => { onPatch(lead.id, { dealerStep: "won" }); toast("ปิดขายแล้ว Lead = Won"); }} className={btnPrimary}><Icon name="verified" style={{ fontSize: 18 }} />ปิดขาย (Win)</button>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={dReason} onChange={(e) => setDReason(e.target.value)} className={cn(inputCls, "w-auto max-w-full")}>{DEALER_LOST.map((r) => <option key={r}>{r}</option>)}</select>
+            <button onClick={() => { onPatch(lead.id, { status: "lost", dealerStep: "lost", lostReason: `Lost - ${dReason}` }); toast("แจ้ง Loss แล้ว"); }} className="rounded-xl bg-rose-600 px-3.5 py-2.5 text-[13px] font-bold text-white">แจ้ง Loss</button>
+          </div>
+        </div>
+      )}
+      {lead.dealerStore && <KV k="ร้านที่รับ" v={lead.dealerStore} />}
         {lead.dealerStep && <KV k="สถานะที่ร้านแจ้ง" v={<span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", DEALER_STEP[lead.dealerStep].cls)}>{DEALER_STEP[lead.dealerStep].label}</span>} />}
         {lead.dealerAmount !== undefined && <KV k="ยอดใบเสนอราคาร้าน" v={`฿${lead.dealerAmount.toLocaleString("en-US")}`} />}
         {lead.lostReason && <KV k="เหตุผล Loss" v={lead.lostReason} />}

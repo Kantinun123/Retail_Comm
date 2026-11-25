@@ -68,7 +68,17 @@ export interface Lead {
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
 export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral", "ลูกค้าเดิม"];
-export const OWNERS = ["ฝน", "บอส", "มิ้น"];
+export interface SE { nick: string; name: string; store: string; color: string }
+export const SE_ROSTER: SE[] = [
+  { nick: "ฝน", name: "ฝน ฝนทิพย์", store: "ร้านหาดใหญ่โฮม", color: "#6366f1" },
+  { nick: "บอส", name: "บอส บริหาร", store: "ร้านสงขลาวัสดุ", color: "#0891b2" },
+  { nick: "มิ้น", name: "มิ้น มินตรา", store: "ร้านภูเก็ตวัสดุ", color: "#d97706" },
+  { nick: "นุ้ย", name: "นุ้ย นุชนาฏ", store: "ร้านหาดใหญ่โฮม", color: "#7c3aed" },
+  { nick: "โอ", name: "โอ อภิวัฒน์", store: "ร้านขอนแก่นโฮม", color: "#059669" },
+  { nick: "แนน", name: "แนน นันทิยา", store: "ร้านกรุงเทพโฮม", color: "#db2777" },
+];
+export const seOfNick = (nick: string) => SE_ROSTER.find((s) => s.nick === nick);
+export const OWNERS = SE_ROSTER.map((s) => s.nick);
 export const LEAD_STATUS: Record<LeadStatus, { label: string; cls: string }> = {
   waiting: { label: "รอติดต่อ", cls: "bg-amber-100 text-amber-800" },
   contacting: { label: "กำลังสกรีน", cls: "bg-sky-100 text-sky-800" },
@@ -112,9 +122,23 @@ export function assignStore(cov: Coverage[], province: string, district?: string
   const candidates = [...new Set(rows.map((r) => r.store))];
   return { store: candidates[0] ?? null, candidates };
 }
+export const SE_STORES: Record<string, string> = Object.fromEntries(SE_ROSTER.map((s) => [s.nick, s.store]));
 export const ROLE_STORES: Record<"coach" | "dealer", string[]> = { coach: ["ร้านหาดใหญ่โฮม", "ร้านสงขลาวัสดุ", "ร้านภูเก็ตวัสดุ"], dealer: ["ร้านหาดใหญ่โฮม"] };
 const hashOf = (s: string) => [...s].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
 export const ownerOfLead = (id: string) => OWNERS[hashOf(id) % OWNERS.length];
+export const ownerForProv = (prov: string): string => {
+  const r = SE_ROSTER.find((s) =>
+    (s.store === "ร้านหาดใหญ่โฮม" && (prov === "สงขลา" || prov === "ตรัง")) ||
+    (s.store === "ร้านสงขลาวัสดุ" && prov === "สงขลา") ||
+    (s.store === "ร้านภูเก็ตวัสดุ" && prov === "ภูเก็ต") ||
+    (s.store === "ร้านขอนแก่นโฮม" && (prov === "ขอนแก่น" || prov === "นครราชสีมา")) ||
+    (s.store === "ร้านกรุงเทพโฮม" && (prov === "กรุงเทพมหานคร" || prov === "นครปฐม")) ||
+    (s.store === "ร้านชลบุรีโฮม" && (prov === "ชลบุรี" || prov === "ระยอง")) ||
+    (s.store === "ร้านเชียงใหม่ซีเมนต์" && prov === "เชียงใหม่") ||
+    (s.store === "ร้านนครสวรรค์วัสดุ" && prov === "นครสวรรค์")
+  );
+  return r?.nick ?? OWNERS[0];
+};
 export const DEALER_STORES = ["ร้านอุดรวัสดุ", "ร้านขอนแก่นโฮม", "ร้านหาดใหญ่โฮม", "ร้านภูเก็ตวัสดุ", "ร้านชลบุรีโฮม", "ร้านเชียงใหม่ซีเมนต์"];
 export const DEALER_LOST = ["ลูกค้าต้องการเปรียบเทียบราคาเท่านั้น", "ยังไม่ตัดสินใจ รอพิจารณา", "ยังไม่มีแผนต่อเติมในช่วงนี้", "ราคาสูง ซื้อ SCG ที่ร้านอื่น", "ราคาสูง เปลี่ยนยี่ห้ออื่น", "สินค้าไม่พร้อมขาย ซื้อ SCG ที่ร้านอื่น", "สินค้าไม่พร้อมขาย เปลี่ยนยี่ห้ออื่น", "ไม่ตรงกับความต้องการลูกค้า"];
 export const LOST_REASONS = ["งบประมาณไม่ถึง", "ยังไม่พร้อมต่อเติม", "อยู่นอกพื้นที่บริการ", "ติดต่อไม่ได้", "เลือกผู้ให้บริการอื่น"];
@@ -450,7 +474,9 @@ export function seedLeads(): Lead[] {
     { id: "L-2611-006", name: "คุณอนันต์ ทองดี", phone: "083-555-6620", product: "Roof Install", channel: "Home Online", province: "กรุงเทพมหานคร", createdAt: hAgo(72), firstContactAt: hAgo(71), status: "qualified", note: "ผ่านเงื่อนไขรับงาน พร้อมให้สำรวจ", interest: "เปลี่ยนกระเบื้องหลังคา" },
     { id: "L-2611-007", name: "คุณพิมพ์ใจ รักไทย", phone: "082-555-2231", product: "Roof Install", channel: "Contact Center", province: "สงขลา", createdAt: hAgo(100), firstContactAt: hAgo(98), status: "qualified", note: "งบ 3-4 แสน ต้องการเริ่มก่อนสิ้นปี", interest: "โรงจอดรถ + ตัวบ้าน ต้องมีอะเสและทรัส" },
     { id: "L-2611-008", name: "คุณวีระ สุขสบาย", phone: "080-555-1177", product: "Home Automation", channel: "LINE OA", province: "ชลบุรี", createdAt: hAgo(120), firstContactAt: hAgo(118), status: "lost", lostReason: "งบประมาณไม่ถึง", interest: "ระบบบ้านอัจฉริยะ" },
-    { id: "L-2611-016", name: "คุณมาลี สุขใจ", phone: "081-555-4416", product: "กระเบื้องหลังคา (สินค้า)", channel: "Home Online", province: "ภูเก็ต", createdAt: hAgo(5), firstContactAt: hAgo(4), status: "dealer", dealerStore: "ร้านภูเก็ตวัสดุ", dealerStep: "sent", sentAt: hAgo(3), interest: "กระเบื้อง 120 ตร.ม. ไม่ต้องการแบบ" },
+    { id: "L-2611-030", name: "คุณอมร บุญมา", phone: "089-555-3030", product: "กระเบื้องหลังคา (สินค้า)", channel: "Walk-in", province: "สงขลา", createdAt: hAgo(8), firstContactAt: hAgo(7), status: "dealer", dealerStore: "ร้านหาดใหญ่โฮม", dealerStep: "sent", sentAt: hAgo(7), interest: "กระเบื้อง 90 ตร.ม." },
+  { id: "L-2611-031", name: "คุณจิรา ทองแดง", phone: "081-555-3031", product: "รางน้ำฝน (สินค้า)", channel: "LINE OA", province: "สงขลา", createdAt: hAgo(50), firstContactAt: hAgo(49), status: "dealer", dealerStore: "ร้านหาดใหญ่โฮม", dealerStep: "quoted", dealerAmount: 32400, sentAt: hAgo(48), interest: "รางน้ำ 4 ด้าน" },
+  { id: "L-2611-016", name: "คุณมาลี สุขใจ", phone: "081-555-4416", product: "กระเบื้องหลังคา (สินค้า)", channel: "Home Online", province: "ภูเก็ต", createdAt: hAgo(5), firstContactAt: hAgo(4), status: "dealer", dealerStore: "ร้านภูเก็ตวัสดุ", dealerStep: "sent", sentAt: hAgo(3), interest: "กระเบื้อง 120 ตร.ม. ไม่ต้องการแบบ" },
     { id: "L-2611-012", name: "คุณมานะ พงษ์ไทย", phone: "089-555-1212", product: "รางน้ำฝน (สินค้า)", channel: "LINE OA", province: "ชลบุรี", createdAt: hAgo(40), firstContactAt: hAgo(39), status: "dealer", dealerStore: "ร้านชลบุรีโฮม", dealerStep: "quoted", dealerAmount: 48200, sentAt: hAgo(38), interest: "รางน้ำรอบบ้าน" },
     { id: "L-2611-011", name: "คุณวิไล รักดี", phone: "085-555-1111", product: "ฝ้าเพดาน (สินค้า)", channel: "Walk-in", province: "เชียงใหม่", createdAt: hAgo(90), firstContactAt: hAgo(89), status: "dealer", dealerStore: "ร้านเชียงใหม่ซีเมนต์", dealerStep: "won", dealerAmount: 36500, sentAt: hAgo(88), interest: "ฝ้าเพดานห้องนั่งเล่น" },
   ];
