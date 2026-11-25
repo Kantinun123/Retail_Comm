@@ -16,7 +16,8 @@ export interface CommissionMonth {
   netSales: number;        // ยอดขายฐาน
   lineCount: number;
   vendorCount: number;
-  paidDate: string | null; // วันที่ทำจ่าย (จาก payouts)
+  paidDate: string | null; // วันที่ทำจ่าย (จาก payouts) — เฉพาะที่ถึงวันแล้ว
+  dueDate: string | null;  // กำหนดโอน (วันที่ทำจ่ายที่ยังไม่ถึง)
 }
 
 export interface CommissionSummary {
@@ -85,9 +86,12 @@ function mapMonth(r: RawMonth): CommissionMonth {
     netSales: Number(r.net_sales ?? 0),
     lineCount: Number(r.line_count ?? 0),
     vendorCount: Number(r.vendor_count ?? 0),
-    paidDate: r.paid_date,
+    // วันที่ทำจ่ายที่ยังไม่ถึง (ไฟล์ใส่กำหนดโอนล่วงหน้า) = ยังไม่จ่าย -> แสดงเป็นกำหนดโอน
+    paidDate: r.paid_date && r.paid_date <= todayBkk() ? r.paid_date : null,
+    dueDate: r.paid_date && r.paid_date > todayBkk() ? r.paid_date : null,
   };
 }
+const todayBkk = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 
 type RawLine = {
   vendor_code: string | null;

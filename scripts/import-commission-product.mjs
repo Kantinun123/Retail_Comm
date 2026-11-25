@@ -3,7 +3,10 @@
    - อ่านทุกไฟล์ DATA sheet ใน Product DI 2026 (ยกเว้น Detail Commission)
    - *** ไม่กรอง Price_check *** (commission จ่ายทุกแถว)
    - gross = Total_commission [R] ; net = gross * 0.97 (หัก 3%)
-   - Detail Commission.xlsx -> commission_product_payouts (period/paid_date/gross/wht/net)
+   - ยอดอ้างอิง = Detail Commission.xlsx ชีต commission_productbystaff (ผู้ใช้ยืนยัน 25 พ.ย. 69)
+       ไม่นับ: สินค้าบริษัท เอสซีจี ลีฟวิง แอนด์ เฮาส์ซิง โซลูชัน (LHS) + ร้านที่ไม่มีในชีตของเดือนนั้น (ยอดไม่ถึง ฿100)
+       ยอดต่อเดือนต้องตรงชีต ไม่งั้นหยุด (exit 2)
+   - payouts (period/paid_date) สร้างจากชีตเดียวกัน ; "อยู่ระหว่างดำเนินการ" = ยังไม่จ่าย
    - idempotent: ลบทั้ง 2 ตารางก่อน insert
    - --period YYYY-MM[,YYYY-MM]: นำเข้าเฉพาะเดือนที่ระบุ (ลบ/เพิ่มเฉพาะเดือนนั้น, ไม่แตะ payouts และเดือนอื่น)
    - หลัง apply ต้องรัน node scripts/backfill-rep-code.mjs --apply (เติม rep_code ให้หน้าพนักงานรายคน)
@@ -22,7 +25,7 @@ const PERIODS = pIdx > 0 ? new Set(String(process.argv[pIdx + 1] ?? "").split(",
 if (PERIODS && !PERIODS.size) { console.error("--period ต้องเป็น YYYY-MM"); process.exit(1); }
 const DIR = "commission-app/Product DI 2026";
 const DETAIL = "Detail Commission.xlsx";
-const MONTH = { Jan:"01",Feb:"02",Mar:"03",Apr:"04",May:"05",Jun:"06",Jul:"07",Aug:"08",Sep:"09" };
+const STAFF_SHEET = "commission_productbystaff";
 
 /* ---- env ---- */
 const env = {};
@@ -38,6 +41,36 @@ const str = (v) => { if (v === undefined || v === null) return null; const s = S
 const num = (v) => { if (v === undefined || v === null || v === "" || v === "NULL") return null; const n = Number(String(v).replace(/,/g, "")); return Number.isFinite(n) ? n : null; };
 const toDate = (v) => { const s = String(v ?? "").trim(); return /^\d{8}$/.test(s) ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : null; };
 const toDateDMY = (v) => { const s = String(v ?? "").trim(); const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}` : null; };
+
+/* ---- 0) ยอดอ้างอิง: Detail Commission ชีต commission_productbystaff (ร้าน × พนักงาน × เดือน + วันที่ทำจ่าย) ---- */
+const serialToIso = (v) => (typeof v === "number" ? new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10) : null);
+const ref = new Map(); // period -> { gross, dealers:Set, paid: Map<date, gross> }
+{
+  const wbD = XLSX.read(readFileSync(join(DIR, DETAIL)), { type: "buffer" });
+  const ws = wbD.Sheets[STAFF_SHEET];
+  if (!ws) { console.error(`ไม่พบชีต ${STAFF_SHEET} ใน ${DETAIL}`); process.exit(1); }
+  const t = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+  const hh = t[0].map((c) => String(c).trim());
+  const c = { dealer: hh.indexOf("Dealer Code"), amt: hh.indexOf("Commission"), pull: hh.indexOf("วันที่ดึงข้อมูล"), paid: hh.indexOf("วันที่ทำจ่าย") };
+  if (Object.values(c).some((i) => i < 0)) { console.error(`ชีต ${STAFF_SHEET} ขาดคอลัมน์ (ต้องมี Dealer Code / Commission / วันที่ดึงข้อมูล / วันที่ทำจ่าย)`); process.exit(1); }
+  for (const r of t.slice(1)) {
+    const pull = serialToIso(r[c.pull]);
+    if (!pull) continue;
+    const p = pull.slice(0, 7);
+    const x = ref.get(p) ?? { gross: 0, dealers: new Set(), paid: new Map() };
+    const g = num(r[c.amt]) ?? 0;
+    x.gross += g;
+    x.dealers.add(String(r[c.dealer] ?? "").trim());
+    const pd = serialToIso(r[c.paid]); // "อยู่ระหว่างดำเนินการ" = ยังไม่มีวันจ่าย
+    if (pd) x.paid.set(pd, (x.paid.get(pd) ?? 0) + g);
+    ref.set(p, x);
+  }
+}
+/** แถวที่ไม่นับ (ตามยอดโอนจริง):
+ *  - สินค้าบริษัท LHS (จ่ายผ่าน LHS Commission แล้ว)
+ *  - ร้านที่ไม่มีในชีตอ้างอิงของเดือนนั้น = ยอดทั้งร้านไม่ถึง ฿100 ไม่โอน (ผู้ใช้: เดือนอื่นเอาออกเหมือนกัน) */
+const EXCL_COMPANY = /ลีฟวิง แอนด์ เฮาส์ซิง/;
+const skipped = new Map(); // period -> { lhs, below100 }
 
 /* ---- 1) อ่าน DATA ทุกไฟล์ (ไม่กรอง Price_check) ---- */
 const files = readdirSync(DIR).filter((f) => f.endsWith(".xlsx") && !f.startsWith("~$") && f !== DETAIL);
@@ -64,6 +97,10 @@ for (const f of files) {
     if (!dealerCode || !/^\d{4}-\d{2}$/.test(period)) continue;
     if (PERIODS && !PERIODS.has(period)) continue;
     const gross = num(row[G("Total_commission [R]")]) ?? 0;
+    const sk = skipped.get(period) ?? { lhs: 0, below100: 0, below100Dealers: new Set() };
+    if (EXCL_COMPANY.test(String(row[G("Company")] ?? ""))) { sk.lhs += gross; skipped.set(period, sk); continue; }
+    const rp = ref.get(period);
+    if (rp && !rp.dealers.has(dealerCode)) { sk.below100 += gross; sk.below100Dealers.add(dealerCode); skipped.set(period, sk); continue; }
     const rec = {
       period,
       dealer_code: dealerCode,
@@ -104,79 +141,62 @@ for (const f of files) {
   console.log(`  ${f}\n    DATA=${sn} | ${fileRows} แถว | gross=${fileGross.toFixed(2)}`);
 }
 
-/* ---- 2) อ่าน Detail Commission ---- */
-const dc = XLSX.read(readFileSync(join(DIR, DETAIL)), { type: "buffer" });
-const dcRows = XLSX.utils.sheet_to_json(dc.Sheets["Export"], { header: 1, blankrows: false });
-const dcHdr = (dcRows[0] || []).map((c) => String(c).trim());
-const ci = {
-  mon: dcHdr.indexOf("MonthName"),
-  paid: dcHdr.indexOf("วันที่ทำจ่าย"),
-  gross: dcHdr.indexOf("Total_commission [R]"),
-  wht: dcHdr.indexOf("หัก 3%"),
-  net: dcHdr.indexOf("ยอดจ่ายจริง"),
-};
+/* ---- 2) payouts จากชีตอ้างอิง (period × วันที่ทำจ่าย ; ยังไม่มีวันจ่าย = ไม่สร้าง -> แอปแสดงรอจ่าย) ---- */
+const linePeriods = new Set(rows.map((r) => r.period));
 const payouts = [];
-let payGross = 0, payNet = 0;
-for (let r = 1; r < dcRows.length; r++) {
-  const row = dcRows[r];
-  const mon = MONTH[String(row[ci.mon] ?? "").trim()];
-  if (!mon) continue;
-  const g = num(row[ci.gross]) ?? 0, w = num(row[ci.wht]) ?? 0, n = num(row[ci.net]) ?? 0;
-  payouts.push({ period: `2026-${mon}`, paid_date: toDateDMY(row[ci.paid]), commission_gross: g, wht_3pct: w, commission_net: n });
-  payGross += g; payNet += n;
+for (const [p, x] of ref) {
+  if (!linePeriods.has(p)) continue; // เดือนที่ไม่มีรายการในแอป (เช่น ปี 2025) ไม่สร้าง
+  for (const [d, g] of x.paid) {
+    const gr = Math.round(g * 100) / 100;
+    payouts.push({ period: p, paid_date: d, commission_gross: gr, wht_3pct: Math.round(gr * 3) / 100, commission_net: Math.round(gr * 97) / 100 });
+  }
 }
 
-/* ---- รายงาน ---- */
-console.log("\n===== DATA lines ต่อเดือน (ไม่กรอง Price_check) =====");
+/* ---- รายงาน: เทียบยอดต่อเดือนกับชีตอ้างอิง ---- */
+console.log(`\n===== ต่อเดือน: นำเข้า vs ${STAFF_SHEET} =====`);
+let bad = 0;
 [...perMonth.keys()].sort().forEach((p) => {
-  const v = perMonth.get(p);
-  console.log(`  ${p} | ${v.rows} แถว | vendor ${v.vendors.size} | ร้าน ${v.dealers.size} | gross ${v.gross.toFixed(2)}`);
+  const v = perMonth.get(p), r = ref.get(p), s = skipped.get(p);
+  const ok = r ? Math.abs(v.gross - r.gross) < 0.05 : null;
+  if (ok === false) bad++;
+  const sk = s ? ` | ตัด LHS ${s.lhs.toFixed(2)} · ไม่ถึง 100 ${s.below100.toFixed(2)} (${s.below100Dealers.size} ร้าน)` : "";
+  const paid = r ? [...r.paid.keys()].join(",") || "ยังไม่จ่าย" : "-";
+  console.log(`  ${p} | ${v.rows} แถว | ร้าน ${v.dealers.size} | gross ${v.gross.toFixed(2)} | อ้างอิง ${r ? r.gross.toFixed(2) : "ไม่มี"} ${ok === null ? "?" : ok ? "✓" : "✗"} | จ่าย ${paid}${sk}`);
 });
-console.log(`  รวม lines gross = ${grandGross.toFixed(2)}`);
-
-console.log("\n===== Detail Commission (payouts) =====");
-console.log(`  รวม gross = ${payGross.toFixed(2)} | net (จ่ายจริง) = ${payNet.toFixed(2)}`);
-console.log(`\n  เทียบ: lines gross ${grandGross.toFixed(2)} vs Detail gross ${payGross.toFixed(2)} | ต่าง ${(grandGross-payGross).toFixed(2)} ${Math.abs(grandGross-payGross)<2?"✓ ตรง":"✗"}`);
+console.log(`  รวม gross = ${grandGross.toFixed(2)} | payouts ${payouts.length} แถว`);
+if (bad) console.log(`\n⚠️  ${bad} เดือนยอดไม่ตรงชีตอ้างอิง — ตรวจก่อน apply`);
 
 if (!APPLY) {
   console.log("\n(DRY RUN) เพิ่ม --apply เพื่อนำเข้าจริง");
   process.exit(0);
 }
+if (bad) { console.error("หยุด: ยอดไม่ตรงชีตอ้างอิง"); process.exit(2); }
 
 /* ---- APPLY ---- */
-if (PERIODS) {
-  // เฉพาะเดือนที่ระบุ: ต้องมีแถวครบทุกเดือนที่ขอ ไม่งั้นหยุด (กันลบเดือนนั้นทิ้งโดยไม่มีของใหม่)
-  const got = new Set(rows.map((r) => r.period));
-  const missing = [...PERIODS].filter((p) => !got.has(p));
+const scope = PERIODS ? [...PERIODS] : null;
+if (scope) {
+  const missing = scope.filter((p) => !linePeriods.has(p));
   if (missing.length) { console.error(`ไม่พบข้อมูลเดือน ${missing.join(", ")} ในไฟล์ — ไม่นำเข้า`); process.exit(1); }
-  console.log(`\nAPPLY: แทนที่เฉพาะเดือน ${[...PERIODS].join(", ")} (${rows.length} แถว) ; payouts ไม่แตะ`);
-  const { data: maxRow } = await sb.from("commission_product_lines").select("id").order("id", { ascending: false }).limit(1).maybeSingle();
-  const maxBefore = maxRow?.id ?? 0;
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await sb.from("commission_product_lines").insert(rows.slice(i, i + 500));
-    if (error) {
-      await sb.from("commission_product_lines").delete().in("period", [...PERIODS]).gt("id", maxBefore); // ย้อนแถวใหม่ ของเดิมยังอยู่
-      console.error("lines insert ล้มเหลว:", error.message); process.exit(1);
-    }
-    process.stdout.write(`\r  lines ${Math.min(i + 500, rows.length)}/${rows.length}`);
+}
+console.log(`\nAPPLY: แทนที่ ${scope ? `เดือน ${scope.join(", ")}` : "ทุกเดือน"} (${rows.length} แถว) — เพิ่มใหม่ก่อนแล้วค่อยลบของเดิม`);
+const { data: maxRow } = await sb.from("commission_product_lines").select("id").order("id", { ascending: false }).limit(1).maybeSingle();
+const maxBefore = maxRow?.id ?? 0;
+const scoped = (q) => (scope ? q.in("period", scope) : q);
+for (let i = 0; i < rows.length; i += 500) {
+  const { error } = await sb.from("commission_product_lines").insert(rows.slice(i, i + 500));
+  if (error) {
+    await scoped(sb.from("commission_product_lines").delete().gt("id", maxBefore)); // ย้อนแถวใหม่ ของเดิมยังอยู่
+    console.error("\nlines insert ล้มเหลว:", error.message); process.exit(1);
   }
-  const { error: dErr } = await sb.from("commission_product_lines").delete().in("period", [...PERIODS]).lte("id", maxBefore);
-  if (dErr) { console.error("\nลบแถวเดิมไม่สำเร็จ:", dErr.message); process.exit(1); }
-  console.log(`\nDONE lines=${rows.length} (เดือน ${[...PERIODS].join(", ")})`);
-  process.exit(0);
+  process.stdout.write(`\r  lines ${Math.min(i + 500, rows.length)}/${rows.length}`);
 }
-console.log("\nAPPLY: ล้าง 2 ตารางแล้ว insert ใหม่...");
-await sb.from("commission_product_lines").delete().neq("id", 0);
-await sb.from("commission_product_payouts").delete().neq("id", 0);
-
-const CHUNK = 500;
-let done = 0;
-for (let i = 0; i < rows.length; i += CHUNK) {
-  const { error } = await sb.from("commission_product_lines").insert(rows.slice(i, i + CHUNK));
-  if (error) { console.error("lines insert ล้มเหลว:", error.message); process.exit(1); }
-  done += Math.min(CHUNK, rows.length - i);
-  process.stdout.write(`\r  lines ${done}/${rows.length}`);
+const { error: dErr } = await scoped(sb.from("commission_product_lines").delete().lte("id", maxBefore));
+if (dErr) { console.error("\nลบแถวเดิมไม่สำเร็จ:", dErr.message); process.exit(1); }
+const { error: pdErr } = await scoped(sb.from("commission_product_payouts").delete().neq("id", 0));
+if (pdErr) { console.error("\nลบ payouts เดิมไม่สำเร็จ:", pdErr.message); process.exit(1); }
+const pay = scope ? payouts.filter((x) => scope.includes(x.period)) : payouts;
+if (pay.length) {
+  const { error: pErr } = await sb.from("commission_product_payouts").insert(pay);
+  if (pErr) { console.error("\npayouts insert ล้มเหลว:", pErr.message); process.exit(1); }
 }
-const { error: pErr } = await sb.from("commission_product_payouts").upsert(payouts, { onConflict: "period,paid_date" });
-if (pErr) { console.error("\npayouts insert ล้มเหลว:", pErr.message); process.exit(1); }
-console.log(`\nDONE lines=${rows.length} payouts=${payouts.length}`);
+console.log(`\nDONE lines=${rows.length} payouts=${pay.length} — ต่อด้วย node scripts/backfill-rep-code.mjs`);

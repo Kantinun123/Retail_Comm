@@ -453,7 +453,7 @@ Product Commission รายเดือน
                               จ่ายแล้ว {fmtDate(m.paidDate)}
                             </span>
                           ) : (
-                            <span className="text-amber-600 font-semibold">รอจ่าย</span>
+                            <span className="text-amber-600 font-semibold">{m.dueDate ? `รอจ่าย · กำหนด ${fmtDate(m.dueDate)}` : "รอจ่าย"}</span>
                           )}
                         </p>
                       </div>
