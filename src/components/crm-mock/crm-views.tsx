@@ -9,7 +9,7 @@ export type View = "home" | "leads" | "board" | "exchange";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;
-  addLead: () => void; newJob: () => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
+  addLead: () => void; newJob: () => void; newSurvey: (lead?: Lead) => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
 }
 
 /* ---------------- Leads ---------------- */

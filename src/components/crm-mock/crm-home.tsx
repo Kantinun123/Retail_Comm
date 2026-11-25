@@ -142,7 +142,7 @@ function TaskRow({ t, c, open, onDraft, onSent }: { t: Task; c: Ctx; open: boole
 /** กล่อง "รอข้อมูลกลับจากหน่วยงาน" — สรุปสิ่งที่ CRM ส่งไปแล้วยังรอคำตอบ */
 function WaitingCard({ jobs, c }: { jobs: Job[]; c: Ctx }) {
   const waits = jobs.flatMap((j) => packetsOf(j).filter((p) => p.state === "waiting"));
-  const parties: Party[] = ["KIM", "SCM", "ROOM"];
+  const parties: Party[] = ["KIM", "SCM", "ROOM", "SURV"];
   return (
     <section className={cn(glass, "p-4 md:p-5")}>
       <div className="mb-3 flex items-center justify-between">

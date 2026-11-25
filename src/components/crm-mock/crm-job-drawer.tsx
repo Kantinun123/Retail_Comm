@@ -86,19 +86,20 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
         </ol>
       </div>
 
-      <IntakeCard job={job} onEdit={() => onEditIntake(job.id)} />
+      {job.work !== "survey" && <IntakeCard job={job} onEdit={() => onEditIntake(job.id)} />}
 
-      <TakeoffCard job={job} onRevise={onRevise} />
+      {job.work !== "survey" && <TakeoffCard job={job} onRevise={onRevise} />}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className={cn(glass, "p-4")}>
           <h3 className="mb-1 text-[13px] font-bold text-slate-900">ใบเสนอราคาและการเงิน</h3>
-          <KV k="ใบเสนอราคาจากแบบ" v={job.done.quote1 ? `ส่งแล้ว ${dateTh(job.done.quote1)} · ${baht(job.quote1Value ?? job.value)}` : "ยังไม่ส่ง"} />
-          {hasDeposit(job) && <KV k="ใบเสนอราคาหลังสำรวจ" v={job.done.quote2 ? `ส่งแล้ว ${dateTh(job.done.quote2)} · ${baht(job.value)}` : !job.done.survey ? "รอรายงานสำรวจจาก KIM" : job.work !== "roof" && !job.done.truss_design ? "รอแบบทรัส + Cutting List จากห้องแบบ" : "พร้อมทำใบเสนอราคา"} />}
-          {hasDeposit(job) && <KV k="หักส่วนลดค่าเตรียมการ (มัดจำที่ชำระแล้ว)" v={<span className={job.done.deposit ? "text-rose-600" : "text-slate-400"}>{job.done.deposit ? `−${baht(dep)}` : `จะหักเมื่อรับมัดจำ ${baht(dep)}`} · ยอดส่วนที่เหลือ {baht(job.value - dep)}</span>} />}
+          {job.work !== "survey" && <KV k="ใบเสนอราคาจากแบบ" v={job.done.quote1 ? `ส่งแล้ว ${dateTh(job.done.quote1)} · ${baht(job.quote1Value ?? job.value)}` : "ยังไม่ส่ง"} />}
+          {hasDeposit(job) && <KV k="ใบเสนอราคาหลังสำรวจ" v={job.done.quote2 ? `ส่งแล้ว ${dateTh(job.done.quote2)} · ${baht(job.value)}` : !job.done.survey ? (job.work === "survey" ? "รอรายงานสำรวจจากทีมสำรวจ" : "รอรายงานสำรวจจาก KIM") : job.work !== "roof" && job.work !== "survey" && !job.done.truss_design ? "รอแบบทรัส + Cutting List จากห้องแบบ" : "พร้อมทำใบเสนอราคา"} />}
+          {hasDeposit(job) && <KV k={job.work === "survey" ? "หักค่าสำรวจออกจากค่าติดตั้ง" : "หักส่วนลดค่าเตรียมการ (มัดจำที่ชำระแล้ว)"} v={<span className={job.done.deposit ? "text-rose-600" : "text-slate-400"}>{job.done.deposit ? `−${baht(dep)}` : `จะหักเมื่อรับมัดจำ ${baht(dep)}`} {job.value > 0 ? ` · ยอดส่วนที่เหลือ ${baht(job.value - dep)}` : " · รอใบเสนอราคา"}</span>} />}
           {hasDeposit(job) && <KV k={depositLabel(job)} v={<span className={job.done.deposit ? "text-emerald-700" : "text-amber-700"}>{baht(dep)} · {job.done.deposit ? `รับแล้ว ${dateTh(job.done.deposit)}` : "ยังไม่ได้รับ"}</span>} />}
-          <KV k="เก็บครบ 100%" v={<span className={closed ? "text-emerald-700" : "text-slate-800"}>{baht(job.value)} · {closed ? `ครบ ${dateTh(job.done.close)}` : `คงเหลือ ${baht(job.value - dep)}`}</span>} />
+          <KV k="เก็บครบ 100%" v={<span className={closed ? "text-emerald-700" : "text-slate-800"}>{baht(job.value)} · {closed ? `ครบ ${dateTh(job.done.close)}` : (job.value > 0 ? `คงเหลือ ${baht(job.value - dep)}` : "รอใบเสนอราคา")}</span>} />
           {job.surveyAt && <KV k="วันนัดสำรวจ" v={<span className={isToday(job.surveyAt) ? "text-cyan-700" : ""}>{dtTh(job.surveyAt)}{isToday(job.surveyAt) ? " (วันนี้)" : ""}</span>} />}
+          {job.scope && <KV k="งาน" v={job.scope} />}
           <KV k="ผู้ดูแล" v={job.owner} />
           <KV k="เบอร์ลูกค้า" v={job.phone} />
         </div>
@@ -278,7 +279,7 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
             <button
               onClick={() => { onComplete(job.id, s.key, s.key === "deposit" ? { surveyAt: new Date(`${surveyAt}:00+07:00`).toISOString() } : undefined); toast(outs.length ? `บันทึกแล้ว และส่งข้อมูลให้ ${outs.map((o) => PARTY[o.party].label).join(" + ")}` : `บันทึก "${s.label}" แล้ว`); }}
               className={btnPrimary}>
-              <Icon name="task_alt" style={{ fontSize: 18 }} />{s.key === "deposit" ? "รับมัดจำ + ล็อกคิวสำรวจ" : s.key === "close" ? "บันทึกรับเงินครบ 100%" : `ทำเสร็จ: ${s.label}`}
+              <Icon name="task_alt" style={{ fontSize: 18 }} />{s.key === "deposit" ? (job.work === "survey" ? "รับค่าสำรวจ + ส่งงานให้ทีมสำรวจ" : "รับมัดจำ + ล็อกคิวสำรวจ") : s.key === "close" ? "บันทึกรับเงินครบ 100%" : `ทำเสร็จ: ${s.label}`}
             </button>
           </div>
         )}

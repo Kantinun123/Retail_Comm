@@ -6,16 +6,16 @@ import { DEALER_LOST, DEALER_STEP, DEALER_STORES, LEAD_STATUS, LOST_REASONS, MAX
 import { Avatar, Drawer, Field, KV, SlaBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 /* ---------------- Lead ---------------- */
-export function LeadDrawer({ lead, tasks, onClose, onPatch, onConvert, toast }: {
-  lead: Lead | null; tasks: Task[]; onClose: () => void; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; toast: (m: string) => void;
+export function LeadDrawer({ lead, tasks, onClose, onPatch, onConvert, onConvertSurvey, toast }: {
+  lead: Lead | null; tasks: Task[]; onClose: () => void; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; toast: (m: string) => void;
 }) {
   return (
     <Drawer open={!!lead} onClose={onClose} title={lead?.name ?? ""} subtitle={lead ? `${lead.id} · ${lead.province}` : ""}>
-      {lead && <LeadBody key={lead.id} lead={lead} task={tasks.find((t) => t.ref.id === lead.id)} onPatch={onPatch} onConvert={onConvert} toast={toast} />}
+      {lead && <LeadBody key={lead.id} lead={lead} task={tasks.find((t) => t.ref.id === lead.id)} onPatch={onPatch} onConvert={onConvert} onConvertSurvey={onConvertSurvey} toast={toast} />}
     </Drawer>
   );
 }
-function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?: Task; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; toast: (m: string) => void }) {
+function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, toast }: { lead: Lead; task?: Task; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; toast: (m: string) => void }) {
   const [note, setNote] = useState(lead.note ?? "");
   const [checks, setChecks] = useState({ budget: false, area: false, ready: false });
   const [lost, setLost] = useState(false);
@@ -128,7 +128,8 @@ function LeadBody({ lead, task, onPatch, onConvert, toast }: { lead: Lead; task?
           <button onClick={failContact} className={btnGhost}><Icon name="phone_missed" style={{ fontSize: 18 }} />ติดต่อไม่ได้ ({tries}/{MAX_CONTACT_TRIES})</button>
           <button onClick={logContact} className={btnGhost}><Icon name="edit_note" style={{ fontSize: 18 }} />บันทึกการติดต่อ</button>
           {allOk && lead.status !== "qualified" && <button onClick={() => { onPatch(lead.id, { status: "qualified", note, firstContactAt: lead.firstContactAt ?? NOW.toISOString() }); toast("ผ่านการสกรีน รอเปิด Opp"); }} className={btnGhost}>ผ่านเงื่อนไข</button>}
-          <button onClick={() => onConvert({ ...lead, note })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Opp</button>
+          <button onClick={() => onConvert({ ...lead, note })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Opp (มีแบบ)</button>
+          <button onClick={() => onConvertSurvey({ ...lead, note })} className={btnGhost}><Icon name="pin_drop" style={{ fontSize: 18 }} />เปิด Opp สำรวจ</button>
           {!lost ? <button onClick={() => setLost(true)} className="rounded-xl px-3.5 py-2.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50">Loss</button>
             : <button onClick={() => { onPatch(lead.id, { status: "lost", lostReason: reason, note, firstContactAt: lead.firstContactAt }); toast("บันทึก Loss แล้ว"); }} className="rounded-xl bg-rose-600 px-3.5 py-2.5 text-[13px] font-bold text-white">ยืนยัน Loss</button>}
         </div>

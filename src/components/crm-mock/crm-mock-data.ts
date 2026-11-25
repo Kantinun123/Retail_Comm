@@ -88,34 +88,39 @@ export const DEALER_LOST = ["ลูกค้าต้องการเปรี
 export const LOST_REASONS = ["งบประมาณไม่ถึง", "ยังไม่พร้อมต่อเติม", "อยู่นอกพื้นที่บริการ", "ติดต่อไม่ได้", "เลือกผู้ให้บริการอื่น"];
 
 /* ---------- หน่วยงาน ---------- */
-export type Party = "SE" | "KIM" | "SCM" | "ROOM";
+export type Party = "SE" | "KIM" | "SCM" | "ROOM" | "SURV";
 export const PARTY: Record<Party, { label: string; sub: string; cls: string; icon: string }> = {
   SE: { label: "ทีมขาย", sub: "Lead · Opp · ใบเสนอราคา · ปิดขาย", cls: "bg-indigo-100 text-indigo-700", icon: "badge" },
   KIM: { label: "KIM", sub: "สำรวจ · แผนติดตั้ง · ควบคุมงาน · ส่งมอบ", cls: "bg-cyan-100 text-cyan-800", icon: "engineering" },
   SCM: { label: "SCM", sub: "เตรียมสินค้า · สั่งโรงงาน · ขนส่ง", cls: "bg-amber-100 text-amber-800", icon: "inventory_2" },
   ROOM: { label: "ห้องแบบ", sub: "ขีดแนวอะเส · แบบทรัส · Cutting List", cls: "bg-fuchsia-100 text-fuchsia-800", icon: "architecture" },
+  SURV: { label: "ทีมสำรวจ", sub: "สำรวจหน้างาน Smart Solution · รายงานสำรวจ · ใบเสนอราคา", cls: "bg-teal-100 text-teal-800", icon: "engineering" },
 };
 
 /* ---------- Project Timeline (แม่แบบตามไฟล์ PT) ---------- */
 export type Segment = "general" | "hbd";
-export type Work = "roof" | "truss" | "ase";
+export type Work = "roof" | "truss" | "ase" | "survey";
+/** ค่าสำรวจของงานชนิดสำรวจ (ค่าสมมติ รอยืนยัน) หักจากค่าติดตั้งตอนปิดขาย */
+export const SURVEY_FEE = 1500;
 export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "quote1" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver" | "install" | "handover";
 export interface Send { party: Party; title: string; at: "start" | "done" }
 export interface StepDef { key: StepKey; label: string; owner: Party; day: number; post: boolean; hint: string; sends: Send[]; result?: string }
 
 export const SEGMENT_LABEL: Record<Segment, string> = { general: "ลูกค้าทั่วไป", hbd: "HBD Focus (ปิดขายจากแบบ)" };
-export const WORK_LABEL: Record<Work, string> = { roof: "มุงหลังคาอย่างเดียว", truss: "โครงทรัส + มุงหลังคา", ase: "อะเส + โครงทรัส + มุงหลังคา" };
+export const WORK_LABEL: Record<Work, string> = { roof: "มุงหลังคาอย่างเดียว", truss: "โครงทรัส + มุงหลังคา", ase: "อะเส + โครงทรัส + มุงหลังคา", survey: "งานสำรวจ (Smart Solution / BA)" };
 
 const DAYS: Record<Segment, Record<Work, Partial<Record<StepKey, number>>>> = {
   general: {
     roof: { plan_in: 1, quote1: 3, deposit: 4, survey: 9, quote2: 11, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
     truss: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 35, install: 42, handover: 43 },
     ase: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 37, install: 44, handover: 45 },
+    survey: { plan_in: 1, deposit: 2, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
   },
   hbd: {
     roof: { plan_in: 1, quote1: 3, close: 4, install_plan: 7, deliver: 15, install: 22, handover: 23 },
     truss: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 24, install: 31, handover: 32 },
     ase: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 26, install: 33, handover: 34 },
+    survey: { plan_in: 1, deposit: 2, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
   },
 };
 const ORDER: Record<Segment, Record<Work, StepKey[]>> = {
@@ -123,18 +128,31 @@ const ORDER: Record<Segment, Record<Work, StepKey[]>> = {
     roof: ["plan_in", "quote1", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
     truss: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
     ase: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
+    survey: ["plan_in", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
   },
   hbd: {
     roof: ["plan_in", "quote1", "close", "install_plan", "deliver", "install", "handover"],
     truss: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
     ase: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
+    survey: ["plan_in", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
   },
 };
 const POST: StepKey[] = ["install_plan", "deliver", "install", "handover"];
-const DELIVER_LABEL: Record<Work, string> = { roof: "ส่งกระเบื้อง", truss: "ส่งทรัส & กระเบื้อง", ase: "ส่งอะเส + ทรัส & กระเบื้อง" };
-const INSTALL_LABEL: Record<Work, string> = { roof: "ติดตั้งกระเบื้อง", truss: "ติดตั้งทรัส & กระเบื้อง", ase: "ติดตั้งอะเส & ทรัส & กระเบื้อง" };
+const DELIVER_LABEL: Record<Work, string> = { roof: "ส่งกระเบื้อง", truss: "ส่งทรัส & กระเบื้อง", ase: "ส่งอะเส + ทรัส & กระเบื้อง", survey: "ส่งอุปกรณ์เข้าหน้างาน" };
+const INSTALL_LABEL: Record<Work, string> = { roof: "ติดตั้งกระเบื้อง", truss: "ติดตั้งทรัส & กระเบื้อง", ase: "ติดตั้งอะเส & ทรัส & กระเบื้อง", survey: "ติดตั้งหน้างาน" };
 
+function surveyMeta(key: StepKey): Omit<StepDef, "day" | "post" | "key"> | null {
+  switch (key) {
+    case "plan_in": return { label: "เปิด Opp รับความต้องการ", owner: "SE", hint: "ทีมขายเปิด Opp และสรุปความต้องการลูกค้า (งานชนิดสำรวจไม่มีขั้นรับแบบ/ถอดแบบ)", sends: [] };
+    case "deposit": return { label: "เก็บค่าสำรวจ + ส่งงานให้ทีมสำรวจ", owner: "SE", hint: "ลูกค้าชำระค่าสำรวจ ล็อกวันนัดสำรวจ แล้วส่งข้อมูลลูกค้า/หน้างานเข้าแอปทีมสำรวจ", sends: [{ party: "SURV", title: "ข้อมูลลูกค้า/หน้างาน + วันนัดสำรวจที่ล็อกคิวแล้ว", at: "done" }] };
+    case "survey": return { label: "ลงสำรวจ + ส่งรายงานสำรวจและใบเสนอราคา", owner: "SURV", hint: "ทีมสำรวจเข้าสำรวจหน้างาน แล้วส่งรายงานสำรวจและใบเสนอราคากลับมาให้ทีมขาย", sends: [], result: "รายงานสำรวจ + ใบเสนอราคา (ไฟล์)" };
+    case "quote2": return { label: "นำเสนอราคาให้ลูกค้า", owner: "SE", hint: "ทีมขายนำใบเสนอราคาจากทีมสำรวจเสนอลูกค้า ตามผลและต่อรอง", sends: [] };
+    case "close": return { label: "ปิดขาย + เก็บค่าติดตั้ง", owner: "SE", hint: "เก็บค่าติดตั้ง (หักค่าสำรวจแล้ว) แล้วส่งข้อมูลปิดขายให้ KIM และรายการสินค้าให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "รายการสินค้า/อุปกรณ์ (เตรียมของ + ขนส่ง)", at: "done" }] };
+    default: return null;
+  }
+}
 function meta(key: StepKey, seg: Segment, work: Work): Omit<StepDef, "day" | "post" | "key"> {
+  if (work === "survey") { const m = surveyMeta(key); if (m) return m; }
   switch (key) {
     case "plan_in": return { label: "รับแบบ", owner: "SE", hint: "ทีมขายรับแบบจากลูกค้า และเปิด Opp", sends: [] };
     case "ase_mark": return { label: "ขีดแนวอะเส", owner: "ROOM", hint: "ห้องแบบขีดแนวอะเส ส่งผลกลับมาให้ทีมขายใช้ทำประมาณการ", sends: [{ party: "ROOM", title: "ข้อมูลลูกค้า + แบบแปลน ขอขีดแนวอะเส", at: "start" }], result: "ผลขีดแนวอะเส (ไฟล์)" };
@@ -249,19 +267,20 @@ export const MODEL_LABEL: Record<Model, string> = { he: "Housing Expert", scg: "
 /** หมวดงานที่ห้องแบบถอดแบบ */
 export type Cat = "ase" | "truss" | "tile" | "fascia";
 export const CAT_LABEL: Record<Cat, string> = { ase: "อะเส (ขีดแนวอะเส)", truss: "โครงทรัส", tile: "กระเบื้อง", fascia: "เชิงชาย" };
-export const catsOf = (w: Work): Cat[] => (w === "roof" ? ["tile", "fascia"] : w === "truss" ? ["truss", "tile", "fascia"] : ["ase", "truss", "tile", "fascia"]);
+export const catsOf = (w: Work): Cat[] => (w === "survey" ? [] : w === "roof" ? ["tile", "fascia"] : w === "truss" ? ["truss", "tile", "fascia"] : ["ase", "truss", "tile", "fascia"]);
 export interface JobLog { at: string; text: string }
 export interface Job {
   id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; segment: Segment; work: Work;
   value: number; quote1Value?: number; model: Model; revise?: Cat[]; intake?: Intake; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
+  /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string;
 }
 export const stepsOf = (j: Job) => template(j.segment, j.work);
 export const currentStep = (j: Job): StepDef | null => (j.cancelReason ? null : stepsOf(j).find((s) => !j.done[s.key]) ?? null);
 export const isFinished = (j: Job) => !j.cancelReason && stepsOf(j).every((s) => j.done[s.key]);
 export const hasDeposit = (j: Job) => j.segment === "general";
-export const depositOf = (j: Job) => (!hasDeposit(j) ? 0 : j.model === "scg" ? DEPOSIT_SCG : Math.round(((j.quote1Value ?? j.value) * DEPOSIT_PCT) / 100));
-export const depositLabel = (j: Job) => (j.model === "scg" ? "มัดจำคงที่ ฿30,000 (SCG Home)" : "มัดจำ 30% (Housing Expert)");
+export const depositOf = (j: Job) => (!hasDeposit(j) ? 0 : j.work === "survey" ? SURVEY_FEE : j.model === "scg" ? DEPOSIT_SCG : Math.round(((j.quote1Value ?? j.value) * DEPOSIT_PCT) / 100));
+export const depositLabel = (j: Job) => (j.work === "survey" ? "ค่าสำรวจ (หักจากค่าติดตั้ง)" : j.model === "scg" ? "มัดจำคงที่ ฿30,000 (SCG Home)" : "มัดจำ 30% (Housing Expert)");
 /** ทีมขายเป็นผู้ถอดแบบรายหมวด หลังสำรวจเลือก Confirm (ใช้ผลเดิม) หรือ Revise (ถอดใหม่) — โครงทรัส/อะเสต้อง Revise เสมอ เพราะใช้แบบทรัส + Cutting List ใหม่จากห้องแบบ */
 export const lockedOf = (j: Job): Cat[] => (j.segment !== "general" ? [] : j.work === "ase" ? ["ase", "truss"] : j.work === "truss" ? ["truss"] : []);
 export const reviseOf = (j: Job): Cat[] => (j.segment !== "general" ? [] : catsOf(j.work).filter((c) => lockedOf(j).includes(c) || (j.revise ?? []).includes(c)));
@@ -386,7 +405,7 @@ export function seedLeads(): Lead[] {
 
 interface Spec {
   id: string; customer: string; phone: string; province: string; segment: Segment; work: Work; value: number; quote1Value?: number;
-  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string; model?: Model; draft?: boolean;
+  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string; model?: Model; draft?: boolean; scope?: string;
 }
 function mk(sp: Spec): Job {
   const job: Job = {
@@ -396,7 +415,8 @@ function mk(sp: Spec): Job {
   };
   const intake = sampleIntake({ province: sp.province, segment: sp.segment, work: sp.work, requestDate: dayKey(job.startedAt) });
   if (sp.draft) { intake.files = []; intake.shape = undefined; intake.deg = undefined; }
-  job.intake = intake;
+  job.intake = sp.work === "survey" ? undefined : intake;
+  if (sp.scope) job.scope = sp.scope;
   if (sp.cancel) { job.cancelReason = sp.cancel; }
   const steps = stepsOf(job);
   for (const s of steps) {
@@ -433,6 +453,8 @@ export function seedJobs(): Job[] {
     mk({ id: "J-2611-0109", customer: "คุณบุญเรือง ทองคำ", phone: "080-555-0109", province: "ภูเก็ต", segment: "general", work: "truss", value: 310000, quote1Value: 300000, at: "install", daysIn: 36, surveyOffset: -28, scm: { ordered: hAgo(500), readyEta: hAgo(200) }, touchH: 8 }),
     mk({ id: "J-2611-0110", customer: "คุณไพโรจน์ ดวงดี", phone: "087-555-0110", province: "ขอนแก่น", segment: "hbd", work: "roof", value: 175000, at: "handover", daysIn: 22, scm: { ordered: hAgo(700), readyEta: hAgo(500) }, touchH: 52 }),
     mk({ id: "J-2611-0111", customer: "คุณศิริพร จันทร์เพ็ญ", phone: "086-555-0111", province: "ระยอง", segment: "general", work: "roof", value: 129000, quote1Value: 129000, at: "done", daysIn: 40, surveyOffset: -33, scm: { ordered: hAgo(700), readyEta: hAgo(600) }, touchH: 200 }),
+    mk({ id: "J-2611-0121", customer: "คุณกิตติ ประเสริฐ", phone: "086-555-7712", province: "ระยอง", segment: "general", work: "survey", value: 0, at: "survey", daysIn: 4, surveyOffset: 1, touchH: 20, scope: "ติดตั้งแอร์ 3 ห้อง" }),
+    mk({ id: "J-2611-0120", customer: "คุณปรีชา แก้วใส", phone: "087-555-3305", province: "นครราชสีมา", segment: "general", work: "survey", value: 86000, at: "quote2", daysIn: 9, surveyOffset: -3, touchH: 8, scope: "ฝ้าเพดาน + ฉนวนกันความร้อน" }),
     mk({ id: "J-2611-0112", customer: "คุณทวีศักดิ์ ศรีสวัสดิ์", phone: "081-555-0112", province: "นครสวรรค์", segment: "general", work: "roof", value: 98000, at: "quote1", daysIn: 9, cancel: "ลูกค้าเลื่อนโครงการไปปีหน้า", touchH: 300 }),
   ];
 }

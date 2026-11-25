@@ -6,14 +6,14 @@ import {
   COLS, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, colOf, missingOf, valueText, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
   type Job, type Packet, type Party,
 } from "./crm-mock-data";
-import { Avatar, PartyBadge, btnPrimary, glass, inputCls } from "./crm-ui";
+import { Avatar, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 import type { Ctx } from "./crm-views";
 
-type Ball = "all" | "SE" | "KIM" | "SCM" | "ROOM" | "late";
+type Ball = "all" | "SE" | "KIM" | "SCM" | "ROOM" | "SURV" | "late";
 const BALL_CHIPS: { k: Ball; label: string }[] = [
-  { k: "all", label: "ทั้งหมด" }, { k: "SE", label: "รอเราทำ" }, { k: "KIM", label: "รอ KIM" }, { k: "SCM", label: "รอ SCM" }, { k: "ROOM", label: "รอห้องแบบ" }, { k: "late", label: "ช้ากว่าแผน" },
+  { k: "all", label: "ทั้งหมด" }, { k: "SE", label: "รอเราทำ" }, { k: "KIM", label: "รอ KIM" }, { k: "SCM", label: "รอ SCM" }, { k: "ROOM", label: "รอห้องแบบ" }, { k: "SURV", label: "รอทีมสำรวจ" }, { k: "late", label: "ช้ากว่าแผน" },
 ];
-const WORK_SHORT = { roof: "มุงอย่างเดียว", truss: "ทรัส + มุง", ase: "อะเส + ทรัส + มุง" } as const;
+const WORK_SHORT = { roof: "มุงอย่างเดียว", truss: "ทรัส + มุง", ase: "อะเส + ทรัส + มุง", survey: "สำรวจ" } as const;
 
 function stepInfo(j: Job) {
   const s = currentStep(j);
@@ -54,6 +54,7 @@ export function BoardView({ c }: { c: Ctx }) {
               </button>
             ))}
           </div>
+          <button onClick={() => c.newSurvey()} className={btnGhost}><Icon name="pin_drop" style={{ fontSize: 18 }} />เปิด Opp สำรวจ</button>
           <button onClick={c.newJob} className={btnPrimary}><Icon name="add" style={{ fontSize: 18 }} />เปิด Opp ใหม่</button>
         </div>
       </div>
@@ -164,7 +165,7 @@ export function ExchangeView({ c }: { c: Ctx }) {
   const rows = all
     .filter((p) => (party === "all" || p.party === party) && (dir === "all" ? true : dir === "waiting" ? p.state === "waiting" : p.dir === dir))
     .sort((a, b) => +new Date(b.at ?? b.due ?? 0) - +new Date(a.at ?? a.due ?? 0));
-  const parties: Party[] = ["KIM", "SCM", "ROOM"];
+  const parties: Party[] = ["KIM", "SCM", "ROOM", "SURV"];
 
   return (
     <div className="space-y-4">

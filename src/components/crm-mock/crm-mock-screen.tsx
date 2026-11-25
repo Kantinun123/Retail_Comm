@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
+import { NewSurveyDrawer, type SurveyInput } from "./crm-new-survey";
 import { ChatDrawer } from "./crm-chat";
 import { JobDrawer, type ScmEvent } from "./crm-job-drawer";
 import { NewOppPage, type NewJobInput } from "./crm-new-opp";
@@ -43,6 +44,7 @@ export function CrmMockScreen() {
   const [jobId, setJobId] = useState<string | null>(sp.get("job"));
   const [chat, setChat] = useState(sp.get("chat") === "1");
   const [addingLead, setAddingLead] = useState(false);
+  const [survey, setSurvey] = useState<{ lead: Lead | null } | null>(null);
   const [opp, setOpp] = useState<OppState | null>(() => {
     const st = Number(sp.get("step"));
     const step = (st === 4 ? 4 : st === 5 ? 5 : 1) as 1 | 4 | 5;
@@ -88,9 +90,25 @@ export function CrmMockScreen() {
     leads, jobs, tasks, toast: setToastMsg, go: goView,
     openLead: setLeadId, openJob: setJobId, openTask, ask: () => setChat(true),
     addLead: () => setAddingLead(true),
+    newSurvey: (l) => { setLeadId(null); setSurvey({ lead: l ?? null }); },
     newJob: () => setOpp({ lead: null, editId: null, step: 1 }),
   };
 
+  const createSurvey = (i: SurveyInput) => {
+    const now = NOW.toISOString();
+    const id = `J-2611-${String(101 + jobs.length).padStart(4, "0")}`;
+    const lid = i.leadId ?? nextLeadId();
+    const created: Job = {
+      id, opsId: id.replace("J-", "OP-"), leadId: lid, customer: i.customer, phone: i.phone, province: i.province, segment: "general", work: "survey", value: 0,
+      model: i.model, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, lastTouchAt: now, scope: i.scope,
+      log: [{ at: now, text: i.leadId ? `เปิด Opp ชนิดสำรวจจาก Lead ${i.leadId}` : "เปิด Opp ชนิดสำรวจ" }],
+    };
+    setJobs((all) => [created, ...all]);
+    if (i.leadId) setLeads((all) => all.map((l) => (l.id === i.leadId ? { ...l, status: "converted" } : l)));
+    else setLeads((all) => [{ id: lid, name: i.customer, phone: i.phone, product: "Smart Solution", channel: "ลูกค้าเดิม", province: i.province, createdAt: now, firstContactAt: now, status: "converted", note: "สร้างอัตโนมัติจากการเปิด Opp โดยตรง" }, ...all]);
+    setSurvey(null); setView("board"); setJobId(id);
+    setToastMsg(`เปิด Opp สำรวจ ${id} แล้ว ขั้นต่อไป: เก็บค่าสำรวจและส่งงานให้ทีมสำรวจ`);
+  };
   const nextLeadId = () => `L-2611-${String(30 + leads.length).padStart(3, "0")}`;
   const save = (i: NewJobInput, draft: boolean, editId: string | null) => {
     const now = NOW.toISOString();
@@ -157,7 +175,7 @@ export function CrmMockScreen() {
         </nav>
         <div className="mt-6 space-y-1.5 px-2">
           <div className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">หน่วยงานที่เชื่อมต่อ</div>
-          {(["KIM", "SCM", "ROOM"] as const).map((p) => (
+          {(["KIM", "SCM", "ROOM", "SURV"] as const).map((p) => (
             <div key={p} className="flex items-center gap-2 text-[12px] text-slate-600">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />{PARTY[p].label}<span className="text-[10.5px] text-slate-400">· {PARTY[p].sub.split(" · ")[0]}</span>
             </div>
@@ -198,7 +216,7 @@ export function CrmMockScreen() {
 
       <LeadDrawer lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
         onPatch={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))}
-        onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} />
+        onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} onConvertSurvey={(l) => ctx.newSurvey(l)} />
       <JobDrawer job={job} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
         onEditIntake={(id) => { setJobId(null); setOpp({ lead: null, editId: id, step: 1 }); }}
         onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))}
@@ -212,6 +230,7 @@ export function CrmMockScreen() {
         onCancel={(id, reason) => { patchJob(id, (j) => ({ ...j, cancelReason: reason, lastTouchAt: NOW.toISOString(), log: [...j.log, { at: NOW.toISOString(), text: `ยกเลิกงาน: ${reason}` }] })); setToastMsg("ยกเลิกงานแล้ว"); }} />
       <AddLeadDrawer open={addingLead} onClose={() => setAddingLead(false)} nextId={nextLeadId()}
         onAdd={(l) => { setLeads((all) => [l, ...all]); setView("leads"); setToastMsg(`เพิ่ม Lead ${l.id} แล้ว`); }} />
+      <NewSurveyDrawer open={!!survey} lead={survey?.lead ?? null} onClose={() => setSurvey(null)} onCreate={createSurvey} />
       <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} toast={setToastMsg} />
 
       <div className={cn("pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-5 py-2.5 text-[12.5px] font-medium text-white shadow-xl transition-all duration-300 lg:bottom-8", toastMsg ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>
