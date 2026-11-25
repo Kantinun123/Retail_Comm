@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { DEALER_STEP, LEAD_STATUS, NOW, PRODUCTS, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
 import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
-export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers";
+export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;
@@ -162,6 +162,7 @@ function LeadBoard({ c, rows }: { c: Ctx; rows: Lead[] }) {
                   <div className="mt-1 text-[13px] font-semibold text-slate-900">{l.name}</div>
                   <div className="text-[11px] text-slate-500">{l.province} · {l.channel}</div>
                   <div className="mt-1 text-[11.5px] text-slate-600">{l.product}</div>
+                  {l.store && !l.dealerStore && l.status !== "lost" && <div className="mt-2 flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-[10.5px] text-indigo-700"><Icon name="share_location" style={{ fontSize: 14 }} />จ่ายให้ {l.store}</div>}
                   {l.dealerStore && <div className="mt-2 flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-[10.5px] text-slate-600"><Icon name="storefront" style={{ fontSize: 14 }} />{l.dealerStore}</div>}
                   {l.status === "lost" && l.lostReason && <div className="mt-2 rounded-lg bg-rose-50 px-2 py-1 text-[10.5px] text-rose-700">{l.lostReason}</div>}
                 </button>

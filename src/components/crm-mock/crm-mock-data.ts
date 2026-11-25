@@ -63,6 +63,7 @@ export interface Lead {
   id: string; name: string; phone: string; product: string; channel: string; province: string;
   createdAt: string; firstContactAt?: string; status: LeadStatus; note?: string; lostReason?: string; interest?: string; tries?: number;
   /** สายสินค้า: ส่งให้ร้านทำใบเสนอราคาในระบบร้าน */
+  district?: string; /** ร้านที่รับพื้นที่นี้ (คำนวณจากตารางพื้นที่ ไม่เก็บ) */ store?: string; owner?: string;
   visitAt?: string; dealerStore?: string; dealerStep?: DealerStep; dealerAmount?: number; sentAt?: string;
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
@@ -83,6 +84,37 @@ export const DEALER_STEP: Record<DealerStep, { label: string; cls: string }> = {
   won: { label: "ร้านปิดขาย", cls: "bg-emerald-100 text-emerald-800" },
   lost: { label: "ร้านแจ้ง Loss", cls: "bg-rose-50 text-rose-700" },
 };
+/* ---------- ตารางพื้นที่รับงานของร้าน (ใช้จ่าย Lead ออนไลน์) ---------- */
+export interface Coverage { store: string; province: string; district?: string; priority: number }
+export const DEFAULT_COVERAGE: Coverage[] = [
+  { store: "ร้านหาดใหญ่โฮม", province: "สงขลา", district: "หาดใหญ่", priority: 1 },
+  { store: "ร้านหาดใหญ่โฮม", province: "สงขลา", priority: 1 },
+  { store: "ร้านสงขลาวัสดุ", province: "สงขลา", district: "เมืองสงขลา", priority: 1 },
+  { store: "ร้านสงขลาวัสดุ", province: "สงขลา", priority: 2 },
+  { store: "ร้านภูเก็ตวัสดุ", province: "ภูเก็ต", priority: 1 },
+  { store: "ร้านขอนแก่นโฮม", province: "ขอนแก่น", priority: 1 },
+  { store: "ร้านโคราชซีเมนต์", province: "นครราชสีมา", priority: 1 },
+  { store: "ร้านขอนแก่นโฮม", province: "นครราชสีมา", priority: 2 },
+  { store: "ร้านอุดรวัสดุ", province: "อุดรธานี", priority: 1 },
+  { store: "ร้านชลบุรีโฮม", province: "ชลบุรี", priority: 1 },
+  { store: "ร้านชลบุรีโฮม", province: "ระยอง", priority: 1 },
+  { store: "ร้านเชียงใหม่ซีเมนต์", province: "เชียงใหม่", priority: 1 },
+  { store: "ร้านกรุงเทพโฮม", province: "กรุงเทพมหานคร", priority: 1 },
+  { store: "ร้านกรุงเทพโฮม", province: "นครปฐม", priority: 1 },
+  { store: "ร้านนครสวรรค์วัสดุ", province: "นครสวรรค์", priority: 1 },
+];
+/** ร้านที่รับพื้นที่นี้: ตรงอำเภอก่อน แล้วเรียงตามลำดับ ; candidates = ทุกร้านที่รับพื้นที่ (เรียงตามลำดับจ่ายงาน) */
+export function assignStore(cov: Coverage[], province: string, district?: string): { store: string | null; candidates: string[] } {
+  const p = province.trim();
+  const d = (district ?? "").trim();
+  const rows = cov.filter((c) => c.province === p && (!c.district || (d && c.district === d)));
+  rows.sort((a, b) => (a.district ? 0 : 1) - (b.district ? 0 : 1) || a.priority - b.priority);
+  const candidates = [...new Set(rows.map((r) => r.store))];
+  return { store: candidates[0] ?? null, candidates };
+}
+export const ROLE_STORES: Record<"coach" | "dealer", string[]> = { coach: ["ร้านหาดใหญ่โฮม", "ร้านสงขลาวัสดุ", "ร้านภูเก็ตวัสดุ"], dealer: ["ร้านหาดใหญ่โฮม"] };
+const hashOf = (s: string) => [...s].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
+export const ownerOfLead = (id: string) => OWNERS[hashOf(id) % OWNERS.length];
 export const DEALER_STORES = ["ร้านอุดรวัสดุ", "ร้านขอนแก่นโฮม", "ร้านหาดใหญ่โฮม", "ร้านภูเก็ตวัสดุ", "ร้านชลบุรีโฮม", "ร้านเชียงใหม่ซีเมนต์"];
 export const DEALER_LOST = ["ลูกค้าต้องการเปรียบเทียบราคาเท่านั้น", "ยังไม่ตัดสินใจ รอพิจารณา", "ยังไม่มีแผนต่อเติมในช่วงนี้", "ราคาสูง ซื้อ SCG ที่ร้านอื่น", "ราคาสูง เปลี่ยนยี่ห้ออื่น", "สินค้าไม่พร้อมขาย ซื้อ SCG ที่ร้านอื่น", "สินค้าไม่พร้อมขาย เปลี่ยนยี่ห้ออื่น", "ไม่ตรงกับความต้องการลูกค้า"];
 export const LOST_REASONS = ["งบประมาณไม่ถึง", "ยังไม่พร้อมต่อเติม", "อยู่นอกพื้นที่บริการ", "ติดต่อไม่ได้", "เลือกผู้ให้บริการอื่น"];
@@ -293,7 +325,7 @@ export interface Job {
   id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; segment: Segment; work: Work;
   value: number; quote1Value?: number; model: Model; revise?: Cat[]; intake?: Intake; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
   /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
-  csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[];
+  csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[]; /** ร้านที่รับงาน (คำนวณจากจังหวัด) */ store?: string;
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string;
 }
 export const stepsOf = (j: Job) => template(j.segment, j.work);

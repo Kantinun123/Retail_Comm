@@ -5,9 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerOfLead, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
+import { AreasView } from "./crm-areas";
 import { NewSurveyDrawer, type SurveyInput } from "./crm-new-survey";
 import { ChatDrawer } from "./crm-chat";
 import { JobDrawer, type ScmEvent } from "./crm-job-drawer";
@@ -24,6 +25,7 @@ const NAV: { key: View; label: string; icon: string }[] = [
   { key: "leads", label: "Leads", icon: "person_search" },
   { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
   { key: "customers", label: "ลูกค้า 360", icon: "groups" },
+  { key: "areas", label: "พื้นที่รับงาน", icon: "share_location" },
   { key: "exchange", label: "เชื่อมข้อมูล", icon: "sync_alt" },
 ];
 
@@ -56,6 +58,7 @@ export function CrmMockScreen() {
   const [chat, setChat] = useState(sp.get("chat") === "1");
   const [addingLead, setAddingLead] = useState(false);
   const [custPhone, setCustPhone] = useState<string | null>(null);
+  const [coverage, setCoverage] = useState(DEFAULT_COVERAGE);
   const [survey, setSurvey] = useState<{ lead: Lead | null; prefill?: { customer: string; phone: string; province: string; scope: string }; right?: { jobId: string; rightId: string } } | null>(null);
   const [opp, setOpp] = useState<OppState | null>(() => {
     const st = Number(sp.get("step"));
@@ -73,6 +76,13 @@ export function CrmMockScreen() {
     return () => clearTimeout(t);
   }, [toastMsg]);
 
+  /* ร้านที่รับงาน/พนักงานขายคำนวณจากตารางพื้นที่ (ไม่เก็บในข้อมูล) ; โค้ช/ร้านค้าเห็นเฉพาะร้านในขอบเขต */
+  const scope = role === "coach" || role === "dealer" ? ROLE_STORES[role] : null;
+  const dLeads = useMemo(() => leads.map((l) => ({ ...l, store: assignStore(coverage, l.province, l.district).store ?? undefined, owner: ownerOfLead(l.id) })), [leads, coverage]);
+  const dJobs = useMemo(() => jobs.map((j) => ({ ...j, store: assignStore(coverage, j.province).store ?? undefined })), [jobs, coverage]);
+  const vLeads = readOnly && scope ? dLeads.filter((l) => l.store && scope.includes(l.store)) : dLeads;
+  const vJobs = readOnly && scope ? dJobs.filter((j) => j.store && scope.includes(j.store)) : dJobs;
+  const roleStores = role === "area" ? [...new Set(coverage.map((c) => c.store))] : scope ?? [];
   const tasks = useMemo(() => buildTasks(leads, jobs), [leads, jobs]);
   const urgent = tasks.filter((t) => t.priority === 1).length;
   const lead = leads.find((l) => l.id === leadId) ?? null;
@@ -107,7 +117,7 @@ export function CrmMockScreen() {
   };
 
   const ctx: Ctx = {
-    leads, jobs, tasks, toast: setToastMsg, go: goView, readOnly,
+    leads: vLeads, jobs: vJobs, tasks, toast: setToastMsg, go: goView, readOnly,
     openLead: (id) => (readOnly ? roView(" Lead") : setLeadId(id)), openJob: (id) => (readOnly ? roView("งาน") : setJobId(id)), openTask, ask: () => setChat(true),
     addLead: () => setAddingLead(true),
     newSurvey: (l) => { setLeadId(null); setSurvey({ lead: l ?? null }); },
@@ -225,8 +235,9 @@ export function CrmMockScreen() {
               {view === "leads" && <LeadsView c={ctx} />}
               {view === "board" && <BoardView c={ctx} />}
               {view === "exchange" && <ExchangeView c={ctx} />}
+              {view === "areas" && !readOnly && <AreasView coverage={coverage} setCoverage={setCoverage} />}
               {view === "customers" && !readOnly && <CustomersView jobs={jobs} openCustomer={setCustPhone} />}
-              {view === "report" && readOnly && <ReportView role={role as Exclude<Role, "se">} c={ctx} />}
+              {view === "report" && readOnly && <ReportView role={role as Exclude<Role, "se">} c={ctx} stores={roleStores} />}
             </>
           )}
         </div>
@@ -255,7 +266,7 @@ export function CrmMockScreen() {
             : { ...j, scm: { ...j.scm, readyEta: addWd(now, 7) }, lastTouchAt: now, log: [...j.log, { at: now, text: "SCM แจ้ง: คาดว่าสินค้าครบภายใน 7 วันทำการ" }] };
         })}
         onCancel={(id, reason) => { patchJob(id, (j) => ({ ...j, cancelReason: reason, lastTouchAt: NOW.toISOString(), log: [...j.log, { at: NOW.toISOString(), text: `ยกเลิกงาน: ${reason}` }] })); setToastMsg("ยกเลิกงานแล้ว"); }} />
-      <AddLeadDrawer open={addingLead} onClose={() => setAddingLead(false)} nextId={nextLeadId()}
+      <AddLeadDrawer coverage={coverage} open={addingLead} onClose={() => setAddingLead(false)} nextId={nextLeadId()}
         onAdd={(l) => { setLeads((all) => [l, ...all]); setView("leads"); setToastMsg(`เพิ่ม Lead ${l.id} แล้ว`); }} />
       <NewSurveyDrawer open={!!survey} lead={survey?.lead ?? null} prefill={survey?.prefill} onClose={() => setSurvey(null)} onCreate={createSurvey} />
       <Customer360Drawer phone={custPhone} jobs={jobs} onClose={() => setCustPhone(null)} openJob={(id) => { setCustPhone(null); setJobId(id); }}
