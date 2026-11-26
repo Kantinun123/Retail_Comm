@@ -2,7 +2,8 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, PRODUCTS, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
+import { DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
+import { InterestChips } from "./crm-interests";
 import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas";
@@ -19,7 +20,7 @@ export function LeadsView({ c }: { c: Ctx }) {
   const [prod, setProd] = useState("");
   const [mode, setMode] = useState<"board" | "list">("board");
   const curSE = c.seNick ? SE_ROSTER.find((s) => s.nick === c.seNick) : null;
-  const [flt, setFlt] = useState<"" | "sla" | "visit" | "stale">("");
+  const [flt, setFlt] = useState<"" | "sla" | "visit" | "stale" | "follow">("");
   const counts = useMemo(() => {
     const m: Record<string, number> = { all: c.leads.length };
     for (const l of c.leads) m[l.status] = (m[l.status] ?? 0) + 1;
@@ -30,8 +31,9 @@ export function LeadsView({ c }: { c: Ctx }) {
   const isSla = (l: Lead) => l.status === "waiting" && leadSla(l).state === "breach";
   const isVisit = (l: Lead) => visitDay(l) === today;
   const isStale = (l: Lead) => l.status === "qualified" && hoursSince(l.createdAt) > 72;
+  const isFollow = (l: Lead) => !!l.nextFollowAt && dayKey(l.nextFollowAt) === today && (l.status === "waiting" || l.status === "contacting" || l.status === "qualified");
   const rows = c.leads
-    .filter((l) => (!flt || (flt === "sla" ? isSla(l) : flt === "visit" ? isVisit(l) : isStale(l))) && (st === "all" || l.status === st) && (!prod || l.product === prod) && (!q || `${l.name}${l.phone}${l.id}${l.province}`.includes(q)))
+    .filter((l) => (!flt || (flt === "sla" ? isSla(l) : flt === "visit" ? isVisit(l) : flt === "follow" ? isFollow(l) : isStale(l))) && (st === "all" || l.status === st) && (!prod || !!l.interests?.some((i) => i.group === prod) || l.product === prod) && (!q || `${l.name}${l.phone}${l.id}${l.province}`.includes(q)))
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   const breach = c.leads.filter(isSla).length;
   const nToday = c.leads.filter((l) => dayKey(l.createdAt) === today).length;
@@ -39,6 +41,7 @@ export function LeadsView({ c }: { c: Ctx }) {
   const strip = [
     { k: "sla" as const, label: "เกิน SLA", n: breach, icon: "alarm", tone: "text-rose-700 bg-rose-50 border-rose-200" },
     { k: "visit" as const, label: "เข้าร้านวันนี้", n: c.leads.filter(isVisit).length, icon: "storefront", tone: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    { k: "follow" as const, label: "นัดติดตามวันนี้", n: c.leads.filter(isFollow).length, icon: "event", tone: "text-sky-700 bg-sky-50 border-sky-200" },
     { k: "stale" as const, label: "รอเปิด Opp เกิน 3 วัน", n: c.leads.filter(isStale).length, icon: "hourglass_top", tone: "text-violet-700 bg-violet-50 border-violet-200" },
   ];
   const chips: { k: LeadStatus | "all"; label: string }[] = [{ k: "all", label: "ทั้งหมด" }, { k: "waiting", label: "รอติดต่อ" }, { k: "contacting", label: "กำลังสกรีน" }, { k: "qualified", label: "รอเปิด Opp" }, { k: "converted", label: "เปิด Opp แล้ว" }, { k: "lost", label: "Loss" }];
@@ -80,8 +83,8 @@ export function LeadsView({ c }: { c: Ctx }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อ เบอร์ รหัส หรือจังหวัด" className={cn(inputCls, "pl-9")} />
           </div>
           <select value={prod} onChange={(e) => setProd(e.target.value)} className={cn(inputCls, "w-auto")}>
-            <option value="">ทุก Solution</option>
-            {PRODUCTS.map((p) => <option key={p}>{p}</option>)}
+            <option value="">ทุกความสนใจ</option>
+            {interestGroups.map((p) => <option key={p}>{p}</option>)}
           </select>
         </div>
         {mode === "list" && <div className="flex flex-wrap gap-2">
@@ -98,7 +101,7 @@ export function LeadsView({ c }: { c: Ctx }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-[12.5px]">
             <thead className="bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500">
-              <tr>{["ลูกค้า", "Solution", "ช่องทาง", "เข้ามาเมื่อ", "SLA ติดต่อครั้งแรก", "สถานะ", ""].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
+              <tr>{["ลูกค้า", "ความสนใจ", "ช่องทาง", "เข้ามาเมื่อ", "SLA ติดต่อครั้งแรก", "สถานะ", ""].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
             </thead>
             <tbody>
               {rows.map((l) => (
@@ -112,7 +115,7 @@ export function LeadsView({ c }: { c: Ctx }) {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{l.product}</td>
+                  <td className="px-4 py-3 text-slate-700"><InterestChips list={l.interests} max={2} fallback={l.product} /></td>
                   <td className="px-4 py-3 text-slate-500">{l.channel}</td>
                   <td className="px-4 py-3 text-slate-500">{dtTh(l.createdAt)}<div className="text-[11px] text-slate-400">{agoText(l.createdAt)}</div></td>
                   <td className="px-4 py-3"><SlaBadge lead={l} /></td>
@@ -164,7 +167,13 @@ function LeadBoard({ c, rows }: { c: Ctx; rows: Lead[] }) {
                   <div className="mt-1 text-[13px] font-semibold text-slate-900">{l.name}</div>
                   <div className="text-[11px] text-slate-500">{l.province} · {l.channel}</div>
                   {l.owner && !c.seNick && <div className="text-[10.5px] text-slate-400">{l.owner}</div>}
-                  <div className="mt-1 text-[11.5px] text-slate-600">{l.product}</div>
+                  <div className="mt-1.5"><InterestChips list={l.interests} max={2} fallback={l.product} /></div>
+                  {(l.status === "waiting" || l.status === "contacting" || l.status === "qualified") && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {l.source === "customer" && !l.reviewed && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">ยังไม่ทวนความต้องการ</span>}
+                      {l.nextFollowAt && <span className="inline-flex items-center gap-0.5 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700"><Icon name="event" style={{ fontSize: 11 }} />นัด {dtTh(l.nextFollowAt)}</span>}
+                    </div>
+                  )}
                   {l.store && !l.dealerStore && l.status !== "lost" && <div className="mt-2 flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-[10.5px] text-indigo-700"><Icon name="share_location" style={{ fontSize: 14 }} />จ่ายให้ {l.store}{l._escalated && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">เลื่อนร้านแล้ว</span>}</div>}
                   {l.dealerStore && <div className="mt-2 flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-[10.5px] text-slate-600"><Icon name="storefront" style={{ fontSize: 14 }} />{l.dealerStore}</div>}
                   {l.status === "lost" && l.lostReason && <div className="mt-2 rounded-lg bg-rose-50 px-2 py-1 text-[10.5px] text-rose-700">{l.lostReason}</div>}

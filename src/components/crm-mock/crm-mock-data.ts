@@ -67,8 +67,59 @@ export interface Lead {
   visitAt?: string; dealerStore?: string; dealerStep?: DealerStep; dealerAmount?: number; sentAt?: string;
   /** computed at display time: เกิน SLA แล้วเลื่อนไปร้านถัดไป */
   _escalated?: boolean;
+  /** ความสนใจ (สินค้า/บริการ เลือกได้หลายรายการ) · source = ใครเป็นคนเลือก */
+  interests?: Interest[]; source?: "customer" | "staff";
+  /** ทวนความต้องการกับลูกค้าแล้ว (original = สิ่งที่ลูกค้าเลือกเองก่อนแก้ไข) */
+  reviewed?: { at: string; by: string; edited: boolean; original?: Interest[] };
+  /** บันทึกการติดต่อทุกครั้ง (ลบไม่ได้ แก้โดยเพิ่มรายการใหม่) */
+  contacts?: ContactLog[]; nextFollowAt?: string;
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
+
+/* ---------- ความสนใจ: สินค้า / บริการ (รายการตัวอย่าง รอรายการจริงจากระบบต้นทาง) ---------- */
+export type InterestKind = "service" | "product";
+export interface Interest { kind: InterestKind; group: string; item: string }
+export const SERVICE_CATALOG: Record<string, string[]> = {
+  "งานหลังคา": ["ติดตั้งหลังคาใหม่ (Roof Install)", "เปลี่ยนหลังคา (Re-roof)", "ซ่อมหลังคารั่ว (Roof Repair)", "ทาสีหลังคา"],
+  "งานโครงสร้างหลังคา": ["โครงทรัส", "อะเสและโครงหลังคา"],
+  "พลังงานแสงอาทิตย์": ["Solar Roof", "Solar Roof + แบตเตอรี่"],
+  "ฝ้า ผนัง และฉนวน": ["ติดตั้งฝ้าเพดาน", "ติดตั้งฉนวนกันความร้อน"],
+  "ระบบอัจฉริยะและแอร์": ["Home Automation", "ระบบแอร์ (Air Solution)"],
+  "บริการหลังการขาย": ["ล้างแอร์", "สำรวจต่อเติมโรงจอดรถ", "สำรวจรางน้ำฝน"],
+};
+export const PRODUCT_CATALOG: Record<string, string[]> = {
+  "กระเบื้องหลังคา": ["Prestige (เพรสทีจ)", "Excella", "Neustile", "Cotto Roof"],
+  "รางน้ำฝน": ["รางน้ำฝน PVC", "รางน้ำฝนอลูมิเนียม"],
+  "ฝ้าและผนัง": ["ฝ้าเพดานไฟเบอร์ซีเมนต์", "ผนังไฟเบอร์ซีเมนต์", "ไม้ฝา"],
+  "ฉนวนและแผ่นสะท้อนความร้อน": ["แผ่นสะท้อนความร้อน", "Ultra Cool InnoGreen"],
+  "อุปกรณ์หลังคา": ["ครอบสันหลังคา", "สกรูและอุปกรณ์ยึด"],
+};
+export const catalogOf = (k: InterestKind) => (k === "service" ? SERVICE_CATALOG : PRODUCT_CATALOG);
+export const interestGroups = [...Object.keys(SERVICE_CATALOG), ...Object.keys(PRODUCT_CATALOG)];
+export const cleanInterests = (xs?: Interest[]) => (xs ?? []).filter((i) => i.group && i.item);
+export const interestSummary = (xs?: Interest[]) => {
+  const c = cleanInterests(xs);
+  return c.length === 0 ? "" : c.length <= 2 ? c.map((i) => i.item).join(", ") : `${c[0].item}, ${c[1].item} +${c.length - 2}`;
+};
+/** ข้อความความสนใจทั้งหมด ใช้เติมใบเปิดงานตอนเปิด Opp */
+export const interestText = (l: { interests?: Interest[]; interest?: string }) => [...cleanInterests(l.interests).map((i) => i.item), l.interest].filter(Boolean).join(", ");
+/** แนะนำเส้นทาง: มีบริการ = เปิด Opp ; สินค้าอย่างเดียว = ส่งให้ร้าน */
+export const suggestRoute = (xs?: Interest[]): "solution" | "product" | "none" => {
+  const c = cleanInterests(xs);
+  if (c.length === 0) return "none";
+  return c.some((i) => i.kind === "service") ? "solution" : "product";
+};
+
+/* ---------- บันทึกการติดต่อ ---------- */
+export const CONTACT_CHANNELS = ["โทร", "LINE", "เข้าร้าน", "อื่นๆ"] as const;
+export const CONTACT_OUTCOMES = ["คุยได้", "ไม่รับสาย", "นัดหมาย", "ขอเวลาคิด", "ปฏิเสธ"] as const;
+export interface ContactLog { id: string; at: string; by: string; channel: (typeof CONTACT_CHANNELS)[number]; outcome: (typeof CONTACT_OUTCOMES)[number]; note: string; nextAt?: string }
+/** จำนวนครั้งที่ไม่รับสายติดต่อกันล่าสุด */
+export const trailingMisses = (cs?: ContactLog[]) => {
+  let n = 0;
+  for (let i = (cs?.length ?? 0) - 1; i >= 0; i--) { if (cs![i].outcome === "ไม่รับสาย") n++; else break; }
+  return n;
+};
 export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral", "ลูกค้าเดิม"];
 export interface SE { nick: string; name: string; store: string; color: string }
 export const SE_ROSTER: SE[] = [
@@ -464,7 +515,65 @@ export function leadSla(l: Lead): { state: "ok" | "warn" | "breach" | "met" | "n
 }
 
 /* ---------- ข้อมูลตั้งต้น ---------- */
+const SV = (group: string, item: string): Interest => ({ kind: "service", group, item });
+const PD = (group: string, item: string): Interest => ({ kind: "product", group, item });
+const SEED_INTERESTS: Record<string, { i: Interest[]; src: "customer" | "staff" }> = {
+  "L-2611-009": { i: [SV("งานหลังคา", "เปลี่ยนหลังคา (Re-roof)"), PD("กระเบื้องหลังคา", "Neustile")], src: "customer" },
+  "L-2611-001": { i: [SV("งานหลังคา", "ติดตั้งหลังคาใหม่ (Roof Install)"), SV("งานโครงสร้างหลังคา", "โครงทรัส")], src: "customer" },
+  "L-2611-002": { i: [SV("งานหลังคา", "เปลี่ยนหลังคา (Re-roof)")], src: "staff" },
+  "L-2611-003": { i: [SV("งานหลังคา", "ซ่อมหลังคารั่ว (Roof Repair)")], src: "customer" },
+  "L-2611-010": { i: [SV("พลังงานแสงอาทิตย์", "Solar Roof")], src: "staff" },
+  "L-2611-004": { i: [SV("ฝ้า ผนัง และฉนวน", "ติดตั้งฝ้าเพดาน"), SV("ฝ้า ผนัง และฉนวน", "ติดตั้งฉนวนกันความร้อน")], src: "staff" },
+  "L-2611-005": { i: [SV("งานหลังคา", "ติดตั้งหลังคาใหม่ (Roof Install)"), SV("งานโครงสร้างหลังคา", "โครงทรัส")], src: "staff" },
+  "L-2611-006": { i: [SV("งานหลังคา", "เปลี่ยนหลังคา (Re-roof)"), PD("กระเบื้องหลังคา", "Excella")], src: "customer" },
+  "L-2611-007": { i: [SV("งานหลังคา", "ติดตั้งหลังคาใหม่ (Roof Install)"), SV("งานโครงสร้างหลังคา", "อะเสและโครงหลังคา")], src: "staff" },
+  "L-2611-008": { i: [SV("ระบบอัจฉริยะและแอร์", "Home Automation")], src: "customer" },
+  "L-2611-030": { i: [PD("กระเบื้องหลังคา", "Prestige (เพรสทีจ)")], src: "staff" },
+  "L-2611-031": { i: [PD("รางน้ำฝน", "รางน้ำฝน PVC")], src: "customer" },
+  "L-2611-016": { i: [PD("กระเบื้องหลังคา", "Cotto Roof")], src: "customer" },
+  "L-2611-012": { i: [PD("รางน้ำฝน", "รางน้ำฝนอลูมิเนียม")], src: "customer" },
+  "L-2611-011": { i: [PD("ฝ้าและผนัง", "ฝ้าเพดานไฟเบอร์ซีเมนต์")], src: "staff" },
+  "L-2611-032": { i: [SV("งานหลังคา", "ติดตั้งหลังคาใหม่ (Roof Install)")], src: "customer" },
+  "L-2611-033": { i: [SV("งานหลังคา", "ซ่อมหลังคารั่ว (Roof Repair)")], src: "customer" },
+  "L-2611-034": { i: [SV("งานหลังคา", "ติดตั้งหลังคาใหม่ (Roof Install)"), SV("งานโครงสร้างหลังคา", "โครงทรัส")], src: "staff" },
+  "L-2611-035": { i: [SV("พลังงานแสงอาทิตย์", "Solar Roof")], src: "staff" },
+  "L-2611-036": { i: [SV("งานหลังคา", "เปลี่ยนหลังคา (Re-roof)"), PD("กระเบื้องหลังคา", "Prestige (เพรสทีจ)")], src: "customer" },
+  "L-2611-037": { i: [SV("ฝ้า ผนัง และฉนวน", "ติดตั้งฝ้าเพดาน"), PD("ฉนวนและแผ่นสะท้อนความร้อน", "แผ่นสะท้อนความร้อน")], src: "staff" },
+};
+const SEED_CONTACTS: Record<string, { ago: number; ch: ContactLog["channel"]; out: ContactLog["outcome"]; note: string; next?: number; by: string }[]> = {
+  "L-2611-010": [
+    { ago: 19, ch: "เข้าร้าน", out: "คุยได้", note: "มาที่ร้าน สอบถามโซลาร์รูฟ ขอเทียบกับอีก 2 เจ้า", by: "ฝน" },
+    { ago: 3, ch: "โทร", out: "นัดหมาย", note: "โทรกลับ ลูกค้าขอใบเสนอราคาเบื้องต้น นัดโทรอีกครั้งพรุ่งนี้", next: 20, by: "ฝน" },
+  ],
+  "L-2611-004": [
+    { ago: 28, ch: "เข้าร้าน", out: "คุยได้", note: "ฝ้าเพดานและฉนวน ส่งรูปหน้างานแล้ว", by: "โอ" },
+    { ago: 10, ch: "LINE", out: "ขอเวลาคิด", note: "รอตอบเรื่องงบ ขอปรึกษาครอบครัวก่อน", next: 48, by: "โอ" },
+  ],
+  "L-2611-005": [{ ago: 49, ch: "โทร", out: "คุยได้", note: "ร้านตัวแทนแนะนำมา พื้นที่อยู่ในขอบเขต", by: "มิ้น" }],
+  "L-2611-006": [{ ago: 71, ch: "โทร", out: "คุยได้", note: "ผ่านเงื่อนไขรับงาน พร้อมให้สำรวจ", by: "แนน" }],
+  "L-2611-007": [{ ago: 98, ch: "โทร", out: "คุยได้", note: "งบ 3-4 แสน ต้องการเริ่มก่อนสิ้นปี", by: "ฝน" }],
+  "L-2611-033": [{ ago: 29, ch: "LINE", out: "นัดหมาย", note: "นัดดูหน้างานเย็นนี้ ลูกค้าส่งรูปหลังคารั่วมาแล้ว", next: 8, by: "บอส" }],
+  "L-2611-034": [
+    { ago: 5, ch: "โทร", out: "ไม่รับสาย", note: "โทรครั้งแรกไม่รับสาย", by: "นุ้ย" },
+    { ago: 4, ch: "LINE", out: "คุยได้", note: "คุยทาง LINE ส่งแบบแปลนแล้ว บ้านใหม่ 2 ชั้น", next: 30, by: "นุ้ย" },
+  ],
+  "L-2611-035": [{ ago: 20, ch: "เข้าร้าน", out: "คุยได้", note: "เข้ามาที่ร้าน ผ่านเงื่อนไข พร้อมสำรวจ", by: "โอ" }],
+  "L-2611-012": [{ ago: 39, ch: "LINE", out: "คุยได้", note: "ลูกค้าต้องการเฉพาะรางน้ำ ไม่ต้องการแบบ ส่งให้ร้าน", by: "ฝน" }],
+};
+const SEED_REVIEW: Record<string, NonNullable<Lead["reviewed"]>> = {
+  "L-2611-010": { at: hAgo(19), by: "ฝน", edited: false },
+  "L-2611-006": { at: hAgo(70), by: "แนน", edited: true, original: [SV("งานหลังคา", "เปลี่ยนหลังคา (Re-roof)")] },
+  "L-2611-033": { at: hAgo(29), by: "บอส", edited: false },
+};
+function applySeed(l: Lead): Lead {
+  const s = SEED_INTERESTS[l.id];
+  const cs = SEED_CONTACTS[l.id]?.map((c, i) => ({ id: `${l.id}-C${i + 1}`, at: hAgo(c.ago), by: c.by, channel: c.ch, outcome: c.out, note: c.note, nextAt: c.next !== undefined ? hAgo(-c.next) : undefined }));
+  return { ...l, interests: s?.i, source: s?.src, contacts: cs, nextFollowAt: cs?.[cs.length - 1]?.nextAt, reviewed: SEED_REVIEW[l.id], product: interestSummary(s?.i) || l.product };
+}
 export function seedLeads(): Lead[] {
+  return seedLeadsRaw().map(applySeed);
+}
+function seedLeadsRaw(): Lead[] {
   return [
     { id: "L-2611-009", name: "คุณนภา ใจงาม", phone: "081-555-0931", product: "Roof Install", channel: "Home Online", province: "อุดรธานี", createdAt: hAgo(1.2), status: "waiting", interest: "ต้องการเปลี่ยนหลังคาบ้านชั้นเดียว ประมาณ 180 ตร.ม." },
     { id: "L-2611-001", name: "คุณวิภา ศรีสุข", phone: "062-555-1204", product: "Roof Install", channel: "Home Online", province: "สงขลา", createdAt: hAgo(2.8), status: "waiting", interest: "สร้างบ้านใหม่ ต้องการโครงทรัสพร้อมมุงกระเบื้อง" },

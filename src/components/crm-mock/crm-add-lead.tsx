@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { CHANNELS, NOW, PRODUCTS, assignStore, slaHoursOf, type Coverage, type Lead } from "./crm-mock-data";
+import { CHANNELS, NOW, PRODUCTS, assignStore, cleanInterests, interestSummary, slaHoursOf, suggestRoute, type Coverage, type Interest, type Lead } from "./crm-mock-data";
+import { InterestEditor } from "./crm-interests";
 import { Drawer, Field, btnPrimary, inputCls } from "./crm-ui";
 
 export function AddLeadDrawer({ open, onClose, nextId, onAdd, coverage }: { open: boolean; onClose: () => void; nextId: string; onAdd: (l: Lead) => void; coverage: Coverage[] }) {
@@ -15,7 +16,10 @@ export function AddLeadDrawer({ open, onClose, nextId, onAdd, coverage }: { open
 }
 
 function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: () => void; onAdd: (l: Lead) => void; coverage: Coverage[] }) {
-  const [f, setF] = useState({ name: "", phone: "", province: "", district: "", channel: CHANNELS[0], product: PRODUCTS[0], interest: "", visit: false, contacted: false });
+  const [f, setF] = useState({ name: "", phone: "", province: "", district: "", channel: CHANNELS[0], interest: "", visit: false, contacted: false });
+  const [interests, setInterests] = useState<Interest[]>([]);
+  const picked = cleanInterests(interests);
+  const route = suggestRoute(picked);
   const walkin = f.channel === "Walk-in";
   const visit = walkin || f.visit;
   const contacted = walkin || f.contacted;
@@ -23,7 +27,8 @@ function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: (
   const save = () => {
     const now = NOW.toISOString();
     onAdd({
-      id: nextId, name: f.name.trim(), phone: f.phone.trim(), product: f.product, channel: f.channel, province: f.province.trim(), district: f.district.trim() || undefined, createdAt: now,
+      id: nextId, name: f.name.trim(), phone: f.phone.trim(), product: interestSummary(picked) || PRODUCTS[0], interests: picked, source: f.channel === "Home Online" ? "customer" : "staff", channel: f.channel, province: f.province.trim(), district: f.district.trim() || undefined, createdAt: now,
+      contacts: contacted ? [{ id: `${nextId}-C1`, at: now, by: "ทีมขาย", channel: walkin ? "เข้าร้าน" : "โทร", outcome: "คุยได้", note: walkin ? "ลูกค้าเข้ามาที่ร้าน" : "ติดต่อลูกค้าแล้วก่อนคีย์ข้อมูล" }] : undefined,
       firstContactAt: contacted ? now : undefined, visitAt: visit ? now : undefined, status: contacted ? "contacting" : "waiting", interest: f.interest.trim() || undefined,
     });
     onClose();
@@ -38,10 +43,14 @@ function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: (
         <Field label="แหล่งที่มา">
           <select value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value })} className={inputCls}>{CHANNELS.map((c) => <option key={c}>{c}</option>)}</select>
         </Field>
-        <Field label="สนใจ">
-          <select value={f.product} onChange={(e) => setF({ ...f, product: e.target.value })} className={inputCls}>{PRODUCTS.map((c) => <option key={c}>{c}</option>)}</select>
-        </Field>
-        <Field label="ความต้องการ (ถ้ามี)"><input value={f.interest} onChange={(e) => setF({ ...f, interest: e.target.value })} className={inputCls} /></Field>
+      </div>
+      <div className="space-y-3">
+        <div className="text-[13px] font-bold text-slate-900">ลูกค้าสนใจอะไร <span className="font-normal text-slate-400">· เลือกได้หลายรายการ ทั้งบริการและสินค้า</span></div>
+        <InterestEditor kind="service" value={interests} onChange={setInterests} />
+        <InterestEditor kind="product" value={interests} onChange={setInterests} />
+        <Field label="หมายเหตุความต้องการ (ถ้ามี)"><input value={f.interest} onChange={(e) => setF({ ...f, interest: e.target.value })} className={inputCls} placeholder="เช่น บ้านชั้นเดียว ประมาณ 180 ตร.ม." /></Field>
+        {f.channel === "Home Online" && <p className="flex items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-800"><Icon name="language" style={{ fontSize: 16 }} />ช่องทาง Home Online: ในระบบจริงลูกค้าเลือกรายการเองจากหน้าเว็บ ฟอร์มนี้จำลองข้อมูลที่ติดมา ทีมขายต้องทวนความต้องการอีกครั้ง</p>}
+        {route !== "none" && <p className={cn("flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px]", route === "solution" ? "bg-indigo-50 text-indigo-800" : "bg-fuchsia-50 text-fuchsia-800")}><Icon name="alt_route" style={{ fontSize: 16 }} />{route === "solution" ? "ระบบแนะนำ: เปิด Opp (มีงานบริการ)" : "ระบบแนะนำ: ส่งให้ร้านทำใบเสนอราคา (สินค้าอย่างเดียว) ถ้าลูกค้าต้องการแบบ ให้เปิด Opp"}</p>}
       </div>
       {f.province.trim() && (() => {
         const a = assignStore(coverage, f.province, f.district);
