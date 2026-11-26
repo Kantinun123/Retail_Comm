@@ -256,6 +256,11 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
   const late = isCur ? lateWd(due) : 0;
   const owner = PARTY[s.owner];
   const outs = s.sends.filter((x) => x.at === "done");
+  const [handoff, setHandoff] = useState(false);
+  const [siteContact, setSiteContact] = useState("");
+  const [startWish, setStartWish] = useState("ภายใน 15 วัน");
+  const [caution, setCaution] = useState("");
+  const [mapOk, setMapOk] = useState(true);
   return (
     <li className="relative flex gap-3 pb-4 last:pb-0">
       {!last && <span className={cn("absolute left-[15px] top-8 h-[calc(100%-18px)] w-0.5", done ? "bg-emerald-400" : "bg-slate-200")} />}
@@ -290,10 +295,32 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
               </div>
             )}
             <button
-              onClick={() => { onComplete(job.id, s.key, s.key === "deposit" ? { surveyAt: new Date(`${surveyAt}:00+07:00`).toISOString() } : undefined); toast(outs.length ? `บันทึกแล้ว และส่งข้อมูลให้ ${outs.map((o) => PARTY[o.party].label).join(" + ")}` : `บันทึก "${s.label}" แล้ว`); }}
+              onClick={() => { if (s.key === "close") { setHandoff(true); return; } onComplete(job.id, s.key, s.key === "deposit" ? { surveyAt: new Date(`${surveyAt}:00+07:00`).toISOString() } : undefined); toast(outs.length ? `บันทึกแล้ว และส่งข้อมูลให้ ${outs.map((o) => PARTY[o.party].label).join(" + ")}` : `บันทึก "${s.label}" แล้ว`); }}
               className={btnPrimary}>
               <Icon name="task_alt" style={{ fontSize: 18 }} />{s.key === "deposit" ? (job.work === "survey" ? "รับค่าสำรวจ + ส่งงานให้ทีมสำรวจ" : "รับมัดจำ + ล็อกคิวสำรวจ") : s.key === "close" ? "บันทึกรับเงินครบ 100%" : `ทำเสร็จ: ${s.label}`}
             </button>
+          </div>
+        )}
+
+        {handoff && (
+          <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={() => setHandoff(false)}>
+            <div className="max-h-[92vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 text-emerald-600"><Icon name="verified" /></span><div><p className="text-[14px] font-bold text-slate-900">ยืนยันปิดขาย และส่งต่อให้งานหลังขาย</p><p className="text-[11px] text-slate-400">{job.id} · {job.customer}</p></div></div>
+              <p className="text-[12px] text-slate-500">ตรวจข้อมูลที่ KIM และ SCM ต้องใช้ ถ้าขาดจะต้องโทรถามลูกค้าซ้ำ</p>
+              <ul className="space-y-1.5 text-[12px]">
+                <li className="flex gap-2 rounded-xl border border-slate-200 p-2.5"><Icon name="check_circle" className="text-emerald-500" /><span><b>ชำระครบ 100%</b><br />{baht(job.value)} (หัก{job.work === "survey" ? "ค่าสำรวจ" : "มัดจำ"} {baht(depositOf(job))} · ส่วนที่เหลือ {baht(Math.max(0, job.value - depositOf(job)))})</span></li>
+                <li className="flex gap-2 rounded-xl border border-slate-200 p-2.5"><Icon name="check_circle" className="text-emerald-500" /><span><b>ใบเสนอราคาฉบับแก้ไข</b><br />ส่งให้ SCM เพื่อ Map สินค้าและสั่งโรงงาน</span></li>
+                <li className="flex items-center gap-2 rounded-xl border border-slate-200 p-2.5"><Icon name={mapOk ? "check_circle" : "error"} className={mapOk ? "text-emerald-500" : "text-amber-500"} /><span className="flex-1"><b>ที่อยู่และ Location หน้างาน</b><br />{job.province} · แนบ Google Maps แล้ว</span><label className="flex items-center gap-1 text-[11px] text-slate-500"><input type="checkbox" checked={mapOk} onChange={(e) => setMapOk(e.target.checked)} />ครบ</label></li>
+              </ul>
+              <label className={cn("block rounded-xl border p-2.5", siteContact.trim() ? "border-slate-200" : "border-amber-300 bg-amber-50")}><span className="text-[11px] font-semibold text-slate-500">ผู้ติดต่อหน้างาน (ชื่อ + เบอร์)</span><input value={siteContact} onChange={(e) => setSiteContact(e.target.value)} placeholder="เช่น คุณสมชาย 081-234-5678" className={cn(inputCls, "mt-1")} /></label>
+              <label className="block rounded-xl border border-slate-200 p-2.5"><span className="text-[11px] font-semibold text-slate-500">วันที่ลูกค้าอยากให้เริ่มงาน</span><input value={startWish} onChange={(e) => setStartWish(e.target.value)} className={cn(inputCls, "mt-1")} /></label>
+              <label className="block rounded-xl border border-slate-200 p-2.5"><span className="text-[11px] font-semibold text-slate-500">ข้อควรระวังหน้างาน (ไม่บังคับ)</span><input value={caution} onChange={(e) => setCaution(e.target.value)} placeholder="เช่น ทางเข้าแคบ รถบรรทุกใหญ่เข้าไม่ได้" className={cn(inputCls, "mt-1")} /></label>
+              <div className="rounded-xl bg-emerald-50 p-3 text-[11.5px] text-emerald-800">เมื่อกดยืนยัน ระบบจะ:<ul className="mt-1 list-disc space-y-0.5 pl-4"><li>เปลี่ยน Opp เป็น Won และนับยอดขาย</li><li>ส่งข้อมูลให้ KIM และ SCM แล้วสร้างงานในหน้า &ldquo;งานหลังขาย&rdquo;</li><li>ส่งแบบประเมิน CSAT รอบ 1 ให้ลูกค้าทาง LINE OA</li></ul></div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setHandoff(false)} className={btnGhost}>ยกเลิก</button>
+                <button onClick={() => { setHandoff(false); onComplete(job.id, s.key); toast(`ปิดขายแล้ว ส่งต่อ KIM + SCM · ดูต่อที่เมนู "งานหลังขาย"${siteContact.trim() ? "" : " (ยังไม่มีผู้ติดต่อหน้างาน)"}`); }} className={btnPrimary}>ยืนยันปิดขาย{siteContact.trim() ? "" : " (ขาดข้อมูล 1 ข้อ)"}</button>
+              </div>
+            </div>
           </div>
         )}
 
