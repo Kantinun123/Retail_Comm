@@ -51,6 +51,13 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, wide,
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [open, onClose]);
+  /* หน้าเต็ม: ล็อกการเลื่อนของหน้าด้านหลัง ไม่ให้เห็นเคลื่อนไหวตอนเลื่อนในหน้านี้ */
+  useEffect(() => {
+    if (!open || side) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open, side]);
   if (!side) {
     const w = wide ? "max-w-5xl" : "max-w-3xl";
     return (

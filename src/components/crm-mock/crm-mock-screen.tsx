@@ -212,7 +212,7 @@ export function CrmMockScreen() {
         <div className="absolute bottom-0 left-1/3 h-[22rem] w-[22rem] rounded-full bg-cyan-300/20 blur-3xl" />
       </div>
 
-      <div className="relative z-10 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-[11px] text-amber-800">
+      <div className="sticky top-0 z-[45] border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-[11px] text-amber-800">
         หน้าตัวอย่าง (mock) — ข้อมูลสมมติ ไม่บันทึกลงระบบจริง · การเชื่อมกับ KIM / SCM / ห้องแบบ เป็นการจำลอง · เวลาถูกตรึงที่ 24 พ.ย. 2569 10:30
       </div>
 
