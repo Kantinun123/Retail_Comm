@@ -5,6 +5,7 @@ import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { MODEL_LABEL, OWNERS, SURVEY_FEE, type Lead, type Model } from "./crm-mock-data";
 import { Drawer, Field, btnPrimary, inputCls } from "./crm-ui";
+import { TH_PROVINCES } from "./th-geo";
 
 export interface SurveyInput { customer: string; phone: string; province: string; model: Model; owner: string; scope: string; leadId?: string }
 
@@ -25,7 +26,7 @@ function Body({ lead, prefill, onCreate }: { lead: Lead | null; prefill?: Survey
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="ชื่อลูกค้า *"><input value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} className={inputCls} /></Field>
         <Field label="เบอร์โทร *"><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className={inputCls} /></Field>
-        <Field label="จังหวัดหน้างาน *"><input value={f.province} onChange={(e) => setF({ ...f, province: e.target.value })} className={inputCls} /></Field>
+        <Field label="จังหวัดหน้างาน *"><select value={f.province} onChange={(e) => setF({ ...f, province: e.target.value })} className={inputCls}><option value="">เลือกจังหวัด...</option>{TH_PROVINCES.map((p) => <option key={p}>{p}</option>)}</select></Field>
         <Field label="โมเดลร้าน">
           <select value={f.model} onChange={(e) => setF({ ...f, model: e.target.value as Model })} className={inputCls}>{(Object.keys(MODEL_LABEL) as Model[]).map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}</select>
         </Field>

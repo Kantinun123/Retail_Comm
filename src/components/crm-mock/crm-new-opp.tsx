@@ -7,11 +7,12 @@ import { Icon } from "@/components/commission/icon";
 import { fetchStores, type StoreInfo } from "@/lib/commission/employee-store";
 import { cn } from "@/lib/utils";
 import {
-  ASE_OPTS, BCHARS, BTYPES, CAT_LABEL, CAT_ORDER, CHC_OPTS, COLOR_OPTS, CTYPES, DEPOSIT_PCT, DEPOSIT_SCG, FAMILY, INS_OPTS, MODEL_LABEL, NOW, OWNERS, PKG_OPTS, PROV, RC_OPTS,
+  ASE_OPTS, BCHARS, BTYPES, CAT_LABEL, CAT_ORDER, CHC_OPTS, COLOR_OPTS, CTYPES, DEPOSIT_PCT, DEPOSIT_SCG, FAMILY, INS_OPTS, MODEL_LABEL, NOW, OWNERS, PKG_OPTS, RC_OPTS,
   ROUND_LABEL, SEA_OPTS, SEGMENT_LABEL, SHAPE_OPTS, SHOPS, SVC_LABEL, TERRAIN, TILE_MODEL_OPTS, TILE_OPTS, WORK_LABEL, baht, dayKey, missingOf, planTotals, segmentOfCtype, template, workOfDet,
   type Cat, type Intake, type Job, type Lead, type Model, type Segment, type Work,
 } from "./crm-mock-data";
 import { KV, btnGhost, btnPrimary, glass, inputCls, labelCls } from "./crm-ui";
+import { TH_PROVINCES, districtsOf } from "./th-geo";
 
 export interface NewJobInput {
   customer: string; phone: string; province: string; segment: Segment; work: Work; model: Model; value: number; owner: string; leadId?: string; intake: Intake;
@@ -383,12 +384,16 @@ export function NewOppPage({ lead, editJob, jobs, initialStep, onDirty, onCancel
                   <Fld label="ประเภทอาคาร"><select value={f.btype} onChange={(e) => set("btype", e.target.value)} className={inputCls}>{BTYPES.map((o) => <option key={o}>{o}</option>)}</select></Fld>
                   <Fld label="ลักษณะอาคาร"><select value={f.bchar} onChange={(e) => set("bchar", e.target.value)} className={inputCls}>{BCHARS.map((o) => <option key={o}>{o}</option>)}</select></Fld>
                   <Fld label="จังหวัด" req err={errs.prov}>
-                    <input list="crm-prov" value={f.prov} onChange={(e) => set("prov", e.target.value)} placeholder="-- เลือกจังหวัด --" className={errCls(errs.prov)} />
-                    <datalist id="crm-prov">{Object.keys(PROV).map((p) => <option key={p} value={p} />)}</datalist>
+                    <select value={f.prov} onChange={(e) => { set("prov", e.target.value); set("dist", ""); }} className={errCls(errs.prov)}>
+                      <option value="">-- เลือกจังหวัด --</option>
+                      {TH_PROVINCES.map((p) => <option key={p}>{p}</option>)}
+                    </select>
                   </Fld>
                   <Fld label="อำเภอ" req err={errs.dist}>
-                    <input list="crm-dist" value={f.dist} onChange={(e) => set("dist", e.target.value)} placeholder="-- เลือกอำเภอ --" className={errCls(errs.dist)} />
-                    <datalist id="crm-dist">{(PROV[f.prov] ?? []).map((d) => <option key={d} value={d} />)}</datalist>
+                    <select value={f.dist} disabled={!f.prov} onChange={(e) => set("dist", e.target.value)} className={cn(errCls(errs.dist), "disabled:opacity-50")}>
+                      <option value="">{f.prov ? "-- เลือกอำเภอ --" : "เลือกจังหวัดก่อน"}</option>
+                      {districtsOf(f.prov).map((d) => <option key={d}>{d}</option>)}
+                    </select>
                   </Fld>
                 </div>
                 <Fld label="Location หน้างาน" err={errs.loc} hint="ตัวอย่าง : https://maps.app.goo.gl/xxxxxxxx">

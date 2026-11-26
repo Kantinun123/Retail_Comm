@@ -5,6 +5,7 @@ import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { assignStore, type Coverage } from "./crm-mock-data";
 import { glass, inputCls } from "./crm-ui";
+import { districtsOf } from "./th-geo";
 
 export function AreasView({ coverage, setCoverage }: { coverage: Coverage[]; setCoverage: (c: Coverage[]) => void }) {
   const provinces = useMemo(() => [...new Set(coverage.map((c) => c.province))], [coverage]);
@@ -23,8 +24,8 @@ export function AreasView({ coverage, setCoverage }: { coverage: Coverage[]; set
       <div className={cn(glass, "p-4")}>
         <div className="mb-2 flex items-center gap-1.5 text-[13px] font-bold text-slate-900"><Icon name="science" style={{ fontSize: 18 }} />ทดลองจ่าย Lead</div>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={prov} onChange={(e) => setProv(e.target.value)} className={cn(inputCls, "w-auto")}>{provinces.map((p) => <option key={p}>{p}</option>)}</select>
-          <input value={dist} onChange={(e) => setDist(e.target.value)} placeholder="อำเภอ (ถ้ามี) เช่น หาดใหญ่" className={cn(inputCls, "w-56")} />
+          <select value={prov} onChange={(e) => { setProv(e.target.value); setDist(""); }} className={cn(inputCls, "w-auto")}>{provinces.map((p) => <option key={p}>{p}</option>)}</select>
+          <select value={dist} onChange={(e) => setDist(e.target.value)} className={cn(inputCls, "w-56")}><option value="">ไม่ระบุอำเภอ</option>{districtsOf(prov).map((d) => <option key={d}>{d}</option>)}</select>
           <span className={cn("rounded-xl px-3 py-2 text-[12.5px]", test.store ? "bg-indigo-50 text-indigo-800" : "bg-amber-50 text-amber-800")}>
             {test.store ? <>จ่ายให้ <b>{test.store}</b>{test.candidates.length > 1 && <span className="text-slate-500"> · ถัดไป: {test.candidates.slice(1).join(", ")}</span>}</> : "ไม่มีร้านรับพื้นที่นี้"}
           </span>

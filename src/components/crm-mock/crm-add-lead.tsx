@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { CHANNELS, NOW, PRODUCTS, assignStore, cleanInterests, interestSummary, slaHoursOf, suggestRoute, type Coverage, type Interest, type Lead } from "./crm-mock-data";
 import { InterestEditor } from "./crm-interests";
 import { Tip, useGuideOn } from "./crm-guide";
+import { TH_PROVINCES, districtsOf } from "./th-geo";
 import { Drawer, Field, btnPrimary, inputCls } from "./crm-ui";
 
 export function AddLeadDrawer({ open, onClose, nextId, onAdd, coverage }: { open: boolean; onClose: () => void; nextId: string; onAdd: (l: Lead) => void; coverage: Coverage[] }) {
@@ -40,8 +41,8 @@ function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: (
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="ชื่อลูกค้า *"><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} placeholder="เช่น คุณสมหมาย ใจดี" /></Field>
         <Field label="เบอร์โทร *"><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className={inputCls} placeholder="08x-xxx-xxxx" /><Tip>ใช้เบอร์ที่ติดต่อได้จริง ระบบใช้เบอร์รวมประวัติลูกค้าคนเดียวกัน</Tip></Field>
-        <Field label="จังหวัดหน้างาน *"><input value={f.province} onChange={(e) => setF({ ...f, province: e.target.value })} className={inputCls} /><Tip>ใช้จ่ายงานให้ร้านที่รับพื้นที่นี้ ใส่จังหวัดของหน้างาน ไม่ใช่ที่อยู่ปัจจุบันของลูกค้า</Tip></Field>
-        <Field label="อำเภอหน้างาน (ถ้ามี)"><input value={f.district} onChange={(e) => setF({ ...f, district: e.target.value })} className={inputCls} placeholder="เช่น หาดใหญ่" /><Tip>ถ้าใส่ ระบบเลือกร้านในอำเภอนั้นก่อน</Tip></Field>
+        <Field label="จังหวัดหน้างาน *"><select value={f.province} onChange={(e) => setF({ ...f, province: e.target.value, district: "" })} className={inputCls}><option value="">เลือกจังหวัด...</option>{TH_PROVINCES.map((p) => <option key={p}>{p}</option>)}</select><Tip>ใช้จ่ายงานให้ร้านที่รับพื้นที่นี้ ใส่จังหวัดของหน้างาน ไม่ใช่ที่อยู่ปัจจุบันของลูกค้า</Tip></Field>
+        <Field label={f.province === "กรุงเทพมหานคร" ? "เขตหน้างาน (ถ้ามี)" : "อำเภอหน้างาน (ถ้ามี)"}><select value={f.district} disabled={!f.province} onChange={(e) => setF({ ...f, district: e.target.value })} className={cn(inputCls, "disabled:opacity-50")}><option value="">{f.province ? "ไม่ระบุ" : "เลือกจังหวัดก่อน"}</option>{districtsOf(f.province).map((d) => <option key={d}>{d}</option>)}</select><Tip>ถ้าใส่ ระบบเลือกร้านในอำเภอนั้นก่อน</Tip></Field>
         <Field label="แหล่งที่มา">
           <select value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value })} className={inputCls}>{CHANNELS.map((c) => <option key={c}>{c}</option>)}</select>
         </Field>
