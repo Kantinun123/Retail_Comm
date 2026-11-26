@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { CHANNELS, NOW, PRODUCTS, assignStore, cleanInterests, interestSummary, slaHoursOf, suggestRoute, type Coverage, type Interest, type Lead } from "./crm-mock-data";
+import { CHANNELS, NOW, PRODUCTS, assignStore, cleanInterests, interestSummary, needsBuyMode, slaHoursOf, suggestRoute, type BuyMode, type Coverage, type Interest, type Lead } from "./crm-mock-data";
 import { InterestEditor } from "./crm-interests";
 import { Tip, useGuideOn } from "./crm-guide";
 import { TH_PROVINCES, districtsOf } from "./th-geo";
@@ -22,15 +22,17 @@ function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: (
   const [interests, setInterests] = useState<Interest[]>([]);
   const guide = useGuideOn();
   const picked = cleanInterests(interests);
-  const route = suggestRoute(picked);
+  const [buy, setBuy] = useState<BuyMode | undefined>();
+  const needBuy = needsBuyMode(picked) && !buy;
+  const route = suggestRoute(picked, buy);
   const walkin = f.channel === "Walk-in";
   const visit = walkin || f.visit;
   const contacted = walkin || f.contacted;
-  const ok = f.name.trim() && f.phone.trim() && f.province.trim();
+  const ok = f.name.trim() && f.phone.trim() && f.province.trim() && !needBuy;
   const save = () => {
     const now = NOW.toISOString();
     onAdd({
-      id: nextId, name: f.name.trim(), phone: f.phone.trim(), product: interestSummary(picked) || PRODUCTS[0], interests: picked, source: f.channel === "Home Online" ? "customer" : "staff", channel: f.channel, province: f.province.trim(), district: f.district.trim() || undefined, createdAt: now,
+      id: nextId, name: f.name.trim(), phone: f.phone.trim(), product: interestSummary(picked) || PRODUCTS[0], interests: picked, buyMode: needsBuyMode(picked) ? buy : undefined, source: f.channel === "Home Online" ? "customer" : "staff", channel: f.channel, province: f.province.trim(), district: f.district.trim() || undefined, createdAt: now,
       contacts: contacted ? [{ id: `${nextId}-C1`, at: now, by: "ทีมขาย", channel: walkin ? "เข้าร้าน" : "โทร", outcome: "คุยได้", note: walkin ? "ลูกค้าเข้ามาที่ร้าน" : "ติดต่อลูกค้าแล้วก่อนคีย์ข้อมูล" }] : undefined,
       firstContactAt: contacted ? now : undefined, visitAt: visit ? now : undefined, status: contacted ? "contacting" : "waiting", interest: f.interest.trim() || undefined,
     });
@@ -51,11 +53,11 @@ function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: (
         <div className="text-[13px] font-bold text-slate-900">ลูกค้าสนใจอะไร <span className="font-normal text-slate-400">· เลือกได้หลายรายการ ทั้งบริการและสินค้า</span></div>
         <Tip>ถามลูกค้าว่า &ldquo;อยากให้ทางเราช่วยเรื่องอะไรบ้าง&rdquo; เลือกได้หลายอย่าง ถ้ามีงานบริการ ระบบจะแนะนำให้เปิด Opp</Tip>
         <InterestEditor kind="service" value={interests} onChange={setInterests} />
-        <InterestEditor kind="product" value={interests} onChange={setInterests} />
+        <InterestEditor kind="product" value={interests} onChange={setInterests} buy={buy} onBuy={setBuy} />
         <Field label="หมายเหตุความต้องการ (ถ้ามี)"><input value={f.interest} onChange={(e) => setF({ ...f, interest: e.target.value })} className={inputCls} placeholder="เช่น บ้านชั้นเดียว ประมาณ 180 ตร.ม." /></Field>
         {guide && picked.length === 0 && <p className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900"><Icon name="warning" style={{ fontSize: 18 }} /><span><b>ยังไม่ได้เลือกความสนใจ</b> ทีมขายคนถัดไปจะไม่รู้ว่าลูกค้าต้องการอะไร ถ้าลูกค้ายังไม่แน่ใจ ใส่หมายเหตุแทนได้ บันทึกต่อได้ ไม่บังคับ</span></p>}
         {f.channel === "Home Online" && <p className="flex items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-800"><Icon name="language" style={{ fontSize: 16 }} />ช่องทาง Home Online: ในระบบจริงลูกค้าเลือกรายการเองจากหน้าเว็บ ฟอร์มนี้จำลองข้อมูลที่ติดมา ทีมขายต้องทวนความต้องการอีกครั้ง</p>}
-        {route !== "none" && <p className={cn("flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px]", route === "solution" ? "bg-indigo-50 text-indigo-800" : "bg-fuchsia-50 text-fuchsia-800")}><Icon name="alt_route" style={{ fontSize: 16 }} />{route === "solution" ? "ระบบแนะนำ: เปิด Opp (มีงานบริการ)" : "ระบบแนะนำ: ส่งให้ร้านทำใบเสนอราคา (สินค้าอย่างเดียว) ถ้าลูกค้าต้องการแบบ ให้เปิด Opp"}</p>}
+        {route !== "none" && <p className={cn("flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px]", route === "solution" ? "bg-indigo-50 text-indigo-800" : "bg-fuchsia-50 text-fuchsia-800")}><Icon name="alt_route" style={{ fontSize: 16 }} />{route === "solution" ? `ระบบแนะนำ: เปิด Opp (${picked.some((i) => i.kind === "service") ? "มีงานบริการ" : "ออกแบบพร้อมซื้อสินค้า"})` : "ระบบแนะนำ: ส่งให้ร้านทำใบเสนอราคา (สินค้าอย่างเดียว) ถ้าลูกค้าต้องการแบบ ให้เปิด Opp"}</p>}
       </div>
       {f.province.trim() && (() => {
         const a = assignStore(coverage, f.province, f.district);

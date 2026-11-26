@@ -4,8 +4,8 @@ import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
   CONTACT_CHANNELS, CONTACT_OUTCOMES, DEALER_LOST, DEALER_STEP, DEALER_STORES, LEAD_STATUS, LOST_REASONS, MAX_CONTACT_TRIES, NOW,
-  agoText, cleanInterests, dtTh, interestSummary, interestText, slaHoursOf, suggestRoute, trailingMisses,
-  type ContactLog, type Interest, type Lead, type Task,
+  agoText, cleanInterests, dtTh, interestSummary, interestText, needsBuyMode, BUY_LABEL, slaHoursOf, suggestRoute, trailingMisses,
+  type BuyMode, type ContactLog, type Interest, type Lead, type Task,
 } from "./crm-mock-data";
 import { InterestChips, InterestEditor } from "./crm-interests";
 import { NextBanner, Stepper, Tip, leadGuide, leadScripts, scrollToId, useGuideOn } from "./crm-guide";
@@ -42,6 +42,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
   /* ทวนความต้องการ */
   const [editing, setEditing] = useState(cleanInterests(lead.interests).length === 0);
   const [draft, setDraft] = useState<Interest[]>(lead.interests ?? []);
+  const [buyDraft, setBuyDraft] = useState<BuyMode | undefined>(lead.buyMode);
   /* บันทึกการติดต่อ */
   const [cChannel, setCChannel] = useState<ContactLog["channel"]>("โทร");
   const [cOutcome, setCOutcome] = useState<ContactLog["outcome"]>("คุยได้");
@@ -56,8 +57,9 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
   const misses = trailingMisses(lead.contacts);
   const saved = cleanInterests(lead.interests);
   const draftClean = cleanInterests(draft);
-  const changed = JSON.stringify(draftClean) !== JSON.stringify(saved);
-  const route = suggestRoute(editing ? draftClean : saved);
+  const needBuy = editing && needsBuyMode(draftClean) && !buyDraft;
+  const changed = JSON.stringify(draftClean) !== JSON.stringify(saved) || (needsBuyMode(draftClean) ? buyDraft : undefined) !== lead.buyMode;
+  const route = suggestRoute(editing ? draftClean : saved, editing ? buyDraft : lead.buyMode);
   const g = guide && open ? leadGuide(lead, { allOk, skipped }) : null;
   const doConvert = (k: "opp" | "survey") => (k === "opp" ? onConvert({ ...lead, interest: interestText(lead) }) : onConvertSurvey({ ...lead, interest: interestText(lead) }));
   const tryConvert = (k: "opp" | "survey") => (guide && !lead.reviewed ? setWarn(k) : doConvert(k));
@@ -70,7 +72,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
     const at = NOW.toISOString();
     const edited = changed || !!lead.reviewed?.edited;
     onPatch(lead.id, {
-      interests: draftClean, product: interestSummary(draftClean) || lead.product,
+      interests: draftClean, buyMode: needsBuyMode(draftClean) ? buyDraft : undefined, product: interestSummary(draftClean) || lead.product,
       reviewed: { at, by: me, edited, original: edited ? lead.reviewed?.original ?? saved : undefined },
     });
     setEditing(false);
@@ -153,6 +155,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
             {!editing ? (
               <>
                 <InterestChips list={saved} fallback="ยังไม่มีข้อมูลความสนใจ" />
+                {lead.buyMode && <p className="text-[12px] text-slate-600">รูปแบบการซื้อ: <b className="text-slate-900">{BUY_LABEL[lead.buyMode]}</b></p>}
                 {lead.reviewed?.edited && lead.reviewed.original && lead.reviewed.original.length > 0 && (
                   <div className="rounded-xl bg-amber-50/70 p-2.5">
                     <div className="mb-1 text-[11px] font-semibold text-amber-800">ลูกค้าเลือกไว้เดิม (ก่อนทีมขายแก้ไขหลังทวน)</div>
@@ -170,16 +173,16 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
               <>
                 <p className="text-[12px] text-slate-500">ทวนกับลูกค้าแล้วปรับรายการให้ตรงกับที่ลูกค้าต้องการจริง</p>
                 <InterestEditor kind="service" value={draft} onChange={setDraft} />
-                <InterestEditor kind="product" value={draft} onChange={setDraft} />
+                <InterestEditor kind="product" value={draft} onChange={setDraft} buy={buyDraft} onBuy={setBuyDraft} />
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={saveReview} className={btnPrimary}><Icon name="task_alt" style={{ fontSize: 18 }} />{changed ? "บันทึกและยืนยันความต้องการ" : "ยืนยันความต้องการ"}</button>
+                  <button onClick={saveReview} disabled={needBuy} className={btnPrimary}><Icon name="task_alt" style={{ fontSize: 18 }} />{changed ? "บันทึกและยืนยันความต้องการ" : "ยืนยันความต้องการ"}</button>
                   {saved.length > 0 && <button onClick={() => { setDraft(lead.interests ?? []); setEditing(false); }} className={btnGhost}>ยกเลิก</button>}
                 </div>
               </>
             )}
             {open && route !== "none" && (
               <p className={cn("flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px]", route === "solution" ? "bg-indigo-50 text-indigo-800" : "bg-fuchsia-50 text-fuchsia-800")}>
-                <Icon name="alt_route" style={{ fontSize: 16 }} />{route === "solution" ? "ระบบแนะนำ: เปิด Opp (มีงานบริการ)" : "ระบบแนะนำ: ส่งให้ร้านทำใบเสนอราคา (สินค้าอย่างเดียว) ถ้าลูกค้าต้องการแบบ ให้เปิด Opp"}
+                <Icon name="alt_route" style={{ fontSize: 16 }} />{route === "solution" ? `ระบบแนะนำ: เปิด Opp (${(editing ? draftClean : saved).some((i) => i.kind === "service") ? "มีงานบริการ" : "ออกแบบพร้อมซื้อสินค้า"})` : "ระบบแนะนำ: ส่งให้ร้านทำใบเสนอราคา (สินค้าอย่างเดียว) ถ้าลูกค้าต้องการแบบ ให้เปิด Opp"}
               </p>
             )}
           </div>
@@ -274,7 +277,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
           </div>
 
           {open && (
-            <div id="lead-dealer" className={cn(glass, "space-y-3 p-4", g && g.at === 4 && suggestRoute(saved) === "product" && "ring-2 ring-indigo-400 ring-offset-2")}>
+            <div id="lead-dealer" className={cn(glass, "space-y-3 p-4", g && g.at === 4 && suggestRoute(saved, lead.buyMode) === "product" && "ring-2 ring-indigo-400 ring-offset-2")}>
               <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-slate-900"><Icon name="storefront" style={{ fontSize: 18 }} />ลูกค้าสนใจเฉพาะสินค้า ไม่ต้องการแบบ</h3>
               <p className="text-[12px] text-slate-500">ส่งให้ร้านทำใบเสนอราคาในระบบร้าน แล้วร้านจะส่งสถานะและผล Win / Loss กลับมาที่นี่</p>
               <div className="flex flex-wrap gap-2">

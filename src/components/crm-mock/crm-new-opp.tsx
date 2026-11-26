@@ -34,6 +34,9 @@ interface Form {
   value: string; owner: string; files: { name: string; size: string }[];
 }
 
+/** รายละเอียดกระเบื้องที่พนักงานกรอกไว้ตอนคีย์ Lead (ถ้ามี) ใช้เติมใบเปิดงาน */
+const leadDetail = (lead: Lead | null) => lead?.interests?.find((i) => i.kind === "service" && i.detail?.type === "กระเบื้องหลังคา")?.detail;
+const pickOpt = (opts: readonly string[], v?: string) => (v && opts.includes(v) ? v : opts[0]);
 function initForm(lead: Lead | null): Form {
   const hint = lead?.interest ?? "";
   const det: Cat[] = /อะเส/.test(hint) ? ["ase", "truss", "tile", "fascia"] : /ทรัส|โครง/.test(hint) ? ["truss", "tile", "fascia"] : ["tile", "fascia"];
@@ -44,7 +47,7 @@ function initForm(lead: Lead | null): Form {
     warrSame: true, warrName: "",
     ref: "", svc: ["sol"], pkgType: "total", pkg: PKG_OPTS[0], det, round: "all",
     ase: ASE_OPTS[0], chc: CHC_OPTS[0], st2: "no", truss: "", muk: "", rc: "", eave: 2,
-    tile: TILE_OPTS[0], tileModel: TILE_MODEL_OPTS[0], color: COLOR_OPTS[0], shape: "", deg: "", ins: INS_OPTS[2],
+    tile: pickOpt(TILE_OPTS, leadDetail(lead)?.brand), tileModel: pickOpt(TILE_MODEL_OPTS, leadDetail(lead)?.model), color: pickOpt(COLOR_OPTS, leadDetail(lead)?.color), shape: "", deg: "", ins: INS_OPTS[2],
     value: "", owner: OWNERS[0], files: [],
   };
 }

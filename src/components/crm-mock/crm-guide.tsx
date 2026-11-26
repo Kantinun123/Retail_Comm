@@ -128,7 +128,7 @@ export function NextBanner({ b, scripts, onCta, onSkip, toast }: { b: BannerData
 /* ---------------- ตรรกะขั้นต่อไป: Lead ---------------- */
 export function leadGuide(lead: Lead, o: { allOk: boolean; skipped: number[] }): { at: number; banner: BannerData } | null {
   const saved = cleanInterests(lead.interests);
-  const route = suggestRoute(saved);
+  const route = suggestRoute(saved, lead.buyMode);
   const done = [true, !!lead.firstContactAt || (lead.contacts?.length ?? 0) > 0, !!lead.reviewed, o.allOk || lead.status === "qualified", false];
   const at = done.findIndex((d, i) => !d && !o.skipped.includes(i));
   if (at < 0) return null;

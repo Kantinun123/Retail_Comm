@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
+import { BUY_LABEL, DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
 import { InterestChips } from "./crm-interests";
 import { BoardFrame } from "./crm-overview";
 import { Avatar, PresetBanner, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
@@ -168,6 +168,7 @@ function LeadBoard({ c, rows }: { c: Ctx; rows: Lead[] }) {
                   <div className="text-[11px] text-slate-500">{l.province} · {l.channel}</div>
                   {l.owner && !c.seNick && <div className="text-[10.5px] text-slate-400">{l.owner}</div>}
                   <div className="mt-1.5"><InterestChips list={l.interests} max={2} fallback={l.product} /></div>
+                  {l.buyMode && <div className="mt-1"><span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", l.buyMode === "design" ? "bg-indigo-50 text-indigo-700" : l.buyMode === "product" ? "bg-fuchsia-50 text-fuchsia-700" : "bg-slate-100 text-slate-500")}>{BUY_LABEL[l.buyMode]}</span></div>}
                   {(l.status === "waiting" || l.status === "contacting" || l.status === "qualified") && (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {l.source === "customer" && !l.reviewed && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">ยังไม่ทวนความต้องการ</span>}

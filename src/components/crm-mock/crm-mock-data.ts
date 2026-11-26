@@ -72,13 +72,22 @@ export interface Lead {
   /** ทวนความต้องการกับลูกค้าแล้ว (original = สิ่งที่ลูกค้าเลือกเองก่อนแก้ไข) */
   reviewed?: { at: string; by: string; edited: boolean; original?: Interest[] };
   /** บันทึกการติดต่อทุกครั้ง (ลบไม่ได้ แก้โดยเพิ่มรายการใหม่) */
-  contacts?: ContactLog[]; nextFollowAt?: string;
+  contacts?: ContactLog[]; nextFollowAt?: string; /** รูปแบบการซื้อ (เมื่อสนใจสินค้า) */ buyMode?: BuyMode;
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
 
 /* ---------- ความสนใจ: สินค้า / บริการ (รายการตัวอย่าง รอรายการจริงจากระบบต้นทาง) ---------- */
 export type InterestKind = "service" | "product";
-export interface Interest { kind: InterestKind; group: string; item: string }
+/** รายละเอียดสินค้าที่ใช้ภายใต้บริการ (ไม่บังคับ) เช่น กระเบื้องหลังคา ยี่ห้อ รุ่น สี */
+export interface ProductDetail { type?: string; brand?: string; model?: string; color?: string }
+export interface Interest { kind: InterestKind; group: string; item: string; detail?: ProductDetail }
+/** รูปแบบการซื้อ (ถามเมื่อสนใจสินค้า) : สินค้าอย่างเดียว -> ส่งร้าน ; ออกแบบพร้อมซื้อ -> เปิด Opp */
+export type BuyMode = "product" | "design" | "unsure";
+export const BUY_LABEL: Record<BuyMode, string> = { product: "ซื้อสินค้าอย่างเดียว", design: "ออกแบบพร้อมซื้อสินค้า", unsure: "ยังไม่แน่ใจ" };
+export const detailText = (d?: ProductDetail) => [d?.type, d?.brand, d?.model, d?.color].filter(Boolean).join(" ");
+export const hasDetail = (d?: ProductDetail) => !!detailText(d);
+/** มีสินค้าแต่ไม่มีบริการ = ต้องถามรูปแบบการซื้อ */
+export const needsBuyMode = (xs?: Interest[]) => { const c = (xs ?? []).filter((i) => i.group && i.item); return c.some((i) => i.kind === "product") && !c.some((i) => i.kind === "service"); };
 export const SERVICE_CATALOG: Record<string, string[]> = {
   "งานหลังคา": ["ติดตั้งหลังคาใหม่ (Roof Install)", "เปลี่ยนหลังคา (Re-roof)", "ซ่อมหลังคารั่ว (Roof Repair)", "ทาสีหลังคา"],
   "งานโครงสร้างหลังคา": ["โครงทรัส", "อะเสและโครงหลังคา"],
@@ -102,12 +111,13 @@ export const interestSummary = (xs?: Interest[]) => {
   return c.length === 0 ? "" : c.length <= 2 ? c.map((i) => i.item).join(", ") : `${c[0].item}, ${c[1].item} +${c.length - 2}`;
 };
 /** ข้อความความสนใจทั้งหมด ใช้เติมใบเปิดงานตอนเปิด Opp */
-export const interestText = (l: { interests?: Interest[]; interest?: string }) => [...cleanInterests(l.interests).map((i) => i.item), l.interest].filter(Boolean).join(", ");
+export const interestText = (l: { interests?: Interest[]; interest?: string }) => [...cleanInterests(l.interests).map((i) => (hasDetail(i.detail) ? `${i.item} (${detailText(i.detail)})` : i.item)), l.interest].filter(Boolean).join(", ");
 /** แนะนำเส้นทาง: มีบริการ = เปิด Opp ; สินค้าอย่างเดียว = ส่งให้ร้าน */
-export const suggestRoute = (xs?: Interest[]): "solution" | "product" | "none" => {
+export const suggestRoute = (xs?: Interest[], buy?: BuyMode): "solution" | "product" | "none" => {
   const c = cleanInterests(xs);
   if (c.length === 0) return "none";
-  return c.some((i) => i.kind === "service") ? "solution" : "product";
+  if (c.some((i) => i.kind === "service")) return "solution";
+  return buy === "design" ? "solution" : "product";
 };
 
 /* ---------- บันทึกการติดต่อ ---------- */
