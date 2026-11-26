@@ -84,6 +84,33 @@ function CardView({ c, open }: { c: Card; open: () => void }) {
   );
 }
 
+/* ---------------- แถบเส้นทางงาน 9 ช่วง (ใช้บนหน้ารายละเอียดงาน) ---------------- */
+export function JourneyStrip({ job }: { job: Job }) {
+  const flow = flowOf(job);
+  const cur = jobPhase(job);
+  const lost = !!job.cancelReason;
+  return (
+    <div className={cn(glass, "overflow-x-auto p-3")}>
+      <div className="flex min-w-max items-start">
+        {PHASES.map((p, i) => {
+          const state = lost ? (p.n < cur ? "done" : "off") : p.n < cur || (p.n === 9 && cur === 9) ? "done" : p.n === cur ? "cur" : "todo";
+          return (
+            <div key={p.n} className="flex items-start">
+              <div className="flex w-[84px] flex-col items-center text-center">
+                <span className={cn("grid h-8 w-8 place-items-center rounded-full text-white", state === "done" ? "bg-emerald-500" : state === "cur" ? "bg-indigo-600 ring-4 ring-indigo-100" : "bg-slate-200 !text-slate-400")}>
+                  <Icon name={state === "done" ? "check" : p.icon} className="!text-[17px]" />
+                </span>
+                <span className={cn("mt-1 text-[10.5px] leading-tight", state === "cur" ? "font-bold text-indigo-700" : state === "done" ? "font-semibold text-slate-600" : "text-slate-400")}>{flow === "a" ? p.a : p.b}</span>
+              </div>
+              {i < PHASES.length - 1 && <span className={cn("mt-4 h-0.5 w-3", p.n < cur ? "bg-emerald-400" : "bg-slate-200")} />}
+            </div>
+          );
+        })}
+      </div>
+      {lost && <p className="mt-2 text-[11px] font-semibold text-rose-600">ยกเลิกที่ช่วง {cur}: {job.cancelReason}</p>}
+    </div>
+  );
+}
 /* ---------------- ภาพรวมงาน ---------------- */
 export function OverviewView({ c }: { c: Ctx }) {
   const [flow, setFlow] = useState<Flow>("a");

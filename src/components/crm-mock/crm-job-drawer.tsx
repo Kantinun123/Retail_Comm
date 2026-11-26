@@ -6,6 +6,7 @@ import {
   CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
+import { JourneyStrip } from "./crm-overview";
 import { CsatCard } from "./crm-customer";
 import { NextBanner, oppGuide, oppScripts, scrollToId, useGuideOn } from "./crm-guide";
 import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
@@ -45,6 +46,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
   const dep = depositOf(job);
   const finished = isFinished(job);
   const closed = !!job.done.close;
+  const [tab, setTab] = useState<"info" | "chat" | "account">("info");
   const guide = useGuideOn();
   const gb = guide ? oppGuide(job) : null;
 
@@ -65,6 +67,14 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
         </p>
       </div>
 
+      <JourneyStrip job={job} />
+      <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 text-[12px] font-bold">
+        {([["info", "ข้อมูลงาน"], ["chat", "แชท"], ["account", "Account"]] as const).map(([k, lb]) => (
+          <button key={k} onClick={() => setTab(k)} className={cn("flex-1 rounded-lg px-3 py-1.5 transition", tab === k ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-indigo-600")}>{lb}</button>
+        ))}
+      </div>
+      {tab === "info" && (
+        <>
       {task && (
         <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">
           <div className="mb-1 flex items-center gap-1.5 text-[12px] font-bold text-violet-700"><Icon name="auto_awesome" style={{ fontSize: 16 }} />น้องเลขาแนะนำ</div>
@@ -174,6 +184,32 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
             </>
           )}
         </div>
+      )}
+        </>
+      )}
+
+      {tab === "chat" && (
+        <div className={cn(glass, "p-5 text-center")}>
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-100 text-[#06a047]"><Icon name="chat" style={{ fontSize: 26 }} /></span>
+          <p className="mt-2 text-[13px] font-bold text-slate-900">แชท LINE OA กับ {job.customer}</p>
+          <p className="mx-auto mt-1 max-w-sm text-[12px] text-slate-500">ห้องแชทเป็นของลูกค้าคนเดียวกัน ข้อความถูกติดแท็กด้วยเลขงาน {job.opsId} เปิดแล้วจะกรองเฉพาะงานนี้ให้</p>
+          <button onClick={() => onOpenChat(job.phone, job.opsId)} className={cn(btnPrimary, "mt-3")}><Icon name="chat" style={{ fontSize: 18 }} />เปิดแชทของงานนี้</button>
+        </div>
+      )}
+
+      {tab === "account" && (
+        <>
+          <div className={cn(glass, "p-4")}>
+            <h3 className="mb-1 text-[13px] font-bold text-slate-900">ลูกค้า (Account)</h3>
+            <KV k="ชื่อ" v={job.customer} />
+            <KV k="เบอร์" v={job.phone} />
+            <KV k="จังหวัด" v={job.province} />
+            <KV k="ร้านที่รับงาน" v={job.store ?? "-"} />
+            <KV k="ผู้ดูแล" v={job.owner} />
+            <KV k="มูลค่างานนี้" v={valueText(job)} />
+          </div>
+          {job.done.close ? <CsatCard job={job} onPatch={onPatchJob} toast={toast} /> : <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-[12px] text-slate-400">แบบประเมิน CSAT และสิทธิ์พิเศษของลูกค้าจะขึ้นหลังปิดขาย</p>}
+        </>
       )}
     </>
   );
