@@ -67,10 +67,10 @@ export function HomeView({ c }: { c: Ctx }) {
       </section>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Stat icon="person_search" label="Lead รอติดต่อ" value={waiting.length} sub={breach ? `เกิน SLA ${breach} ราย` : "ทันเวลาทั้งหมด"} tone={breach ? "rose" : "emerald"} />
-        <Stat icon="badge" label="งานที่รอทีมขายทำ" value={mine.length} sub={`มูลค่า ${baht(mine.reduce((s, j) => s + j.value, 0))}`} />
-        <Stat icon="hourglass_top" label="งานที่รอหน่วยงานอื่น" value={others.length} sub={lateOthers.length ? `ช้ากว่าแผน ${lateOthers.length} งาน` : "ตามแผนทั้งหมด"} tone={lateOthers.length ? "rose" : "emerald"} />
-        <Stat icon="account_balance_wallet" label="รอเก็บเงิน (มัดจำ + 100%)" value={baht(collect)} sub={`${live.filter((j) => dueMoney(j) > 0).length} งาน`} tone="amber" />
+        <Stat icon="person_search" label="Lead รอติดต่อ" value={waiting.length} sub={breach ? `เกิน SLA ${breach} ราย` : "ทันเวลาทั้งหมด"} tone={breach ? "rose" : "emerald"} onClick={() => (waiting.length === 1 ? c.openLead(waiting[0].id) : c.goPreset("leads", { key: "lead_waiting", label: "Lead รอติดต่อ" }))} />
+        <Stat icon="badge" label="งานที่รอทีมขายทำ" value={mine.length} sub={`มูลค่า ${baht(mine.reduce((s, j) => s + j.value, 0))}`} onClick={() => (mine.length === 1 ? c.openJob(mine[0].id) : c.goPreset("board", { key: "opp_mine", label: "งานที่รอทีมขายทำ" }))} />
+        <Stat icon="hourglass_top" label="งานที่รอหน่วยงานอื่น" value={others.length} sub={lateOthers.length ? `ช้ากว่าแผน ${lateOthers.length} งาน` : "ตามแผนทั้งหมด"} tone={lateOthers.length ? "rose" : "emerald"} onClick={() => (others.length === 1 ? c.openJob(others[0].id) : c.goPreset("board", { key: "opp_others", label: "งานที่รอหน่วยงานอื่น" }))} />
+        <Stat icon="account_balance_wallet" label="รอเก็บเงิน (มัดจำ + 100%)" value={baht(collect)} sub={`${live.filter((j) => dueMoney(j) > 0).length} งาน`} tone="amber" onClick={() => { const m = live.filter((j) => dueMoney(j) > 0); if (m.length === 1) c.openJob(m[0].id); else c.goPreset("board", { key: "opp_money", label: "งานที่รอเก็บเงิน" }); }} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">

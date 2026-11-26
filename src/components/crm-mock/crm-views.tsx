@@ -5,19 +5,20 @@ import { cn } from "@/lib/utils";
 import { DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
 import { InterestChips } from "./crm-interests";
 import { BoardFrame } from "./crm-overview";
-import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
+import { Avatar, PresetBanner, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas" | "inbox" | "overview" | "aftersale";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;
+  /** ตัวกรองที่ส่งมาจากหน้าหลัก (การ์ดตัวเลข) */ preset: { key: string; label: string } | null; setPreset: (p: { key: string; label: string } | null) => void; goPreset: (v: View, p: { key: string; label: string }) => void;
   readOnly: boolean; seNick?: string; addLead: () => void; newJob: () => void; newSurvey: (lead?: Lead) => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
 }
 
 /* ---------------- Leads ---------------- */
 export function LeadsView({ c }: { c: Ctx }) {
   const [q, setQ] = useState("");
-  const [st, setSt] = useState<LeadStatus | "all">("all");
+  const [st, setSt] = useState<LeadStatus | "all">(() => (c.preset?.key === "lead_waiting" ? "waiting" : "all"));
   const [prod, setProd] = useState("");
   const [mode, setMode] = useState<"board" | "list">("board");
   const curSE = c.seNick ? SE_ROSTER.find((s) => s.nick === c.seNick) : null;
@@ -49,6 +50,7 @@ export function LeadsView({ c }: { c: Ctx }) {
 
   return (
     <div className="space-y-4">
+      {c.preset?.key.startsWith("lead_") && <PresetBanner label={c.preset.label} onClear={() => { c.setPreset(null); setSt("all"); }} />}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-bold tracking-tight text-slate-900">ลูกค้ามุ่งหวัง (Leads)</h1>

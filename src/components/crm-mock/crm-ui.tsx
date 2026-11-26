@@ -122,10 +122,10 @@ export function KV({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-export function Stat({ icon, label, value, sub, tone = "indigo" }: { icon: string; label: string; value: React.ReactNode; sub?: string; tone?: "indigo" | "rose" | "emerald" | "amber" }) {
+export function Stat({ icon, label, value, sub, tone = "indigo", onClick }: { icon: string; label: string; value: React.ReactNode; sub?: string; tone?: "indigo" | "rose" | "emerald" | "amber"; onClick?: () => void }) {
   const t = { indigo: "from-indigo-500 to-violet-500", rose: "from-rose-500 to-orange-400", emerald: "from-emerald-500 to-teal-400", amber: "from-amber-500 to-yellow-400" }[tone];
-  return (
-    <div className={cn(glass, "flex items-center gap-3 p-4")}>
+  const inner = (
+    <>
       <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-lg", t)}>
         <Icon name={icon} />
       </span>
@@ -134,6 +134,21 @@ export function Stat({ icon, label, value, sub, tone = "indigo" }: { icon: strin
         <div className="mt-1 truncate text-[11.5px] font-medium text-slate-500">{label}</div>
         {sub && <div className="truncate text-[10.5px] text-slate-400">{sub}</div>}
       </div>
+      {onClick && <Icon name="chevron_right" className="ml-auto shrink-0 text-slate-300" />}
+    </>
+  );
+  return onClick
+    ? <button type="button" onClick={onClick} className={cn(glass, "flex w-full items-center gap-3 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md active:translate-y-0")}>{inner}</button>
+    : <div className={cn(glass, "flex items-center gap-3 p-4")}>{inner}</div>;
+}
+
+/** แถบบอกว่าหน้านี้ถูกกรองมาจากการ์ดตัวเลขในหน้าหลัก */
+export function PresetBanner({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[12px] text-indigo-800">
+      <Icon name="filter_alt" style={{ fontSize: 17 }} />
+      <span>กรองจากหน้าหลัก: <b>{label}</b></span>
+      <button onClick={onClear} className="ml-auto rounded-lg bg-white px-2.5 py-1 font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100">ล้างตัวกรอง</button>
     </div>
   );
 }

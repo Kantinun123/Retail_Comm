@@ -3,16 +3,16 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  COLS, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, colOf, missingOf, valueText, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
+  COLS, dueMoney, isFinished, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, colOf, missingOf, valueText, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
   type Job, type Packet, type Party,
 } from "./crm-mock-data";
-import { Avatar, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
+import { Avatar, PartyBadge, PresetBanner, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 import { BoardFrame } from "./crm-overview";
 import type { Ctx } from "./crm-views";
 
-type Ball = "all" | "SE" | "KIM" | "SCM" | "ROOM" | "SURV" | "late";
+type Ball = "all" | "others" | "money" | "SE" | "KIM" | "SCM" | "ROOM" | "SURV" | "late";
 const BALL_CHIPS: { k: Ball; label: string }[] = [
-  { k: "all", label: "ทั้งหมด" }, { k: "SE", label: "รอเราทำ" }, { k: "KIM", label: "รอ KIM" }, { k: "SCM", label: "รอ SCM" }, { k: "ROOM", label: "รอห้องแบบ" }, { k: "SURV", label: "รอทีมสำรวจ" }, { k: "late", label: "ช้ากว่าแผน" },
+  { k: "all", label: "ทั้งหมด" }, { k: "SE", label: "รอเราทำ" }, { k: "others", label: "รอหน่วยงานอื่น" }, { k: "money", label: "รอเก็บเงิน" }, { k: "KIM", label: "รอ KIM" }, { k: "SCM", label: "รอ SCM" }, { k: "ROOM", label: "รอห้องแบบ" }, { k: "SURV", label: "รอทีมสำรวจ" }, { k: "late", label: "ช้ากว่าแผน" },
 ];
 const WORK_SHORT = { roof: "มุงอย่างเดียว", truss: "ทรัส + มุง", ase: "อะเส + ทรัส + มุง", survey: "สำรวจ" } as const;
 
@@ -23,17 +23,24 @@ function stepInfo(j: Job) {
   return { s, due, late: lateWd(due) };
 }
 
+function ballOk(j: Job, k: Ball) {
+  if (k === "all") return true;
+  if (k === "money") return !j.cancelReason && !isFinished(j) && dueMoney(j) > 0;
+  const i = stepInfo(j);
+  if (!i) return false;
+  if (k === "late") return i.late > 0;
+  if (k === "others") return i.s.owner !== "SE";
+  return i.s.owner === k;
+}
+const PRESET_BALL: Record<string, Ball> = { opp_mine: "SE", opp_others: "others", opp_money: "money" };
+
 export function BoardView({ c }: { c: Ctx }) {
   const [mode, setMode] = useState<"board" | "list">("board");
   const [q, setQ] = useState("");
-  const [ball, setBall] = useState<Ball>("all");
+  const [ball, setBall] = useState<Ball>(() => PRESET_BALL[c.preset?.key ?? ""] ?? "all");
   const jobs = useMemo(() => c.jobs.filter((j) => {
     if (q && !`${j.customer}${j.id}${j.opsId}${j.province}`.includes(q)) return false;
-    const info = stepInfo(j);
-    if (ball === "all") return true;
-    if (!info) return false;
-    if (ball === "late") return info.late > 0;
-    return info.s.owner === ball;
+    return ballOk(j, ball);
   }), [c.jobs, q, ball]);
 
   return (
@@ -60,9 +67,10 @@ export function BoardView({ c }: { c: Ctx }) {
         </div>
       </div>
 
+      {c.preset && PRESET_BALL[c.preset.key] && <PresetBanner label={c.preset.label} onClear={() => { c.setPreset(null); setBall("all"); }} />}
       <div className="flex flex-wrap gap-2">
         {BALL_CHIPS.map((ch) => {
-          const n = c.jobs.filter((j) => { const i = stepInfo(j); return ch.k === "all" ? true : !!i && (ch.k === "late" ? i.late > 0 : i.s.owner === ch.k); }).length;
+          const n = c.jobs.filter((j) => ballOk(j, ch.k)).length;
           return (
             <button key={ch.k} onClick={() => setBall(ch.k)} className={cn("rounded-full border px-3 py-1.5 text-[12px] font-semibold transition", ball === ch.k ? "border-indigo-600 bg-indigo-600 text-white shadow" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300")}>
               {ch.label} <span className={ball === ch.k ? "text-white/70" : "text-slate-400"}>{n}</span>

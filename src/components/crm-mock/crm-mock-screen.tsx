@@ -88,6 +88,7 @@ export function CrmMockScreen() {
   const onDirty = useCallback((d: boolean) => { dirtyRef.current = d; }, []);
   const [toastMsg, setToastMsg] = useState("");
   const [more, setMore] = useState(false);
+  const [preset, setPreset] = useState<{ key: string; label: string } | null>(null);
 
   useEffect(() => {
     if (!toastMsg) return;
@@ -139,6 +140,7 @@ export function CrmMockScreen() {
     if (opp && dirtyRef.current && !window.confirm("ข้อมูลที่กรอกไว้ยังไม่ได้บันทึก ต้องการออกจากหน้านี้ไหม?")) return;
     dirtyRef.current = false;
     setOpp(null);
+    setPreset(null);
     if (v === "inbox" && !chatSel.phone) {
       const top = chatRooms(chatSt)[0];
       if (top) { setChatSel({ phone: top, job: "" }); markRead(top); }
@@ -171,7 +173,7 @@ export function CrmMockScreen() {
   };
 
   const ctx: Ctx = {
-    leads: vLeads, jobs: vJobs, tasks, toast: setToastMsg, go: goView, readOnly, seNick: seFilter ? seNick : undefined,
+    leads: vLeads, jobs: vJobs, tasks, toast: setToastMsg, go: goView, preset, setPreset, goPreset: (v, p) => { goView(v); setPreset(p); }, readOnly, seNick: seFilter ? seNick : undefined,
     openLead: (id) => (readOnly ? roView(" Lead") : setLeadId(id)), openJob: (id) => (readOnly ? roView("งาน") : setJobId(id)), openTask, ask: () => setChat(true),
     addLead: () => setAddingLead(true),
     newSurvey: (l) => { setLeadId(null); setSurvey({ lead: l ?? null }); },
