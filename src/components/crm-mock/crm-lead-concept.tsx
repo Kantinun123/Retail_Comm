@@ -87,11 +87,11 @@ function CampaignChip({ name }: { name: string }) {
   return <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold", CAMP_CLS[i])}><Icon name="sell" style={{ fontSize: 13 }} />{name}</span>;
 }
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, active = "Leads" }: { children: React.ReactNode; active?: string }) {
   const nav = [
-    { label: "หน้าหลัก", icon: "space_dashboard", on: false }, { label: "Leads", icon: "person_search", on: true },
-    { label: "งาน (Opp)", icon: "view_kanban", on: false }, { label: "เชื่อมข้อมูล", icon: "sync_alt", on: false },
-  ];
+    { label: "หน้าหลัก", icon: "space_dashboard" }, { label: "ภาพรวมงาน", icon: "timeline" }, { label: "Leads", icon: "person_search" },
+    { label: "งาน (Opp)", icon: "view_kanban" }, { label: "งานหลังขาย", icon: "construction" }, { label: "แชท", icon: "chat" }, { label: "ลูกค้า 360", icon: "groups" },
+  ].map((n) => ({ ...n, on: n.label === active }));
   return (
     <div className="min-h-screen bg-[#f5f6fb] text-slate-800">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
