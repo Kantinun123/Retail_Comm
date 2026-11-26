@@ -1,22 +1,26 @@
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { PARTY, atRisk, baht, currentStep, dateTh, dueLabel, dueMoney, dueOf, lateWd, packetsOf, type Job, type Lead, type Task } from "./crm-mock-data";
 import { ClassCheck, CustomerLookup, FlowGuide, OpportunityList, PromoList, PtCalc } from "./crm-assistant-tools";
 import { Drawer, btnPrimary, grad, inputCls } from "./crm-ui";
 
+/* จอกว้าง (>= 1024px) : ใช้ useSyncExternalStore เพื่อไม่ให้ผลต่างระหว่าง server กับ client ทำให้ hydration เตือน */
+const subscribeResize = (cb: () => void) => { window.addEventListener("resize", cb); return () => window.removeEventListener("resize", cb); };
+const useWideScreen = () => useSyncExternalStore(subscribeResize, () => window.innerWidth >= 1024, () => false);
+
 interface Answer { text: string; items?: { label: string; sub?: string; run?: () => void }[]; draft?: string; node?: React.ReactNode }
 interface Msg { from: "me" | "bot"; text: string; ans?: Answer }
 
-const TODAY_Q = ["วันนี้ต้องทำอะไรก่อน", "ตอนนี้รอหน่วยงานไหนอยู่", "งานไหนเสี่ยงหลุด", "ยอดที่ต้องเก็บเงิน", "ร่างข้อความตามหน่วยงานที่ช้า"];
+const TODAY_Q = ["งานค้างวันนี้ มีอะไรบ้าง", "วันนี้ต้องทำอะไรก่อน", "ตอนนี้รอหน่วยงานไหนอยู่", "งานไหนเสี่ยงหลุด", "ยอดที่ต้องเก็บเงิน", "ร่างข้อความตามหน่วยงานที่ช้า"];
 const CATS: { key: string; label: string; icon: string; tone: string; qs: string[] }[] = [
+  { key: "today", label: "งานค้างวันนี้", icon: "today", tone: "bg-amber-50 text-amber-700", qs: TODAY_Q },
   { key: "flow", label: "Flow และแบบฟอร์ม", icon: "alt_route", tone: "bg-indigo-50 text-indigo-700", qs: ["ลูกค้าต้องการออกแบบ ต้องทำอย่างไร", "ลูกค้าซื้อสินค้าอย่างเดียว ทำอย่างไร", "Smart Solution / BA ทำอย่างไร", "ลูกค้าขอคืนเงิน ใช้แบบฟอร์มไหน"] },
   { key: "pt", label: "คำนวณ Project Timeline", icon: "event_note", tone: "bg-violet-50 text-violet-700", qs: ["คำนวณ PT จากวันที่ลูกค้าเข้ามา", "ลูกค้าอยากได้ก่อนวันที่ ต้องปิดขายเมื่อไร"] },
   { key: "class", label: "เช็ควันกระเบื้อง", icon: "local_shipping", tone: "bg-teal-50 text-teal-700", qs: ["เช็ควันส่งกระเบื้องตาม Class", "สีนี้เป็น Class อะไร"] },
   { key: "cust", label: "ลูกค้าและโอกาสขาย", icon: "person_search", tone: "bg-sky-50 text-sky-700", qs: ["ค้นประวัติลูกค้าจากชื่อหรือเบอร์", "โอกาสขายที่ควรตามตอนนี้"] },
   { key: "promo", label: "โปรโมชั่น", icon: "sell", tone: "bg-fuchsia-50 text-fuchsia-700", qs: ["โปรโมชั่นช่วงนี้มีอะไรบ้าง"] },
-  { key: "today", label: "งานวันนี้", icon: "today", tone: "bg-amber-50 text-amber-700", qs: TODAY_Q },
 ];
 
 export function ChatDrawer({ open, onClose, leads, jobs, tasks, onTask, onJob, onLead, toast }: {
@@ -24,13 +28,22 @@ export function ChatDrawer({ open, onClose, leads, jobs, tasks, onTask, onJob, o
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([{ from: "bot", text: "สวัสดีค่ะ ถามเรื่องงานของวันนี้ Flow และแบบฟอร์ม คำนวณวันที่ เช็คกระเบื้อง ค้นลูกค้า หรือโปรโมชั่นได้เลย เลือกหัวข้อทางด้านข้าง หรือพิมพ์ถามได้ค่ะ (ตัวอย่างนี้ตอบด้วยกฎที่กำหนดไว้ ข้อมูลบางส่วนเป็นตัวอย่าง)" }]);
   const [text, setText] = useState("");
-  const [full, setFull] = useState(false);
-  const [cat, setCat] = useState<string | null>(null);
+  /* เปิดครั้งแรกบนจอใหญ่ = เต็มจอ ผู้ใช้ย่อ/ขยายเองได้ แล้วจำค่าที่เลือกไว้ */
+  const [pref, setPref] = useState<boolean | null>(null);
+  const wideScreen = useWideScreen();
+  const full = pref ?? (open && wideScreen);
+  const setFull = (v: boolean) => setPref(v);
+  const [cat, setCat] = useState<string | null>("today");
   const endRef = useRef<HTMLDivElement>(null);
 
   const answer = (q: string): Answer => {
     const has = (...k: string[]) => k.some((x) => q.includes(x));
     const lower = q.toLowerCase();
+    if (has("ค้าง")) {
+      const urgent = tasks.filter((t) => t.priority === 1);
+      const list = (urgent.length ? urgent : tasks).slice(0, 8);
+      return { text: urgent.length ? `งานค้างวันนี้ ${tasks.length} เรื่อง เร่งด่วน ${urgent.length} เรื่อง เริ่มจากรายการด้านล่างค่ะ` : `งานวันนี้ ${tasks.length} เรื่อง ไม่มีเรื่องเร่งด่วนค่ะ`, items: list.map((t) => ({ label: t.title, sub: t.reason, run: () => onTask(t) })) };
+    }
     /* เครื่องมือ */
     if (has("คืนเงิน", "WHT", "ภาษีหัก")) return { text: "ขอคืนเงินใช้แบบฟอร์มนี้ค่ะ", node: <FlowGuide pick="refund" /> };
     if (has("ออกแบบ")) return { text: "ลูกค้าต้องการออกแบบ ทำตามขั้นนี้ค่ะ", node: <FlowGuide pick="design" /> };
@@ -80,7 +93,6 @@ export function ChatDrawer({ open, onClose, leads, jobs, tasks, onTask, onJob, o
     if (!q.trim()) return;
     setMsgs((m) => [...m, { from: "me", text: q }]);
     setText("");
-    setCat(null);
     setTimeout(() => {
       const a = answer(q);
       setMsgs((m) => [...m, { from: "bot", text: a.text, ans: a }]);
@@ -146,9 +158,9 @@ export function ChatDrawer({ open, onClose, leads, jobs, tasks, onTask, onJob, o
 
   if (full) {
     return (
-      <Drawer open={open} onClose={() => { setFull(false); onClose(); }} wide title={title} subtitle="ผู้ช่วยประจำวันของทีมขาย · เต็มจอ"
+      <Drawer open={open} onClose={onClose} xwide title={title} subtitle="ผู้ช่วยประจำวันของทีมขาย · เต็มจอ"
         footer={<div className="mx-auto w-full max-w-5xl">{form}</div>}>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="space-y-3">{bubbles}</div>
           <aside className="space-y-3 lg:sticky lg:top-0 lg:max-h-[calc(100vh-190px)] lg:self-start lg:overflow-y-auto">
             <button onClick={() => setFull(false)} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"><Icon name="close_fullscreen" className="!text-[16px]" />ย่อเป็นแผงด้านข้าง</button>
@@ -160,7 +172,7 @@ export function ChatDrawer({ open, onClose, leads, jobs, tasks, onTask, onJob, o
   }
 
   return (
-    <Drawer side open={open} onClose={onClose} title={title} subtitle="ผู้ช่วยประจำวันของทีมขาย"
+    <Drawer side open={open} onClose={onClose} title={title} subtitle={<span className="flex items-center gap-2">ผู้ช่วยประจำวันของทีมขาย<button onClick={() => setFull(true)} className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100"><Icon name="open_in_full" className="!text-[13px]" />ขยายเต็มจอ</button></span>}
       footer={
         <div className="space-y-2">
           <div className="flex items-center gap-1.5">

@@ -44,7 +44,7 @@ export function PartyBadge({ party, className }: { party: Party; className?: str
 }
 
 /** หน้าเต็มพื้นที่ด้านขวาของเมนูซ้าย (เหมือนหน้าเปิด Opp) ; side = แผงข้าง ใช้กับแชตน้องเลขา */
-export function Drawer({ open, onClose, title, subtitle, children, footer, wide, side }: { open: boolean; onClose: () => void; title: React.ReactNode; subtitle?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; side?: boolean }) {
+export function Drawer({ open, onClose, title, subtitle, children, footer, wide, xwide, side }: { open: boolean; onClose: () => void; title: React.ReactNode; subtitle?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; xwide?: boolean; side?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -59,7 +59,7 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, wide,
     return () => { document.body.style.overflow = prev; };
   }, [open, side]);
   if (!side) {
-    const w = wide ? "max-w-5xl" : "max-w-3xl";
+    const w = xwide ? "max-w-[1500px]" : wide ? "max-w-5xl" : "max-w-3xl";
     return (
       <div className={cn("fixed bottom-0 left-0 right-0 top-[29px] z-40 flex flex-col bg-[#f5f6fb] transition-opacity duration-200 lg:left-64", open ? "visible opacity-100" : "invisible opacity-0")} aria-hidden={!open}>
         <header className="border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:px-8">
