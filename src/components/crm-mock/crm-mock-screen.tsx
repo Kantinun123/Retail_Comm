@@ -363,7 +363,7 @@ export function CrmMockScreen() {
       <NewSurveyDrawer open={!!survey} lead={survey?.lead ?? null} prefill={survey?.prefill} onClose={() => setSurvey(null)} onCreate={createSurvey} />
       <Customer360Drawer onOpenChat={openChat} phone={custPhone} jobs={jobs} onClose={() => setCustPhone(null)} openJob={(id) => { setCustPhone(null); setJobId(id); }}
         onUseRight={(j, r) => { setCustPhone(null); setSurvey({ lead: null, prefill: { customer: j.customer, phone: j.phone, province: j.province, scope: r.name }, right: { jobId: j.id, rightId: r.id } }); }} />
-      <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} toast={setToastMsg} />
+      <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} onLead={(id) => { setChat(false); setLeadId(id); }} toast={setToastMsg} />
 
       <div className={cn("pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-5 py-2.5 text-[12.5px] font-medium text-white shadow-xl transition-all duration-300 lg:bottom-8", toastMsg ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>
         {toastMsg}
