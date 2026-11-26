@@ -143,6 +143,12 @@ export function CrmMockScreen() {
     dirtyRef.current = false;
     setOpp(null);
     setPreset(null);
+    /* กดเมนูซ้าย = ปิดหน้ารายละเอียดที่เปิดค้างอยู่ แล้วไปหน้านั้น */
+    setLeadId(null);
+    setJobId(null);
+    setCustPhone(null);
+    setSurvey(null);
+    setAddingLead(false);
     if (v === "inbox" && !chatSel.phone) {
       const top = chatRooms(chatSt)[0];
       if (top) { setChatSel({ phone: top, job: "" }); markRead(top); }
