@@ -7,6 +7,7 @@ import {
   type Job, type Packet, type Party,
 } from "./crm-mock-data";
 import { Avatar, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
+import { BoardFrame } from "./crm-overview";
 import type { Ctx } from "./crm-views";
 
 type Ball = "all" | "SE" | "KIM" | "SCM" | "ROOM" | "SURV" | "late";
@@ -71,30 +72,18 @@ export function BoardView({ c }: { c: Ctx }) {
       </div>
 
       {mode === "board" ? (
-        <div className="-mx-4 overflow-x-auto px-4 pb-3 md:-mx-8 md:px-8">
-          <div className="flex min-w-max gap-3">
-            {COLS.map((col) => {
-              const list = jobs.filter((j) => colOf(j) === col.key);
-              return (
-                <div key={col.key} className="w-[272px] shrink-0 rounded-2xl border border-white/70 bg-white/50 p-2.5">
-                  <div className="mb-2 flex items-center gap-2 px-1">
-                    <span className="grid h-7 w-7 place-items-center rounded-lg text-white" style={{ background: col.tone }}><Icon name={col.icon} style={{ fontSize: 16 }} /></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12.5px] font-bold text-slate-800">{col.label}</div>
-                      <div className="truncate text-[10.5px] text-slate-400">{col.hint}</div>
-                    </div>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 shadow-sm">{list.length}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {list.map((j) => <JobCard key={j.id} j={j} onOpen={() => c.openJob(j.id)} />)}
-                    {list.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-[11px] text-slate-300">ไม่มีงาน</div>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
+        <BoardFrame
+          items={COLS.map((col) => { const list = jobs.filter((j) => colOf(j) === col.key); return { id: col.key, label: col.label, short: col.label, hint: col.hint, icon: col.icon, tone: col.tone, count: list.length, alert: list.some((j) => (stepInfo(j)?.late ?? 0) > 0) }; })}
+          render={(id) => {
+            const list = jobs.filter((j) => colOf(j) === id).sort((a, b) => (stepInfo(b)?.late ?? 0) - (stepInfo(a)?.late ?? 0));
+            return (
+              <>
+                {list.map((j) => <JobCard key={j.id} j={j} onOpen={() => c.openJob(j.id)} />)}
+                {list.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-[11px] text-slate-300">ไม่มีงาน</div>}
+              </>
+            );
+          }}
+        />      ) : (
         <div className={cn(glass, "overflow-hidden")}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-[12.5px]">

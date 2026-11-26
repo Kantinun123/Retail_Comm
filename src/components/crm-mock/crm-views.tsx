@@ -4,6 +4,7 @@ import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
 import { InterestChips } from "./crm-interests";
+import { BoardFrame } from "./crm-overview";
 import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas" | "inbox" | "overview" | "aftersale";
@@ -136,25 +137,22 @@ export function LeadsView({ c }: { c: Ctx }) {
 }
 
 /* ---------------- กระดาน Lead ---------------- */
-const BOARD_COLS: { key: string; title: string; sub: string; tone: string; pick: (l: Lead) => boolean }[] = [
-  { key: "waiting", title: "รอติดต่อ", sub: "SLA นับเวลา", tone: "border-amber-300", pick: (l) => l.status === "waiting" },
-  { key: "contacting", title: "กำลังสกรีน", sub: "ถามความสนใจ", tone: "border-sky-300", pick: (l) => l.status === "contacting" },
-  { key: "solution", title: "สาย Solution", sub: "รอเปิด Opp / เปิด Opp แล้ว", tone: "border-indigo-300", pick: (l) => l.status === "qualified" || l.status === "converted" },
-  { key: "dealer", title: "สายสินค้า · ส่งให้ร้านแล้ว", sub: "ร้านทำใบเสนอราคาในระบบร้าน", tone: "border-fuchsia-300", pick: (l) => l.status === "dealer" },
-  { key: "lost", title: "Loss", sub: "ไม่ซื้อ / ร้านแจ้งแพ้", tone: "border-rose-300", pick: (l) => l.status === "lost" },
+const BOARD_COLS: { key: string; title: string; short: string; sub: string; icon: string; hex: string; pick: (l: Lead) => boolean }[] = [
+  { key: "waiting", title: "รอติดต่อ", short: "รอติดต่อ", sub: "SLA นับเวลา", icon: "schedule", hex: "#d97706", pick: (l) => l.status === "waiting" },
+  { key: "contacting", title: "กำลังสกรีน", short: "สกรีน", sub: "ถามความสนใจ", icon: "forum", hex: "#0284c7", pick: (l) => l.status === "contacting" },
+  { key: "solution", title: "สาย Solution", short: "Solution", sub: "รอเปิด Opp / เปิด Opp แล้ว", icon: "rocket_launch", hex: "#6366f1", pick: (l) => l.status === "qualified" || l.status === "converted" },
+  { key: "dealer", title: "สายสินค้า · ส่งให้ร้านแล้ว", short: "สายสินค้า", sub: "ร้านทำใบเสนอราคาในระบบร้าน", icon: "storefront", hex: "#c026d3", pick: (l) => l.status === "dealer" },
+  { key: "lost", title: "Loss", short: "Loss", sub: "ไม่ซื้อ / ร้านแจ้งแพ้", icon: "cancel", hex: "#e11d48", pick: (l) => l.status === "lost" },
 ];
 function LeadBoard({ c, rows }: { c: Ctx; rows: Lead[] }) {
   return (
-    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
-      {BOARD_COLS.map((col) => {
-        const items = rows.filter(col.pick);
+    <BoardFrame
+      items={BOARD_COLS.map((col) => { const xs = rows.filter(col.pick); return { id: col.key, label: col.title, short: col.short, hint: col.sub, icon: col.icon, tone: col.hex, count: xs.length, alert: xs.some((l) => (l.status === "waiting" || l.status === "contacting") && leadSla(l).state === "breach") }; })}
+      render={(id) => {
+        const col = BOARD_COLS.find((b) => b.key === id)!;
+        const items = rows.filter(col.pick).sort((a, b) => Number(leadSla(b).state === "breach") - Number(leadSla(a).state === "breach"));
         return (
-          <div key={col.key} className={cn("rounded-2xl border-t-4 bg-white/60 p-2.5", col.tone)}>
-            <div className="mb-2 px-1">
-              <div className="text-[13px] font-bold text-slate-900">{col.title} <span className="text-slate-400">{items.length}</span></div>
-              <div className="text-[10.5px] text-slate-400">{col.sub}</div>
-            </div>
-            <div className="space-y-2">
+          <>
               {items.map((l) => (
                 <button key={l.id} onClick={() => c.openLead(l.id)} className={cn(glass, "block w-full p-3 text-left transition hover:-translate-y-0.5")}>
                   <div className="flex flex-wrap items-center justify-between gap-1">
@@ -180,10 +178,9 @@ function LeadBoard({ c, rows }: { c: Ctx; rows: Lead[] }) {
                 </button>
               ))}
               {items.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-[11.5px] text-slate-400">ไม่มีรายการ</div>}
-            </div>
-          </div>
+          </>
         );
-      })}
-    </div>
+      }}
+    />
   );
 }

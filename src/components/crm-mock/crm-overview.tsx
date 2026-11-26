@@ -114,7 +114,7 @@ export function JourneyStrip({ job }: { job: Job }) {
 }
 /* ---------------- กรอบบอร์ด: ชิปนำทาง + ปุ่มเลื่อน + ช่องเลื่อนในตัวเอง ---------------- */
 interface BoardItem { id: string; label: string; short: string; hint?: string; icon: string; tone: string; count: number; alert?: boolean }
-function BoardFrame({ items, render }: { items: BoardItem[]; render: (id: string) => React.ReactNode }) {
+export function BoardFrame({ items, render }: { items: BoardItem[]; render: (id: string) => React.ReactNode }) {
   const sc = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(items[0]?.id ?? "");
   const [edge, setEdge] = useState({ l: false, r: true });
