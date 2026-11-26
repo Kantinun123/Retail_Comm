@@ -35,6 +35,9 @@ const NAV: { key: View; label: string; icon: string }[] = [
   { key: "exchange", label: "เชื่อมข้อมูล", icon: "sync_alt" },
 ];
 
+const MOBILE_MAIN: View[] = ["home", "overview", "leads", "inbox"];
+const MOBILE_MORE: View[] = ["board", "aftersale", "customers", "areas", "exchange"];
+
 const NAV_RO: { key: View; label: string; icon: string }[] = [
   { key: "report", label: "รายงานทีม", icon: "monitoring" },
   { key: "overview", label: "ภาพรวมงาน", icon: "timeline" },
@@ -84,6 +87,7 @@ export function CrmMockScreen() {
   const dirtyRef = useRef(false);
   const onDirty = useCallback((d: boolean) => { dirtyRef.current = d; }, []);
   const [toastMsg, setToastMsg] = useState("");
+  const [more, setMore] = useState(false);
 
   useEffect(() => {
     if (!toastMsg) return;
@@ -303,17 +307,32 @@ export function CrmMockScreen() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/70 bg-white/90 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-xl lg:hidden">
-        {(readOnly ? NAV_RO : NAV.slice(0, 4)).map((n) => (
-          <button key={n.key} onClick={() => goView(n.key)} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
+        {(readOnly ? NAV_RO : MOBILE_MAIN.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
+          <button key={n.key} onClick={() => goView(n.key)} className={cn("relative flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
             <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
+            {n.key === "inbox" && chatUnread > 0 && <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-rose-500" />}
           </button>
         ))}
         {!readOnly && (
-          <button onClick={() => goView("customers")} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", isActive("customers") ? "text-indigo-600" : "text-slate-400")}><Icon name="groups" fill={isActive("customers")} />ลูกค้า 360</button>
+          <button onClick={() => setMore(true)} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", MOBILE_MORE.some((k) => isActive(k)) ? "text-indigo-600" : "text-slate-400")}><Icon name="apps" />เพิ่มเติม</button>
         )}
-        <button onClick={() => setChat(true)} className="flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold text-violet-600"><Icon name="auto_awesome" />น้องเลขา</button>
+        {readOnly && <button onClick={() => setChat(true)} className="flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold text-violet-600"><Icon name="auto_awesome" />น้องเลขา</button>}
       </nav>
 
+      {more && !readOnly && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMore(false)}>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white p-4 pb-[max(env(safe-area-inset-bottom),16px)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <p className="mb-3 text-[13px] font-bold text-slate-900">เมนูเพิ่มเติม</p>
+            <div className="grid grid-cols-3 gap-2">
+              {MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!).map((n) => (
+                <button key={n.key} onClick={() => { setMore(false); goView(n.key); }} className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 py-3 text-[11px] font-semibold text-slate-700 active:scale-95"><Icon name={n.icon} className="text-indigo-600" />{n.label}</button>
+              ))}
+              <button onClick={() => { setMore(false); setChat(true); }} className="flex flex-col items-center gap-1 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-[11px] font-semibold text-violet-700 active:scale-95"><Icon name="auto_awesome" />น้องเลขา</button>
+            </div>
+          </div>
+        </div>
+      )}
       <LeadDrawer onOpenChat={openChat} me={seNick} isDealerView={role === "dealer"} lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
         onPatch={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))}
         onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} onConvertSurvey={(l) => ctx.newSurvey(l)} />
