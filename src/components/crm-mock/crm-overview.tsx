@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { PARTY, addDays, baht, currentStep, dateTh, dueOf, lateWd, type Job, type Lead } from "./crm-mock-data";
@@ -112,6 +112,57 @@ export function JourneyStrip({ job }: { job: Job }) {
     </div>
   );
 }
+/* ---------------- กรอบบอร์ด: ชิปนำทาง + ปุ่มเลื่อน + ช่องเลื่อนในตัวเอง ---------------- */
+interface BoardItem { id: string; label: string; short: string; hint?: string; icon: string; tone: string; count: number; alert?: boolean }
+function BoardFrame({ items, render }: { items: BoardItem[]; render: (id: string) => React.ReactNode }) {
+  const sc = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(items[0]?.id ?? "");
+  const [edge, setEdge] = useState({ l: false, r: true });
+  const onScroll = () => {
+    const el = sc.current;
+    if (!el) return;
+    setEdge({ l: el.scrollLeft > 8, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 8 });
+    const cols = Array.from(el.querySelectorAll<HTMLElement>("[data-col]"));
+    let best = cols[0];
+    for (const c of cols) if (Math.abs(c.offsetLeft - el.scrollLeft) < Math.abs(best.offsetLeft - el.scrollLeft)) best = c;
+    if (best?.dataset.col) setActive(best.dataset.col);
+  };
+  const go = (id: string) => {
+    const el = sc.current;
+    const col = el?.querySelector<HTMLElement>(`[data-col="${id}"]`);
+    if (el && col) el.scrollTo({ left: col.offsetLeft - el.offsetLeft - 4, behavior: "smooth" });
+  };
+  const step = (dir: 1 | -1) => sc.current?.scrollBy({ left: dir * 480, behavior: "smooth" });
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {items.map((it) => (
+          <button key={it.id} onClick={() => go(it.id)} className={cn("relative flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-bold transition", active === it.id ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300")}>
+            {it.short}<span className={cn("rounded-full px-1.5 text-[10.5px]", active === it.id ? "bg-white/25" : "bg-slate-100 text-slate-500")}>{it.count}</span>
+            {it.alert && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />}
+          </button>
+        ))}
+      </div>
+      <div className="relative">
+        {edge.l && <button onClick={() => step(-1)} aria-label="เลื่อนไปทางซ้าย" className="absolute left-1 top-1/3 z-10 hidden h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white shadow-lg hover:bg-indigo-50 lg:grid"><Icon name="chevron_left" /></button>}
+        {edge.r && <button onClick={() => step(1)} aria-label="เลื่อนไปทางขวา" className="absolute right-1 top-1/3 z-10 hidden h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white shadow-lg hover:bg-indigo-50 lg:grid"><Icon name="chevron_right" /></button>}
+        <div ref={sc} onScroll={onScroll} className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 lg:snap-none">
+          {items.map((it) => (
+            <div key={it.id} data-col={it.id} className="w-[84vw] shrink-0 snap-start rounded-2xl bg-white/50 p-2 sm:w-[240px]">
+              <div className="mb-2 flex items-center gap-2 px-1">
+                <span className="grid h-6 w-6 place-items-center rounded-lg text-white" style={{ background: it.tone }}><Icon name={it.icon} className="!text-[15px]" /></span>
+                <div className="min-w-0 flex-1"><p className="truncate text-[12px] font-bold text-slate-800">{it.label}</p>{it.hint && <p className="truncate text-[10px] text-slate-400">{it.hint}</p>}</div>
+                <span className="rounded-full bg-slate-100 px-1.5 text-[11px] font-bold text-slate-500">{it.count}</span>
+              </div>
+              <div className="max-h-[calc(100vh-380px)] min-h-[160px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">{render(it.id)}</div>
+              {it.count > 4 && <p className="mt-1 text-center text-[10px] text-slate-400">เลื่อนในช่องเพื่อดูต่อ ↓</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 /* ---------------- ภาพรวมงาน ---------------- */
 export function OverviewView({ c }: { c: Ctx }) {
   const [flow, setFlow] = useState<Flow>("a");
@@ -139,28 +190,20 @@ export function OverviewView({ c }: { c: Ctx }) {
           <div key={l} className={cn(glass, "p-3.5")}><p className="text-[11px] font-semibold text-slate-500">{l}</p><p className={cn("text-[22px] font-bold", t)}>{v}</p></div>
         ))}
       </div>
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-max gap-3">
-          {PHASES.map((p) => {
-            const xs = shown(p.n);
-            return (
-              <div key={p.n} className="w-[230px] shrink-0 rounded-2xl bg-white/50 p-2">
-                <div className="mb-2 flex items-center gap-2 px-1">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg text-white" style={{ background: p.tone }}><Icon name={p.icon} className="!text-[15px]" /></span>
-                  <p className="flex-1 truncate text-[12px] font-bold text-slate-800">{p.n}. {flow === "a" ? p.a : p.b}</p>
-                  <span className="rounded-full bg-slate-100 px-1.5 text-[11px] font-bold text-slate-500">{xs.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {xs.map((x) => <CardView key={x.id} c={x} open={() => open(x)} />)}
-                  {!xs.length && <p className="rounded-xl border border-dashed border-slate-200 py-5 text-center text-[11px] text-slate-300">ไม่มีงาน</p>}
-                </div>
-                {p.n === 6 && <p className="mt-2 px-1 text-[10.5px] text-slate-400">ปิดขายแล้วจะส่งต่อไปช่อง 7 และหน้า &ldquo;งานหลังขาย&rdquo;</p>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div className={cn(glass, "p-3.5")}>
+      <BoardFrame
+        items={PHASES.map((p) => { const xs = shown(p.n); return { id: String(p.n), label: `${p.n}. ${flow === "a" ? p.a : p.b}`, short: flow === "a" ? p.a : p.b, icon: p.icon, tone: p.tone, count: xs.length, alert: xs.some((x) => x.late > 0) }; })}
+        render={(id) => {
+          const p = Number(id);
+          const xs = [...shown(p)].sort((a, b) => b.late - a.late);
+          return (
+            <>
+              {xs.map((x) => <CardView key={x.id} c={x} open={() => open(x)} />)}
+              {!xs.length && <p className="rounded-xl border border-dashed border-slate-200 py-5 text-center text-[11px] text-slate-300">ไม่มีงาน</p>}
+              {p === 6 && <p className="px-1 text-[10.5px] text-slate-400">ปิดขายแล้วจะส่งต่อไปช่อง 7 และหน้า &ldquo;งานหลังขาย&rdquo;</p>}
+            </>
+          );
+        }}
+      />      <div className={cn(glass, "p-3.5")}>
         <p className="mb-2 flex items-center gap-1.5 text-[12.5px] font-bold text-slate-800"><Icon name="storefront" className="!text-[16px] text-indigo-500" />ขายสินค้าอย่างเดียว (ส่งให้ร้านทำใบเสนอราคา)</p>
         <div className="flex flex-wrap gap-2">
           {product.map((l) => <button key={l.id} onClick={() => c.openLead(l.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-left text-[12px] hover:border-indigo-300"><b>{l.name}</b> <span className="text-slate-400">{l.dealerStore ?? "-"}</span></button>)}
@@ -218,46 +261,38 @@ export function AftersaleView({ c }: { c: Ctx }) {
           <div key={l} className={cn(glass, "p-3.5")}><p className="text-[11px] font-semibold text-slate-500">{l}</p><p className="text-[22px] font-bold text-slate-900">{v}</p></div>
         ))}
       </div>
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-max gap-3">
-          {LANES.map((l) => {
-            const xs = inLane(l.key);
-            return (
-              <div key={l.key} className="w-[250px] shrink-0 rounded-2xl bg-white/50 p-2">
-                <div className="mb-2 flex items-center gap-2 px-1">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg text-white" style={{ background: l.tone }}><Icon name={l.icon} className="!text-[15px]" /></span>
-                  <div className="min-w-0 flex-1"><p className="truncate text-[12px] font-bold text-slate-800">{l.label}</p><p className="truncate text-[10px] text-slate-400">{l.hint}</p></div>
-                  <span className="rounded-full bg-slate-100 px-1.5 text-[11px] font-bold text-slate-500">{xs.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {xs.map((j) => {
-                    const s = currentStep(j);
-                    const late = s ? Math.max(0, lateWd(dueOf(j, s))) : 0;
-                    return (
-                      <div key={j.id} className={cn("rounded-xl border bg-white p-2.5", late ? "border-amber-300" : "border-slate-200")}>
-                        <button onClick={() => c.openJob(j.id)} className="flex w-full items-center gap-2 text-left">
-                          <Avatar name={j.customer} size={24} />
-                          <div className="min-w-0 flex-1"><p className="truncate text-[12.5px] font-bold text-slate-800">{j.customer}</p><p className="truncate text-[10.5px] text-slate-400">{j.id} · {j.province} · {baht(j.value)}</p></div>
-                        </button>
-                        <p className="mt-1.5 text-[10.5px] text-slate-500">
-                          {s ? <>ขั้นปัจจุบัน: <b>{s.label}</b> · {PARTY[s.owner].label}</> : <>ประกันถึง <b>{dateTh(expiry(j))}</b></>}
-                        </p>
-                        {late > 0 && <p className="mt-0.5 text-[10.5px] font-bold text-amber-600">เลยแผน {late} วันทำการ</p>}
-                        {claims[j.id] && <p className="mt-1 rounded-md bg-rose-50 px-1.5 py-1 text-[10.5px] text-rose-700">เคลม: {claims[j.id]}</p>}
-                        {!s && (
-                          <button onClick={() => { setClaims((m) => { const n = { ...m }; if (n[j.id]) delete n[j.id]; else n[j.id] = "น้ำรั่วบริเวณรอยต่อ (ตัวอย่าง)"; return n; }); c.toast(claims[j.id] ? "ปิดเคลมแล้ว" : "เปิดเคลมและแจ้ง KIM แล้ว"); }}
-                            className="mt-1.5 w-full rounded-lg border border-slate-200 py-1 text-[11px] font-semibold text-slate-600 hover:border-rose-300 hover:text-rose-600">{claims[j.id] ? "ปิดเคลม" : "แจ้งปัญหา/เคลม"}</button>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {!xs.length && <p className="rounded-xl border border-dashed border-slate-200 py-5 text-center text-[11px] text-slate-300">ไม่มีงาน</p>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+      <BoardFrame
+        items={LANES.map((l) => { const xs = inLane(l.key); return { id: l.key, label: l.label, short: l.label, hint: l.hint, icon: l.icon, tone: l.tone, count: xs.length, alert: xs.some((j) => { const s = currentStep(j); return !!s && lateWd(dueOf(j, s)) > 0; }) }; })}
+        render={(id) => {
+          const late = (j: Job) => { const s = currentStep(j); return s ? Math.max(0, lateWd(dueOf(j, s))) : 0; };
+          const xs = [...inLane(id as Lane | "claim")].sort((a, b) => late(b) - late(a));
+          return (
+            <>
+              {xs.map((j) => {
+                const s = currentStep(j);
+                const lt = late(j);
+                return (
+                  <div key={j.id} className={cn("rounded-xl border bg-white p-2.5", lt ? "border-amber-300" : "border-slate-200")}>
+                    <button onClick={() => c.openJob(j.id)} className="flex w-full items-center gap-2 text-left">
+                      <Avatar name={j.customer} size={24} />
+                      <div className="min-w-0 flex-1"><p className="truncate text-[12.5px] font-bold text-slate-800">{j.customer}</p><p className="truncate text-[10.5px] text-slate-400">{j.id} · {j.province} · {baht(j.value)}</p></div>
+                    </button>
+                    <p className="mt-1.5 text-[10.5px] text-slate-500">
+                      {s ? <>ขั้นปัจจุบัน: <b>{s.label}</b> · {PARTY[s.owner].label}</> : <>ประกันถึง <b>{dateTh(expiry(j))}</b></>}
+                    </p>
+                    {lt > 0 && <p className="mt-0.5 text-[10.5px] font-bold text-amber-600">เลยแผน {lt} วันทำการ</p>}
+                    {claims[j.id] && <p className="mt-1 rounded-md bg-rose-50 px-1.5 py-1 text-[10.5px] text-rose-700">เคลม: {claims[j.id]}</p>}
+                    {!s && (
+                      <button onClick={() => { setClaims((m) => { const n = { ...m }; if (n[j.id]) delete n[j.id]; else n[j.id] = "น้ำรั่วบริเวณรอยต่อ (ตัวอย่าง)"; return n; }); c.toast(claims[j.id] ? "ปิดเคลมแล้ว" : "เปิดเคลมและแจ้ง KIM แล้ว"); }}
+                        className="mt-1.5 w-full rounded-lg border border-slate-200 py-1 text-[11px] font-semibold text-slate-600 hover:border-rose-300 hover:text-rose-600">{claims[j.id] ? "ปิดเคลม" : "แจ้งปัญหา/เคลม"}</button>
+                    )}
+                  </div>
+                );
+              })}
+              {!xs.length && <p className="rounded-xl border border-dashed border-slate-200 py-5 text-center text-[11px] text-slate-300">ไม่มีงาน</p>}
+            </>
+          );
+        }}
+      />    </div>
   );
 }
