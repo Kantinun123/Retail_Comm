@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useSyncExternalStore } from "react
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  PARTY, baht, cleanInterests, currentStep, depositOf, dueLabel, dueOf, interestSummary, isFinished, leadSla, missingOf, slaHoursOf, stepsOf, suggestRoute,
+  PARTY, baht, cleanInterests, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, interestSummary, isFinished, leadSla, missingOf, slaHoursOf, stepsOf, suggestRoute,
   type Job, type Lead,
 } from "./crm-mock-data";
 import { btnGhost, btnPrimary, glass } from "./crm-ui";
@@ -194,3 +194,114 @@ export function oppGuide(job: Job): BannerData | null {
 }
 export const oppScripts = (j: Job) => scriptsFor({ name: j.customer, items: j.scope ?? "งานหลังคา", province: j.province });
 export const scrollToId = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+/* ---------------- ไกด์คุยกับลูกค้าในหน้าแชท ---------------- */
+export interface ChatGuide { stage: string; goal: string; ask: string[]; messages: { label: string; text: string }[] }
+export function chatGuide(o: { name: string; lead?: Lead; job?: Job }): ChatGuide | null {
+  const n = o.name.split(" ")[0] || "คุณลูกค้า";
+  const { lead, job } = o;
+  if (job) {
+    if (job.cancelReason) return null;
+    const cur = currentStep(job);
+    const survey = job.work === "survey";
+    const amount = job.value > 0 ? ` ยอดรวม ${baht(job.value)}` : "";
+    if (!cur) {
+      return { stage: "หลังส่งมอบงาน", goal: "ดูแลหลังการขาย ขอบคุณลูกค้า และเก็บคะแนนความพึงพอใจ", ask: ["ลูกค้าพอใจกับงานหรือไม่", "มีจุดไหนที่ต้องแก้ไขไหม", "สนใจบริการอื่น เช่น ล้างแอร์ สำรวจรางน้ำ"],
+        messages: [{ label: "ขอบคุณ + สิทธิพิเศษ", text: `${n} ค่ะ ขอบคุณที่ไว้วางใจเรานะคะ ตอนนี้ลูกค้ามีสิทธิพิเศษสำหรับบริการต่อยอดด้วย ถ้าสนใจแจ้งได้เลยค่ะ` }, { label: "ถามความพอใจ", text: `งานที่ติดตั้งไปเป็นอย่างไรบ้างคะ ถ้ามีจุดไหนอยากให้ตรวจเพิ่ม แจ้งทางแชทนี้ได้เลยนะคะ อยู่ในระยะรับประกันค่ะ` }] };
+    }
+    const due = dateTh(dueOf(job, cur));
+    switch (cur.key) {
+      case "plan_in":
+        return { stage: "รับแบบจากลูกค้า", goal: "ขอแบบแปลนและข้อมูลหน้างานให้ครบ จะได้ถอดแบบได้ถูกต้อง", ask: ["แบบแปลน (ไฟล์ PDF หรือรูปถ่าย)", "ประเภทอาคารและลักษณะหลังคาที่ต้องการ", "สีและรุ่นกระเบื้องที่ชอบ"],
+          messages: [{ label: "ขอแบบแปลน", text: `${n} ค่ะ รบกวนส่งแบบแปลนบ้าน (ไฟล์ PDF หรือรูปถ่าย) มาทางแชทนี้ได้เลยนะคะ ทีมจะถอดแบบและทำใบเสนอราคาให้ตามแบบค่ะ` }, { label: "ถามสี/รุ่น", text: `ขออนุญาตถามเพิ่มนะคะ ${n} สนใจกระเบื้องสีและรุ่นไหนเป็นพิเศษไหมคะ เดี๋ยวเตรียมตัวอย่างให้เปรียบเทียบค่ะ` }] };
+      case "ase_mark":
+      case "truss_design":
+        return { stage: "รอห้องแบบทำแบบ", goal: "แจ้งลูกค้าว่าขั้นนี้ทีมห้องแบบกำลังทำ และกำหนดเสร็จ", ask: ["ลูกค้ามีส่วนที่อยากปรับแบบก่อนไหม", "ยืนยันว่าไม่มีการเปลี่ยนโครงสร้างเพิ่ม"],
+          messages: [{ label: "แจ้งความคืบหน้า", text: `${n} ค่ะ ตอนนี้ทีมห้องแบบกำลังทำแบบโครงหลังคาให้ คาดว่าเสร็จภายใน ${due} ถ้ามีส่วนที่อยากปรับ แจ้งได้ก่อนวันนี้นะคะ` }] };
+      case "quote1":
+        return { stage: "เสนอราคาจากแบบ", goal: "ส่งใบเสนอราคาและอธิบายรายการหลักให้ลูกค้าเข้าใจ", ask: ["ลูกค้าเข้าใจรายการและยอดรวมหรือยัง", "มีรายการที่อยากเพิ่มหรือลดไหม", "คาดว่าตัดสินใจได้เมื่อไร"],
+          messages: [{ label: "ส่งใบเสนอราคา", text: `${n} ค่ะ ส่งใบเสนอราคาให้แล้วนะคะ${amount} ถ้ามีส่วนไหนอยากให้อธิบายเพิ่ม หรืออยากปรับรายการ บอกได้เลยค่ะ` }, { label: "ถามความเห็น", text: `ใบเสนอราคาที่ส่งไป ${n} ได้ดูแล้วหรือยังคะ ติดตรงไหนอยากให้ช่วยอธิบายไหมคะ` }] };
+      case "deposit":
+        return { stage: survey ? "เก็บค่าสำรวจ" : "รับมัดจำ + ล็อกคิวสำรวจ", goal: "ขอรับ" + (survey ? "ค่าสำรวจ" : "มัดจำ") + "และตกลงวันเข้าสำรวจ", ask: ["วันและเวลาที่สะดวกให้ทีมสำรวจเข้า", "ใครอยู่หน้างานตอนสำรวจ", "ขอสลิปโอน"],
+          messages: [{ label: "ขอรับ" + (survey ? "ค่าสำรวจ" : "มัดจำ"), text: `${n} ค่ะ ถ้าสะดวกดำเนินการต่อ รบกวนโอน${survey ? "ค่าสำรวจ" : "มัดจำ"} ${baht(depositOf(job))} แล้วส่งสลิปมาทางแชทนี้ได้เลยนะคะ จากนั้นทีมจะนัดเข้าสำรวจหน้างานให้ค่ะ` }, { label: "ถามวันสำรวจ", text: `วันที่สะดวกให้ทีมสำรวจเข้าหน้างานมีวันไหนบ้างคะ ช่วงเช้าหรือบ่ายสะดวกกว่ากัน และมีใครอยู่หน้างานให้ทีมสำรวจไหมคะ` }] };
+      case "survey":
+        return { stage: "รอทีมสำรวจ", goal: "แจ้งนัดสำรวจและให้ลูกค้าเตรียมหน้างาน", ask: ["ยืนยันวันเวลานัด", "ทีมสำรวจเข้าถึงหลังคาและพื้นที่ติดตั้งได้ไหม", "มีแบบแปลนฉบับล่าสุดไหม"],
+          messages: [{ label: "ยืนยันนัดสำรวจ", text: `${n} ค่ะ ทีมสำรวจนัดเข้าหน้างาน ${job.surveyAt ? dtTh(job.surveyAt) : due} นะคะ รบกวนเตรียมให้ทีมเข้าถึงหลังคาและพื้นที่ที่จะติดตั้งได้ และถ้ามีแบบแปลนฉบับล่าสุดเตรียมไว้ด้วยนะคะ` }, { label: "แจ้งหลังสำรวจ", text: `ทีมสำรวจเข้าหน้างานเรียบร้อยแล้วนะคะ ตอนนี้กำลังจัดทำรายงานสำรวจ คาดว่าได้รับภายใน ${due} ค่ะ` }] };
+      case "quote2":
+        return { stage: "เสนอราคาหลังสำรวจ", goal: "อธิบายผลสำรวจและรายการที่เปลี่ยนจากใบเสนอราคาแรก", ask: ["ลูกค้าเห็นรายงานสำรวจและรูปหน้างานหรือยัง", "รายการไหนเปลี่ยนจากใบแรก เพราะอะไร", "พร้อมชำระส่วนที่เหลือเมื่อไร"],
+          messages: [{ label: "ส่งใบเสนอราคาหลังสำรวจ", text: `${n} ค่ะ ทีมสำรวจเสร็จแล้ว ส่งรายงานสำรวจและใบเสนอราคาฉบับปรับตามหน้างานให้แล้วนะคะ${amount} มีรายการไหนอยากให้อธิบายเพิ่มบอกได้เลยค่ะ` }, { label: "ตามผลใบเสนอราคา", text: `ติดตามใบเสนอราคาที่ส่งไปนะคะ ตอนนี้มีข้อสงสัยตรงไหนอยากให้ช่วยอธิบายเพิ่มไหมคะ หรืออยากให้ทีมเข้าไปดูหน้างานอีกครั้งไหมคะ` }] };
+      case "close":
+        return { stage: "ปิดขาย", goal: "ขอรับชำระส่วนที่เหลือและยืนยันแผนงาน", ask: ["ยอดคงเหลือที่ต้องชำระ", "ช่องทางชำระเงิน", "วันที่อยากให้เริ่มงาน"],
+          messages: [{ label: "ขอรับชำระส่วนที่เหลือ", text: `${n} ค่ะ ยอดคงเหลือที่ต้องชำระ ${baht(Math.max(0, job.value - depositOf(job)))} (หักที่ชำระแล้ว) ถ้าพร้อมแล้วโอนตามนี้ได้เลยนะคะ ส่งสลิปทางแชทนี้ จากนั้นเราจะส่งแผนติดตั้งให้ค่ะ` }] };
+      case "install_plan":
+        return { stage: "แจ้งแผนติดตั้ง", goal: "แจ้งวันเริ่มงานให้ลูกค้าเตรียมตัว", ask: ["วันที่ลูกค้าไม่สะดวกให้ช่างเข้า", "จุดวางวัสดุและทางเข้า-ออก"],
+          messages: [{ label: "แจ้งแผนติดตั้ง", text: `${n} ค่ะ ทีมวางแผนติดตั้งไว้ว่าจะเริ่มงานประมาณ ${due} จะส่งวันและเวลาแน่นอนให้อีกครั้งนะคะ มีวันไหนที่ไม่สะดวก แจ้งล่วงหน้าได้เลยค่ะ` }] };
+      case "deliver":
+        return { stage: "ส่งสินค้าเข้าหน้างาน", goal: "ให้ลูกค้าเตรียมที่วางวัสดุและมีคนรับของ", ask: ["มีคนรับของวันที่ส่งไหม", "รถขนส่งเข้าหน้างานได้ไหม"],
+          messages: [{ label: "แจ้งวันส่งของ", text: `${n} ค่ะ สินค้าจะส่งเข้าหน้างานประมาณ ${due} รบกวนเตรียมที่วางวัสดุและให้มีคนรับของด้วยนะคะ` }] };
+      case "install":
+        return { stage: "ระหว่างติดตั้ง", goal: "อัปเดตความคืบหน้าและตอบข้อสงสัยระหว่างงาน", ask: ["ลูกค้าเห็นปัญหาอะไรระหว่างงานไหม", "ต้องการเปลี่ยนแปลงอะไรเพิ่มไหม"],
+          messages: [{ label: "แจ้งเริ่มติดตั้ง", text: `${n} ค่ะ ทีมช่างเข้าติดตั้งตามแผนแล้วนะคะ จะอัปเดตความคืบหน้าทางแชทนี้เป็นระยะ ถ้ามีข้อสงสัยระหว่างติดตั้ง แจ้งได้ทันทีค่ะ` }] };
+      case "handover":
+        return { stage: "ส่งมอบงาน", goal: "ตรวจรับงานร่วมกับลูกค้า ส่งใบรับประกัน และขอคะแนนความพึงพอใจ", ask: ["ลูกค้าตรวจรับงานแล้วพอใจไหม", "ส่งใบรับประกันแล้วหรือยัง", "ขอให้ประเมินความพึงพอใจ"],
+          messages: [{ label: "ส่งมอบ + ขอประเมิน", text: `${n} ค่ะ ขอบคุณที่ไว้วางใจเรานะคะ งานส่งมอบเรียบร้อยแล้ว ส่งใบรับประกันให้ทางแชทนี้ รบกวนช่วยประเมินความพึงพอใจสั้นๆ ผ่านลิงก์ที่ส่งให้ด้วยนะคะ` }] };
+      default:
+        return { stage: cur.label, goal: cur.hint, ask: [], messages: [{ label: "แจ้งความคืบหน้า", text: `${n} ค่ะ ตอนนี้งานอยู่ขั้น "${cur.label}" กำหนดเสร็จประมาณ ${due} จะแจ้งความคืบหน้าให้ทราบอีกครั้งนะคะ` }] };
+    }
+  }
+  if (lead) {
+    if (lead.status === "lost") return null;
+    const items = interestSummary(lead.interests) || lead.product;
+    if (lead.status === "dealer") {
+      return { stage: "ส่งต่อให้ร้านทำใบเสนอราคา", goal: "แจ้งลูกค้าว่าร้านจะติดต่อกลับ และติดตามผลใบเสนอราคา", ask: ["ร้านติดต่อกลับลูกค้าแล้วหรือยัง", "ลูกค้าพอใจราคาหรือไม่"],
+        messages: [{ label: "แจ้งส่งต่อร้าน", text: `${n} ค่ะ ส่งรายการที่สนใจให้ ${lead.dealerStore ?? "ร้านตัวแทน"} แล้วนะคะ ร้านจะติดต่อกลับพร้อมใบเสนอราคาภายใน 1 วันทำการค่ะ` }, { label: "ตามผล", text: `ร้านติดต่อกลับ${n}แล้วหรือยังคะ ถ้ายังไม่ได้รับ แจ้งเราได้เลย จะช่วยประสานให้ค่ะ` }] };
+    }
+    if (!lead.firstContactAt && !(lead.contacts?.length)) {
+      return { stage: "ทักครั้งแรก", goal: "แนะนำตัว ถามพื้นที่ งบ และสิ่งที่ลูกค้าต้องการ (ตอบเร็วทันเวลา SLA)", ask: ["พื้นที่หน้างาน (จังหวัดและอำเภอ)", "ประเภทงานหรือสิ่งที่สนใจ", "งบประมาณคร่าวๆ", "ช่วงเวลาที่อยากเริ่ม"],
+        messages: [{ label: "แนะนำตัว", text: `สวัสดีค่ะ ${n} ติดต่อจากทีม Housing Expert นะคะ ได้รับข้อมูลที่คุณสนใจ ${items} ไว้แล้วค่ะ ขออนุญาตสอบถามรายละเอียดเพิ่มเติมได้ไหมคะ` }, { label: "ถามรายละเอียด", text: `รบกวนขอทราบพื้นที่หน้างาน งบประมาณคร่าวๆ และช่วงเวลาที่อยากเริ่มงานด้วยนะคะ จะได้แนะนำให้ตรงความต้องการค่ะ` }] };
+    }
+    if (!lead.reviewed) {
+      return { stage: "ทวนความต้องการ", goal: "ยืนยันรายการที่ลูกค้าสนใจให้ตรงกับที่ต้องการจริง", ask: ["ยืนยันรายการที่สนใจ", "ข้อกังวลของลูกค้า", "มีแบบแปลนหรือรูปหน้างานไหม"],
+        messages: [{ label: "ทวนความต้องการ", text: `ขอทวนสิ่งที่คุณสนใจนะคะ ตอนนี้มี ${items} ถูกต้องไหมคะ มีอะไรอยากเพิ่มหรือเปลี่ยนไหม และหน้างานอยู่ที่${lead.province}ใช่ไหมคะ` }, { label: "ขอรูปหน้างาน", text: `${n} ถ่ายรูปหน้างานหรือแบบแปลนส่งมาทางแชทนี้ได้ไหมคะ ทีมจะได้ประเมินเบื้องต้นให้ค่ะ` }] };
+    }
+    if (lead.status !== "qualified") {
+      return { stage: "สกรีนความพร้อม", goal: "เช็คงบ พื้นที่ และความพร้อมให้ทีมเข้าสำรวจหรือออกแบบ", ask: ["งบตรงกับที่รับงานไหม", "หน้างานอยู่ในพื้นที่บริการ", "พร้อมให้ทีมเข้าสำรวจหรือออกแบบไหม"],
+        messages: [{ label: "ถามความพร้อม", text: `${n} สะดวกให้ทีมเข้าไปดูหน้างานหรือคุยรายละเอียดเพิ่มเติมช่วงไหนคะ ถ้าพร้อมแล้ว เราจะเปิดงานและนัดวันให้ค่ะ` }] };
+    }
+    return { stage: "นัดคุยต่อ / เปิดงาน", goal: "นัดวันเข้าสำรวจหรือส่งใบเสนอราคา แล้วเปิด Opp", ask: ["วันที่สะดวกเข้าสำรวจ", "ลูกค้ามีแบบแปลนไหม"],
+      messages: [{ label: "นัดสำรวจ", text: `${n} ค่ะ ผ่านขั้นตอนเบื้องต้นแล้ว ขออนุญาตนัดทีมเข้าดูหน้างานนะคะ วันไหนสะดวกบ้างคะ` }, { label: "ส่งใบเสนอราคาเบื้องต้น", text: `${n} ค่ะ ส่งใบเสนอราคาเบื้องต้นให้ทางแชทนี้แล้วนะคะ ถ้าสนใจดำเนินการต่อ เราจะเปิดงานและนัดวันให้ค่ะ` }] };
+  }
+  return null;
+}
+export function ChatGuideCard({ g, onPick }: { g: ChatGuide; onPick: (text: string) => void }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="mb-2 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50">
+      <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-1.5 px-3 py-2 text-left">
+        <Icon name="school" style={{ fontSize: 16 }} className="text-indigo-600" />
+        <span className="text-[11.5px] font-bold text-indigo-800">ไกด์คุยกับลูกค้า</span>
+        <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10.5px] font-bold text-white">{g.stage}</span>
+        <Icon name={open ? "expand_more" : "chevron_right"} style={{ fontSize: 18 }} className="ml-auto text-slate-400" />
+      </button>
+      {open && (
+        <div className="max-h-52 space-y-2 overflow-y-auto px-3 pb-3">
+          <p className="text-[11.5px] text-slate-600"><b className="text-slate-800">เป้าหมายขั้นนี้:</b> {g.goal}</p>
+          {g.ask.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-[11px] font-semibold text-slate-500">ควรถาม:</span>
+              {g.ask.map((a) => <span key={a} className="rounded-full bg-white px-2 py-0.5 text-[10.5px] text-slate-700 ring-1 ring-slate-200">{a}</span>)}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            {g.messages.map((m) => (
+              <div key={m.label} className="flex items-start gap-2 rounded-lg bg-white/90 p-2 ring-1 ring-slate-200">
+                <div className="min-w-0 flex-1"><div className="text-[11px] font-bold text-slate-800">{m.label}</div><p className="line-clamp-2 text-[11.5px] leading-snug text-slate-600">{m.text}</p></div>
+                <button type="button" onClick={() => onPick(m.text)} className="shrink-0 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700">ใช้ข้อความนี้</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

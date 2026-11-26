@@ -9,7 +9,7 @@ import {
   stepsOf, suggestTeam, unreadOf, waitingHours,
   type ChatMember, type ChatMsg, type ChatState, type ContactLog, type Interest, type Job, type Lead,
 } from "./crm-mock-data";
-import { scriptsFor } from "./crm-guide";
+import { ChatGuideCard, chatGuide, scriptsFor, useGuideOn } from "./crm-guide";
 import { InterestChips } from "./crm-interests";
 import { Avatar, btnGhost, btnPrimary, glass } from "./crm-ui";
 
@@ -186,6 +186,7 @@ export function InboxView(p: Props) {
   const [dlg, setDlg] = useState<null | "summary" | "invite">(null);
   const [filter, setFilter] = useState<"all" | "unread" | "wait">("all");
   const box = useRef<HTMLDivElement>(null);
+  const guideOn = useGuideOn();
 
   const nameOf = (ph: string) => jobs.find((j) => j.phone === ph)?.customer ?? leads.find((l) => l.phone === ph)?.name ?? ph;
   const roomMsgs = useMemo(() => st.msgs.filter((m) => m.phone === phone), [st.msgs, phone]);
@@ -281,6 +282,7 @@ export function InboxView(p: Props) {
   const scripts = scriptsFor({ name: nameOf(phone ?? ""), items: interestSummary(lead?.interests) || (job?.scope ?? ""), province: (job ?? lead)?.province ?? "" });
   const cur = job ? currentStep(job) : null;
   const suggest = suggestTeam(job);
+  const cg = guideOn && tab === "customer" ? chatGuide({ name: nameOf(phone ?? ""), lead, job }) : null;
 
   if (!phone) return <div className={cn(glass, "p-10 text-center text-[13px] text-slate-400")}>ยังไม่มีห้องแชท เปิดจากหน้า Lead หรือ Opp ด้วยปุ่ม &ldquo;เปิดแชท&rdquo;</div>;
   return (
@@ -350,7 +352,7 @@ export function InboxView(p: Props) {
             {visible.map((m) => (m.kind === "sys" ? <Sys key={m.id} m={m} /> : <Bubble key={m.id} m={m} name={nameOf(phone)} onUsePhoto={usePhoto} />))}
           </div>
           <div className="border-t border-slate-200 bg-white/90 p-3">
-            {tab === "customer" && <div className="mb-2 flex flex-wrap gap-1.5">{scripts.slice(0, 4).map((s) => <button key={s.key} onClick={() => setText(s.text)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600 hover:bg-indigo-50">{s.when}</button>)}</div>}
+            {tab === "customer" && (cg ? <ChatGuideCard key={cg.stage} g={cg} onPick={setText} /> : <div className="mb-2 flex flex-wrap gap-1.5">{scripts.slice(0, 4).map((s) => <button key={s.key} onClick={() => setText(s.text)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600 hover:bg-indigo-50">{s.when}</button>)}</div>)}
             <div className="flex items-center gap-2">
               <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(text)} placeholder={tab === "internal" ? "พิมพ์โน้ตภายใน ใช้ @ เพื่อเรียกคนในทีม" : "พิมพ์ข้อความถึงลูกค้า"} className={cn("min-w-0 flex-1 rounded-full border px-4 py-2 text-[12.5px] outline-none", tab === "internal" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white")} />
               <button onClick={sendCard} className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-600 hover:bg-slate-50 md:inline-flex"><Icon name="view_timeline" style={{ fontSize: 16 }} />ส่งการ์ดสถานะงาน</button>
