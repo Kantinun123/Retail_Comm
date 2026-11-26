@@ -65,6 +65,8 @@ export interface Lead {
   /** สายสินค้า: ส่งให้ร้านทำใบเสนอราคาในระบบร้าน */
   district?: string; /** ร้านที่รับพื้นที่นี้ (คำนวณจากตารางพื้นที่ ไม่เก็บ) */ store?: string; owner?: string;
   visitAt?: string; dealerStore?: string; dealerStep?: DealerStep; dealerAmount?: number; sentAt?: string;
+  /** computed at display time: เกิน SLA แล้วเลื่อนไปร้านถัดไป */
+  _escalated?: boolean;
 }
 export const PRODUCTS = ["Roof Install", "Solar Roof", "Roof Repair", "Ceiling & Insulation", "Home Automation"];
 export const CHANNELS = ["Home Online", "Contact Center", "LINE OA", "Walk-in", "Dealer Referral", "ลูกค้าเดิม"];
@@ -489,7 +491,7 @@ interface Spec {
 function mk(sp: Spec): Job {
   const job: Job = {
     id: sp.id, opsId: sp.id.replace("J-", "OP-"), customer: sp.customer, phone: sp.phone, province: sp.province, segment: sp.segment, work: sp.work,
-    value: sp.value, quote1Value: sp.quote1Value, model: sp.model ?? "he", owner: sp.owner ?? "ฝน", startedAt: subWd(sp.daysIn), done: {}, scm: sp.scm ?? {},
+    value: sp.value, quote1Value: sp.quote1Value, model: sp.model ?? "he", owner: sp.owner ?? ownerForProv(sp.province), startedAt: subWd(sp.daysIn), done: {}, scm: sp.scm ?? {},
     lastTouchAt: hAgo(sp.touchH ?? 6), log: [],
   };
   const intake = sampleIntake({ province: sp.province, segment: sp.segment, work: sp.work, requestDate: dayKey(job.startedAt) });

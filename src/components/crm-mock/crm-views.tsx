@@ -2,14 +2,14 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { DEALER_STEP, LEAD_STATUS, NOW, PRODUCTS, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
+import { DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, PRODUCTS, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
 import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;
-  readOnly: boolean; addLead: () => void; newJob: () => void; newSurvey: (lead?: Lead) => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
+  readOnly: boolean; seNick?: string; addLead: () => void; newJob: () => void; newSurvey: (lead?: Lead) => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
 }
 
 /* ---------------- Leads ---------------- */
@@ -18,6 +18,7 @@ export function LeadsView({ c }: { c: Ctx }) {
   const [st, setSt] = useState<LeadStatus | "all">("all");
   const [prod, setProd] = useState("");
   const [mode, setMode] = useState<"board" | "list">("board");
+  const curSE = c.seNick ? SE_ROSTER.find((s) => s.nick === c.seNick) : null;
   const [flt, setFlt] = useState<"" | "sla" | "visit" | "stale">("");
   const counts = useMemo(() => {
     const m: Record<string, number> = { all: c.leads.length };
@@ -56,6 +57,7 @@ export function LeadsView({ c }: { c: Ctx }) {
             ))}
           </div>
           {!c.readOnly && <button onClick={c.addLead} className={btnPrimary}><Icon name="add" style={{ fontSize: 18 }} />เพิ่ม Lead</button>}
+          {curSE && <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-1.5 text-[12.5px] font-semibold" style={{ color: curSE.color }}><Icon name="badge" style={{ fontSize: 17 }} />{curSE.name} · {curSE.store}</div>}
         </div>
       </div>
       <div className={cn(glass, "flex flex-wrap items-center gap-x-5 gap-y-2 p-3")}>
@@ -161,8 +163,9 @@ function LeadBoard({ c, rows }: { c: Ctx; rows: Lead[] }) {
                   </div>
                   <div className="mt-1 text-[13px] font-semibold text-slate-900">{l.name}</div>
                   <div className="text-[11px] text-slate-500">{l.province} · {l.channel}</div>
+                  {l.owner && !c.seNick && <div className="text-[10.5px] text-slate-400">{l.owner}</div>}
                   <div className="mt-1 text-[11.5px] text-slate-600">{l.product}</div>
-                  {l.store && !l.dealerStore && l.status !== "lost" && <div className="mt-2 flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-[10.5px] text-indigo-700"><Icon name="share_location" style={{ fontSize: 14 }} />จ่ายให้ {l.store}</div>}
+                  {l.store && !l.dealerStore && l.status !== "lost" && <div className="mt-2 flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-[10.5px] text-indigo-700"><Icon name="share_location" style={{ fontSize: 14 }} />จ่ายให้ {l.store}{l._escalated && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">เลื่อนร้านแล้ว</span>}</div>}
                   {l.dealerStore && <div className="mt-2 flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-[10.5px] text-slate-600"><Icon name="storefront" style={{ fontSize: 14 }} />{l.dealerStore}</div>}
                   {l.status === "lost" && l.lostReason && <div className="mt-2 rounded-lg bg-rose-50 px-2 py-1 text-[10.5px] text-rose-700">{l.lostReason}</div>}
                 </button>

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
 import { AreasView } from "./crm-areas";
@@ -49,7 +49,10 @@ function completeStep(j: Job, key: StepKey, extra?: { surveyAt?: string }): Job 
 export function CrmMockScreen() {
   const sp = useSearchParams();
   const [role, setRole] = useState<Role>(() => (["coach", "area", "dealer"].includes(sp.get("role") ?? "") ? (sp.get("role") as Role) : "se"));
+  /* ชื่อเล่น SE ของตัวเอง (เดโมเลือกจาก ?se=; ของจริงมาจาก profile) */
+  const [seNick] = useState(() => sp.get("se") ?? "ฝน");
   const readOnly = role !== "se";
+  const seFilter = role === "se" && sp.get("se");
   const [view, setView] = useState<View>((sp.get("v") as View) ?? (readOnly ? "report" : "home"));
   const [leads, setLeads] = useState<Lead[]>(() => seedLeads());
   const [jobs, setJobs] = useState<Job[]>(() => seedJobs());
@@ -78,13 +81,28 @@ export function CrmMockScreen() {
 
   /* ร้านที่รับงาน/พนักงานขายคำนวณจากตารางพื้นที่ (ไม่เก็บในข้อมูล) ; โค้ช/ร้านค้าเห็นเฉพาะร้านในขอบเขต */
   const scope = role === "coach" || role === "dealer" ? ROLE_STORES[role] : null;
-  const dLeads = useMemo(() => leads.map((l) => ({ ...l, store: assignStore(coverage, l.province, l.district).store ?? undefined, owner: l.owner ?? ownerForProv(l.province) })), [leads, coverage]);
+  const dLeads = useMemo(() => leads.map((l) => {
+    const base = { ...l, store: assignStore(coverage, l.province, l.district).store ?? undefined, owner: l.owner ?? ownerForProv(l.province) };
+    if (base.status !== "waiting" || base.firstContactAt) return base;
+    const { candidates } = assignStore(coverage, base.province, base.district);
+    const hoursGone = (NOW.getTime() - new Date(base.createdAt).getTime()) / 3600e3;
+    if (hoursGone <= slaHoursOf(base.channel) || candidates.length < 2) return base;
+    return { ...base, store: candidates[1], _escalated: true };
+  }), [leads, coverage]);
   const dJobs = useMemo(() => jobs.map((j) => ({ ...j, store: assignStore(coverage, j.province).store ?? undefined })), [jobs, coverage]);
   const dealerStore = scope?.length === 1 ? scope[0] : null;
   const dealerLeads = dealerStore ? dLeads.filter((l) => l.status === "dealer" && l.dealerStore === dealerStore) : [];
   const dealerLeadIds = new Set(dealerLeads.map((l) => l.id));
-  const vLeads = readOnly && scope ? dLeads.filter((l) => (l.store && scope.includes(l.store)) || dealerLeadIds.has(l.id)) : dLeads;
-  const vJobs = readOnly && scope ? dJobs.filter((j) => j.store && scope.includes(j.store)) : dJobs;
+  const vLeads = readOnly && scope
+    ? dLeads.filter((l) => (l.store && scope.includes(l.store)) || dealerLeadIds.has(l.id))
+    : seFilter
+    ? dLeads.filter((l) => l.owner === seNick)
+    : dLeads;
+  const vJobs = readOnly && scope
+    ? dJobs.filter((j) => j.store && scope.includes(j.store))
+    : seFilter
+    ? dJobs.filter((j) => j.owner === seNick)
+    : dJobs;
   const roleStores = role === "area" ? [...new Set(coverage.map((c) => c.store))] : scope ?? [];
   const tasks = useMemo(() => buildTasks(leads, jobs), [leads, jobs]);
   const urgent = tasks.filter((t) => t.priority === 1).length;
@@ -120,7 +138,7 @@ export function CrmMockScreen() {
   };
 
   const ctx: Ctx = {
-    leads: vLeads, jobs: vJobs, tasks, toast: setToastMsg, go: goView, readOnly,
+    leads: vLeads, jobs: vJobs, tasks, toast: setToastMsg, go: goView, readOnly, seNick: seFilter ? seNick : undefined,
     openLead: (id) => (readOnly ? roView(" Lead") : setLeadId(id)), openJob: (id) => (readOnly ? roView("งาน") : setJobId(id)), openTask, ask: () => setChat(true),
     addLead: () => setAddingLead(true),
     newSurvey: (l) => { setLeadId(null); setSurvey({ lead: l ?? null }); },
