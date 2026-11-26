@@ -43,17 +43,44 @@ export function PartyBadge({ party, className }: { party: Party; className?: str
   );
 }
 
-export function Drawer({ open, onClose, title, subtitle, children, footer, wide }: { open: boolean; onClose: () => void; title: React.ReactNode; subtitle?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
+/** หน้าเต็มพื้นที่ด้านขวาของเมนูซ้าย (เหมือนหน้าเปิด Opp) ; side = แผงข้าง ใช้กับแชตน้องเลขา */
+export function Drawer({ open, onClose, title, subtitle, children, footer, wide, side }: { open: boolean; onClose: () => void; title: React.ReactNode; subtitle?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; side?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [open, onClose]);
+  if (!side) {
+    const w = wide ? "max-w-5xl" : "max-w-3xl";
+    return (
+      <div className={cn("fixed bottom-0 left-0 right-0 top-[29px] z-40 flex flex-col bg-[#f5f6fb] transition-opacity duration-200 lg:left-64", open ? "visible opacity-100" : "invisible opacity-0")} aria-hidden={!open}>
+        <header className="border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:px-8">
+          <div className={cn("mx-auto flex items-center gap-3", w)}>
+            <button onClick={onClose} className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-semibold text-slate-600 transition hover:bg-slate-50">
+              <Icon name="arrow_back" style={{ fontSize: 18 }} />กลับ
+            </button>
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-[17px] font-bold text-slate-900">{title}</h2>
+              {subtitle && <div className="mt-0.5 truncate text-[12px] text-slate-500">{subtitle}</div>}
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 overflow-y-auto px-4 pb-24 pt-5 md:px-8 lg:pb-10">
+          <div className={cn("mx-auto space-y-4", w)}>{children}</div>
+        </div>
+        {footer && (
+          <footer className="border-t border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:px-8">
+            <div className={cn("mx-auto", w)}>{footer}</div>
+          </footer>
+        )}
+      </div>
+    );
+  }
   return (
     <div className={cn("fixed inset-0 z-50 transition", open ? "visible" : "invisible")} aria-hidden={!open}>
       <div onClick={onClose} className={cn("absolute inset-0 bg-slate-900/30 backdrop-blur-[2px] transition-opacity duration-300", open ? "opacity-100" : "opacity-0")} />
-      <aside className={cn("absolute right-0 top-0 flex h-full w-full flex-col bg-slate-50 shadow-2xl transition-transform duration-300 ease-out", wide ? "max-w-2xl" : "max-w-md", open ? "translate-x-0" : "translate-x-full")}>
+      <aside className={cn("absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-slate-50 shadow-2xl transition-transform duration-300 ease-out", open ? "translate-x-0" : "translate-x-full")}>
         <header className="flex items-start gap-3 border-b border-slate-200 bg-white/90 px-5 py-4 backdrop-blur">
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-[16px] font-bold text-slate-900">{title}</h2>

@@ -60,7 +60,7 @@ export function ChatDrawer({ open, onClose, leads, jobs, tasks, onTask, onJob, t
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title={<span className="flex items-center gap-2"><span className={cn("grid h-8 w-8 place-items-center rounded-xl text-white", grad)}><Icon name="auto_awesome" style={{ fontSize: 18 }} /></span>น้องเลขา</span>} subtitle="ผู้ช่วยประจำวันของทีมขาย"
+    <Drawer side open={open} onClose={onClose} title={<span className="flex items-center gap-2"><span className={cn("grid h-8 w-8 place-items-center rounded-xl text-white", grad)}><Icon name="auto_awesome" style={{ fontSize: 18 }} /></span>น้องเลขา</span>} subtitle="ผู้ช่วยประจำวันของทีมขาย"
       footer={
         <div className="space-y-2">
           <div className="flex gap-1.5 overflow-x-auto pb-1">{PROMPTS.map((p) => <button key={p} onClick={() => send(p)} className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[11.5px] font-semibold text-indigo-700 hover:bg-indigo-100">{p}</button>)}</div>
