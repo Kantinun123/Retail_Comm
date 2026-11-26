@@ -15,6 +15,7 @@ import { JobDrawer, type ScmEvent } from "./crm-job-drawer";
 import { NewOppPage, type NewJobInput } from "./crm-new-opp";
 import { BoardView, ExchangeView } from "./crm-board";
 import { HomeView } from "./crm-home";
+import { AftersaleView, OverviewView } from "./crm-overview";
 import { LeadsView, type Ctx, type View } from "./crm-views";
 import { ReportView, RoleBar, type Role } from "./crm-report";
 import { GuideCtx, setGuideOn, useGuidePref } from "./crm-guide";
@@ -24,8 +25,10 @@ import { grad } from "./crm-ui";
 
 const NAV: { key: View; label: string; icon: string }[] = [
   { key: "home", label: "หน้าหลัก", icon: "space_dashboard" },
+  { key: "overview", label: "ภาพรวมงาน", icon: "timeline" },
   { key: "leads", label: "Leads", icon: "person_search" },
   { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
+  { key: "aftersale", label: "งานหลังขาย", icon: "construction" },
   { key: "inbox", label: "แชท", icon: "chat" },
   { key: "customers", label: "ลูกค้า 360", icon: "groups" },
   { key: "areas", label: "พื้นที่รับงาน", icon: "share_location" },
@@ -34,8 +37,10 @@ const NAV: { key: View; label: string; icon: string }[] = [
 
 const NAV_RO: { key: View; label: string; icon: string }[] = [
   { key: "report", label: "รายงานทีม", icon: "monitoring" },
+  { key: "overview", label: "ภาพรวมงาน", icon: "timeline" },
   { key: "leads", label: "Leads", icon: "person_search" },
   { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
+  { key: "aftersale", label: "งานหลังขาย", icon: "construction" },
 ];
 
 type OppState = { lead: Lead | null; editId: string | null; step: 1 | 4 | 5 };
@@ -279,7 +284,9 @@ export function CrmMockScreen() {
           ) : (
             <>
               {view === "home" && <HomeView c={ctx} />}
-              {view === "leads" && <LeadsView c={ctx} />}
+              {view === "overview" && <OverviewView c={ctx} />}
+          {view === "aftersale" && <AftersaleView c={ctx} />}
+          {view === "leads" && <LeadsView c={ctx} />}
               {view === "board" && <BoardView c={ctx} />}
               {view === "exchange" && <ExchangeView c={ctx} />}
               {view === "areas" && !readOnly && <AreasView coverage={coverage} setCoverage={setCoverage} />}
