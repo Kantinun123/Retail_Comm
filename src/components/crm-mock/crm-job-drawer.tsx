@@ -12,7 +12,8 @@ import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from ".
 
 export type ScmEvent = "ordered" | "eta";
 
-export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, toast }: {
+export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, onOpenChat, toast }: {
+  onOpenChat: (phone: string, job?: string) => void;
   onPatchJob: (id: string, fn: (j: Job) => Job) => void;
   onEditIntake: (id: string) => void;
   job: Job | null; tasks: Task[]; onClose: () => void; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void;
@@ -21,12 +22,13 @@ export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, on
 }) {
   return (
     <Drawer open={!!job} onClose={onClose} wide title={job?.customer ?? ""} subtitle={job ? `${job.id} · ${job.opsId} · ${job.province}` : ""}>
-      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} onEditIntake={onEditIntake} onPatchJob={onPatchJob} toast={toast} />}
+      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} onEditIntake={onEditIntake} onPatchJob={onPatchJob} onOpenChat={onOpenChat} toast={toast} />}
     </Drawer>
   );
 }
 
-function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, toast }: {
+function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, onOpenChat, toast }: {
+  onOpenChat: (phone: string, job?: string) => void;
   onPatchJob: (id: string, fn: (j: Job) => Job) => void;
   onEditIntake: (id: string) => void;
   job: Job; task?: Task; onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void; onScm: (id: string, ev: ScmEvent) => void;
@@ -53,7 +55,8 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
           <span className={cn("rounded-full px-3 py-1 text-[11.5px] font-bold", job.segment === "hbd" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600")}>{SEGMENT_LABEL[job.segment]}</span>
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-[11.5px] font-bold text-indigo-700">{WORK_LABEL[job.work]}</span>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-[11.5px] font-bold text-amber-800">{MODEL_LABEL[job.model]}</span>
-          <span className="ml-auto text-[20px] font-bold tracking-tight text-indigo-700">{valueText(job)}</span>
+          <button onClick={() => onOpenChat(job.phone, job.opsId)} className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-[#06a047] hover:bg-emerald-50"><Icon name="chat" style={{ fontSize: 17 }} />เปิดแชท</button>
+          <span className="text-[20px] font-bold tracking-tight text-indigo-700">{valueText(job)}</span>
         </div>
         <p className="mt-2 text-[12px] text-slate-500">
           แผน PT: รับแบบ → ส่งมอบรวม <b className="text-slate-700">{totals.total} วันทำการ</b> · ปิดขาย → ส่งมอบ <b className="text-slate-700">{totals.afterClose} วันทำการ</b>

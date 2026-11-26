@@ -12,12 +12,13 @@ import { NextBanner, Stepper, Tip, leadGuide, leadScripts, scrollToId, useGuideO
 import { Avatar, Drawer, Field, KV, SlaBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 /* ---------------- Lead ---------------- */
-export function LeadDrawer({ lead, tasks, onClose, onPatch, onConvert, onConvertSurvey, isDealerView, me, toast }: {
+export function LeadDrawer({ lead, tasks, onClose, onPatch, onConvert, onConvertSurvey, isDealerView, me, onOpenChat, toast }: {
+  onOpenChat: (phone: string, job?: string) => void;
   lead: Lead | null; tasks: Task[]; onClose: () => void; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; isDealerView?: boolean; me: string; toast: (m: string) => void;
 }) {
   return (
     <Drawer open={!!lead} onClose={onClose} wide title={lead?.name ?? ""} subtitle={lead ? `${lead.id} · ${lead.province}` : ""}>
-      {lead && <LeadBody key={lead.id} lead={lead} task={tasks.find((t) => t.ref.id === lead.id)} onPatch={onPatch} onConvert={onConvert} onConvertSurvey={onConvertSurvey} isDealerView={isDealerView} me={me} toast={toast} />}
+      {lead && <LeadBody key={lead.id} lead={lead} task={tasks.find((t) => t.ref.id === lead.id)} onPatch={onPatch} onConvert={onConvert} onConvertSurvey={onConvertSurvey} isDealerView={isDealerView} me={me} onOpenChat={onOpenChat} toast={toast} />}
     </Drawer>
   );
 }
@@ -27,7 +28,8 @@ const OUTCOME_CLS: Record<ContactLog["outcome"], string> = {
 };
 const CHANNEL_ICON: Record<ContactLog["channel"], string> = { "โทร": "call", "LINE": "chat", "เข้าร้าน": "storefront", "อื่นๆ": "more_horiz" };
 
-function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerView, me, toast }: {
+function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerView, me, onOpenChat, toast }: {
+  onOpenChat: (phone: string, job?: string) => void;
   lead: Lead; task?: Task; onPatch: (id: string, p: Partial<Lead>) => void; onConvert: (l: Lead) => void; onConvertSurvey: (l: Lead) => void; isDealerView?: boolean; me: string; toast: (m: string) => void;
 }) {
   const [checks, setChecks] = useState({ budget: false, area: false, ready: false });
@@ -112,6 +114,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
               <div className="text-[14px] font-bold text-slate-900">{lead.name}</div>
               <div className="text-[12px] text-slate-500">{lead.phone}</div>
             </div>
+            <button onClick={() => onOpenChat(lead.phone, lead.id)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-[#06a047] hover:bg-emerald-50"><Icon name="chat" style={{ fontSize: 17 }} />เปิดแชท</button>
             <button onClick={() => toast(`กำลังโทร ${lead.phone} (ตัวอย่าง) แล้วอย่าลืมบันทึกการติดต่อ`)} className="grid h-11 w-11 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"><Icon name="call" /></button>
           </div>
 

@@ -6,7 +6,7 @@ import { DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayK
 import { InterestChips } from "./crm-interests";
 import { Avatar, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
-export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas";
+export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas" | "inbox";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;

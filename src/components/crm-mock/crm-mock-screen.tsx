@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { chatRooms, seedChat, totalUnread, type ChatState, DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
 import { AreasView } from "./crm-areas";
@@ -19,12 +19,14 @@ import { LeadsView, type Ctx, type View } from "./crm-views";
 import { ReportView, RoleBar, type Role } from "./crm-report";
 import { GuideCtx, setGuideOn, useGuidePref } from "./crm-guide";
 import { Customer360Drawer, CustomersView } from "./crm-customer";
+import { InboxView, type ChatSel } from "./crm-inbox";
 import { grad } from "./crm-ui";
 
 const NAV: { key: View; label: string; icon: string }[] = [
   { key: "home", label: "หน้าหลัก", icon: "space_dashboard" },
   { key: "leads", label: "Leads", icon: "person_search" },
   { key: "board", label: "งาน (Opp)", icon: "view_kanban" },
+  { key: "inbox", label: "แชท", icon: "chat" },
   { key: "customers", label: "ลูกค้า 360", icon: "groups" },
   { key: "areas", label: "พื้นที่รับงาน", icon: "share_location" },
   { key: "exchange", label: "เชื่อมข้อมูล", icon: "sync_alt" },
@@ -65,6 +67,8 @@ export function CrmMockScreen() {
   const [addingLead, setAddingLead] = useState(false);
   const [custPhone, setCustPhone] = useState<string | null>(null);
   const [coverage, setCoverage] = useState(DEFAULT_COVERAGE);
+  const [chatSt, setChatSt] = useState<ChatState>(() => seedChat());
+  const [chatSel, setChatSel] = useState<ChatSel>({ phone: null, job: "" });
   const [survey, setSurvey] = useState<{ lead: Lead | null; prefill?: { customer: string; phone: string; province: string; scope: string }; right?: { jobId: string; rightId: string } } | null>(null);
   const [opp, setOpp] = useState<OppState | null>(() => {
     const st = Number(sp.get("step"));
@@ -121,12 +125,29 @@ export function CrmMockScreen() {
   };
   const nav = readOnly ? NAV_RO : NAV;
   const roView = (what: string) => setToastMsg(`มุมมองนี้อ่านอย่างเดียว เปิดรายละเอียด${what}ได้เฉพาะพนักงานขาย`);
+  const markRead = (ph: string) => setChatSt((s) => ({ ...s, lastRead: { ...s.lastRead, [ph]: NOW.toISOString() } }));
   const goView = (v: View) => {
     if (opp && dirtyRef.current && !window.confirm("ข้อมูลที่กรอกไว้ยังไม่ได้บันทึก ต้องการออกจากหน้านี้ไหม?")) return;
     dirtyRef.current = false;
     setOpp(null);
+    if (v === "inbox" && !chatSel.phone) {
+      const top = chatRooms(chatSt)[0];
+      if (top) { setChatSel({ phone: top, job: "" }); markRead(top); }
+    }
     setView(v);
   };
+  /** เปิดห้องแชทของลูกค้า (สร้างห้องให้ถ้ายังไม่มี) */
+  const openChat = (phone: string, jobTag?: string) => {
+    setChatSt((s) => ({
+      ...s,
+      msgs: s.msgs.some((m) => m.phone === phone) ? s.msgs : [...s.msgs, { id: "m" + (s.msgs.length + 1), phone, kind: "sys", at: NOW.toISOString(), job: jobTag, text: "เริ่มห้องแชท LINE OA (เดโม)" }],
+      lastRead: { ...s.lastRead, [phone]: NOW.toISOString() },
+    }));
+    setChatSel({ phone, job: jobTag ?? "" });
+    setLeadId(null); setJobId(null); setCustPhone(null); setOpp(null);
+    setView("inbox");
+  };
+  const chatUnread = totalUnread(chatSt);
   const isActive = (k: View) => !opp && view === k;
 
   const openTask = (t: Task) => {
@@ -228,6 +249,7 @@ export function CrmMockScreen() {
           {nav.map((n) => (
             <button key={n.key} onClick={() => goView(n.key)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition", isActive(n.key) ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "text-slate-600 hover:bg-indigo-50")}>
               <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
+              {n.key === "inbox" && chatUnread > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{chatUnread}</span>}
               {n.key === "home" && urgent > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{urgent}</span>}
             </button>
           ))}
@@ -261,6 +283,11 @@ export function CrmMockScreen() {
               {view === "board" && <BoardView c={ctx} />}
               {view === "exchange" && <ExchangeView c={ctx} />}
               {view === "areas" && !readOnly && <AreasView coverage={coverage} setCoverage={setCoverage} />}
+              {view === "inbox" && !readOnly && (
+                <InboxView st={chatSt} setSt={setChatSt} sel={chatSel} setSel={setChatSel} leads={vLeads} jobs={vJobs} me={seNick}
+                  onPatchLead={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))} onPatchJob={patchJob}
+                  openLead={setLeadId} openJob={setJobId} openAccount={setCustPhone} toast={setToastMsg} />
+              )}
               {view === "customers" && !readOnly && <CustomersView jobs={jobs} openCustomer={setCustPhone} />}
               {view === "report" && readOnly && <ReportView role={role as Exclude<Role, "se">} c={ctx} stores={roleStores} />}
             </>
@@ -269,21 +296,21 @@ export function CrmMockScreen() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/70 bg-white/90 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-xl lg:hidden">
-        {(readOnly ? NAV_RO : NAV.slice(0, 3)).map((n) => (
-          <button key={n.key} onClick={() => goView(n.key)} className={cn("flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
+        {(readOnly ? NAV_RO : NAV.slice(0, 4)).map((n) => (
+          <button key={n.key} onClick={() => goView(n.key)} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
             <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
           </button>
         ))}
         {!readOnly && (
-          <button onClick={() => goView("customers")} className={cn("flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold", isActive("customers") ? "text-indigo-600" : "text-slate-400")}><Icon name="groups" fill={isActive("customers")} />ลูกค้า 360</button>
+          <button onClick={() => goView("customers")} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", isActive("customers") ? "text-indigo-600" : "text-slate-400")}><Icon name="groups" fill={isActive("customers")} />ลูกค้า 360</button>
         )}
-        <button onClick={() => setChat(true)} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] font-semibold text-violet-600"><Icon name="auto_awesome" />น้องเลขา</button>
+        <button onClick={() => setChat(true)} className="flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold text-violet-600"><Icon name="auto_awesome" />น้องเลขา</button>
       </nav>
 
-      <LeadDrawer me={seNick} isDealerView={role === "dealer"} lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
+      <LeadDrawer onOpenChat={openChat} me={seNick} isDealerView={role === "dealer"} lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
         onPatch={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))}
         onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} onConvertSurvey={(l) => ctx.newSurvey(l)} />
-      <JobDrawer job={job} onPatchJob={patchJob} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
+      <JobDrawer onOpenChat={openChat} job={job} onPatchJob={patchJob} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
         onEditIntake={(id) => { setJobId(null); setOpp({ lead: null, editId: id, step: 1 }); }}
         onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))}
         onRevise={(id, cats) => patchJob(id, (j) => ({ ...j, revise: cats, log: [...j.log, { at: NOW.toISOString(), text: "ทีมขายปรับหมวดที่ต้องถอดแบบใหม่หลังสำรวจ (Revise)" }] }))}
@@ -297,7 +324,7 @@ export function CrmMockScreen() {
       <AddLeadDrawer coverage={coverage} open={addingLead} onClose={() => setAddingLead(false)} nextId={nextLeadId()}
         onAdd={(l) => { setLeads((all) => [l, ...all]); setView("leads"); setToastMsg(`เพิ่ม Lead ${l.id} แล้ว`); }} />
       <NewSurveyDrawer open={!!survey} lead={survey?.lead ?? null} prefill={survey?.prefill} onClose={() => setSurvey(null)} onCreate={createSurvey} />
-      <Customer360Drawer phone={custPhone} jobs={jobs} onClose={() => setCustPhone(null)} openJob={(id) => { setCustPhone(null); setJobId(id); }}
+      <Customer360Drawer onOpenChat={openChat} phone={custPhone} jobs={jobs} onClose={() => setCustPhone(null)} openJob={(id) => { setCustPhone(null); setJobId(id); }}
         onUseRight={(j, r) => { setCustPhone(null); setSurvey({ lead: null, prefill: { customer: j.customer, phone: j.phone, province: j.province, scope: r.name }, right: { jobId: j.id, rightId: r.id } }); }} />
       <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} toast={setToastMsg} />
 

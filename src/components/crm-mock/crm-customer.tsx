@@ -137,7 +137,8 @@ export function CustomersView({ jobs, openCustomer }: { jobs: Job[]; openCustome
 const RIGHT_CLS = { ok: "bg-emerald-50 text-emerald-700", soon: "bg-amber-50 text-amber-700", used: "bg-sky-50 text-sky-700", expired: "bg-slate-100 text-slate-500" } as const;
 const RIGHT_TXT = { ok: "ใช้ได้", soon: "ใกล้หมดอายุ", used: "ใช้แล้ว", expired: "หมดอายุ" } as const;
 
-export function Customer360Drawer({ phone, jobs, onClose, openJob, onUseRight }: {
+export function Customer360Drawer({ phone, jobs, onClose, openJob, onUseRight, onOpenChat }: {
+  onOpenChat: (phone: string, job?: string) => void;
   phone: string | null; jobs: Job[]; onClose: () => void; openJob: (id: string) => void; onUseRight: (j: Job, r: Right) => void;
 }) {
   const mine = phone ? jobs.filter((j) => j.phone === phone) : [];
@@ -151,6 +152,7 @@ export function Customer360Drawer({ phone, jobs, onClose, openJob, onUseRight }:
         <>
           <div className={cn(glass, "p-4")}>
             <div className="flex items-center gap-2 rounded-xl bg-indigo-50 px-3 py-2 text-[12px]"><Icon name="badge" style={{ fontSize: 17 }} />รหัส SCG Family <b className="ml-auto text-indigo-700">{familyCode(c.phone)}</b></div>
+            <button onClick={() => onOpenChat(c.phone)} className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-semibold text-[#06a047] hover:bg-emerald-50"><Icon name="chat" style={{ fontSize: 17 }} />เปิดแชท LINE OA</button>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               {[[String(mine.length), "Opp"], [baht(mine.filter((j) => j.done.close).reduce((a, j) => a + j.value, 0)), "ยอดปิดขาย"], [avg === null ? "-" : avg.toFixed(1), "CSAT เฉลี่ย"]].map(([a, b]) => (
                 <div key={b} className="rounded-xl bg-white/70 p-2"><div className="text-[15px] font-bold text-slate-900">{a}</div><div className="text-[10.5px] text-slate-500">{b}</div></div>

@@ -767,3 +767,75 @@ export function dueMoney(j: Job): number {
   if (c.key === "close") return j.value - depositOf(j);
   return 0;
 }
+
+/* ---------- แชทลูกค้าแบบ LINE OA (จำลอง) ---------- */
+export interface ChatMsg {
+  id: string; phone: string; kind: "cust" | "se" | "team" | "sys"; at: string;
+  /** ป้ายงาน: รหัส Lead (L-...) หรือเลข Opp (OP-...) */ job?: string;
+  /** true = โน้ตภายใน ลูกค้าไม่เห็น */ internal?: boolean;
+  who?: string; text?: string; img?: boolean; card?: { title: string; lines: string[] };
+}
+export interface ChatMember { nick: string; role: string; party: Party; mode: "internal" | "customer" }
+export interface ChatState { msgs: ChatMsg[]; members: Record<string, ChatMember[]>; lastRead: Record<string, string> }
+export const TEAM_DIRECTORY: { nick: string; role: string; party: Party }[] = [
+  { nick: "สมชาย", role: "ทีมสำรวจ KIM", party: "KIM" },
+  { nick: "ประเสริฐ", role: "ทีมติดตั้ง KIM", party: "KIM" },
+  { nick: "วิไล", role: "SCM เตรียมสินค้า", party: "SCM" },
+  { nick: "อิ้งค์", role: "ห้องแบบ", party: "ROOM" },
+  { nick: "ทีมสำรวจ Smart", role: "ทีมสำรวจ Smart Solution", party: "SURV" },
+  { nick: "โค้ชเนม", role: "โค้ชของร้าน", party: "SE" },
+];
+/** แนะนำคนที่ควรเชิญตามขั้นปัจจุบันของ Opp */
+export function suggestTeam(j: Job | undefined): string | null {
+  const c = j ? currentStep(j) : null;
+  if (!c) return null;
+  if (c.owner === "KIM") return c.key === "survey" ? "สมชาย" : "ประเสริฐ";
+  if (c.owner === "SCM") return "วิไล";
+  if (c.owner === "ROOM") return "อิ้งค์";
+  if (c.owner === "SURV") return "ทีมสำรวจ Smart";
+  return null;
+}
+export const unreadOf = (st: ChatState, phone: string) => st.msgs.filter((m) => m.phone === phone && m.kind === "cust" && !m.internal && new Date(m.at).getTime() > new Date(st.lastRead[phone] ?? 0).getTime()).length;
+export const totalUnread = (st: ChatState) => [...new Set(st.msgs.map((m) => m.phone))].reduce((a, p) => a + unreadOf(st, p), 0);
+/** ลูกค้าทักมาแล้วยังไม่มีใครตอบ: คืนจำนวนชั่วโมงที่รอ (0 = ไม่ได้รอ) */
+export function waitingHours(st: ChatState, phone: string) {
+  const vis = st.msgs.filter((m) => m.phone === phone && !m.internal && m.kind !== "sys");
+  const last = vis[vis.length - 1];
+  return last && last.kind === "cust" ? Math.max(0, Math.round(hoursSince(last.at))) : 0;
+}
+export const chatRooms = (st: ChatState) => {
+  const last = new Map<string, number>();
+  for (const m of st.msgs) last.set(m.phone, Math.max(last.get(m.phone) ?? 0, new Date(m.at).getTime()));
+  return [...last.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
+};
+export function seedChat(): ChatState {
+  let n = 0;
+  const m = (phone: string, kind: ChatMsg["kind"], ago: number, o: Partial<ChatMsg>): ChatMsg => ({ id: "s" + ++n, phone, kind, at: hAgo(ago), ...o });
+  const P1 = "087-555-0103", P2 = "086-555-7712", P3 = "062-555-1204", P4 = "086-555-0111";
+  const msgs: ChatMsg[] = [
+    m(P1, "cust", 150, { job: "OP-2611-0103", text: "สวัสดีค่ะ สนใจเปลี่ยนหลังคาบ้านค่ะ มีโรงจอดรถด้วย" }),
+    m(P1, "se", 149.7, { job: "OP-2611-0103", who: "ฝน", text: "สวัสดีค่ะ คุณชนิดา ทีม Housing Expert ยินดีให้บริการค่ะ ขอทราบพื้นที่หน้างานและงบประมาณคร่าวๆ ได้ไหมคะ แล้วเดี๋ยวส่งใบเสนอราคาเบื้องต้นให้ทาง LINE นะคะ" }),
+    m(P1, "cust", 149.4, { job: "OP-2611-0103", text: "สงขลาค่ะ งบประมาณ 3-4 แสน อยากได้กระเบื้องสีเทา กลัวหลังคารั่วซ้ำอีก" }),
+    m(P1, "sys", 120, { job: "OP-2611-0103", text: "เปิด Opp OP-2611-0103 · ส่งใบเสนอราคาแล้ว" }),
+    m(P1, "sys", 80, { job: "OP-2611-0103", text: "รับมัดจำแล้ว · ล็อกคิวสำรวจ" }),
+    m(P1, "cust", 2.6, { job: "OP-2611-0103", img: true, text: "รูปหน้างาน (3 รูป)" }),
+    m(P1, "cust", 2.5, { job: "OP-2611-0103", text: "ช่วยเพิ่มโรงจอดรถด้วยนะคะ แล้วบ่ายวันที่ 2 ธ.ค. ก็ว่างค่ะ" }),
+    m(P1, "sys", 2.2, { job: "OP-2611-0103", internal: true, text: "สมชาย (ทีมสำรวจ KIM) เข้าร่วมโน้ตภายใน" }),
+    m(P1, "se", 2.1, { job: "OP-2611-0103", internal: true, who: "ฝน", text: "@สมชาย ลูกค้าขอเพิ่มโรงจอดรถ ช่วยวัดพื้นที่เพิ่มตอนสำรวจด้วยนะคะ ลูกค้าเป็นห่วงเรื่องหลังคารั่วซ้ำ" }),
+    m(P1, "team", 2, { job: "OP-2611-0103", internal: true, who: "สมชาย", text: "รับทราบครับ ขอรูปแปลนที่ลูกค้าส่งมาด้วย จะเตรียมอุปกรณ์วัดรอยรั่วไปด้วย" }),
+    m(P2, "sys", 20, { job: "L-2611-010", text: "Lead เข้ามาทาง Walk-in" }),
+    m(P2, "cust", 19.5, { job: "L-2611-010", text: "ขอเทียบราคาโซลาร์รูฟกับอีก 2 เจ้าครับ" }),
+    m(P2, "se", 19, { job: "L-2611-010", who: "ฝน", text: "ได้ครับ เดี๋ยวส่งใบเสนอราคาเบื้องต้นให้ทาง LINE นะครับ" }),
+    m(P2, "sys", 5, { job: "OP-2611-0121", text: "เปิด Opp สำรวจ OP-2611-0121 · รับค่าสำรวจแล้ว" }),
+    m(P2, "cust", 1, { job: "OP-2611-0121", img: true, text: "ส่งรูปหน้างานแล้วนะครับ" }),
+    m(P3, "sys", 2.8, { job: "L-2611-001", text: "Lead เข้ามาทาง Home Online" }),
+    m(P3, "cust", 2.7, { job: "L-2611-001", text: "สนใจโครงทรัสด้วยค่ะ ไม่ทราบว่าสำรวจฟรีไหมคะ" }),
+    m(P4, "cust", 120, { job: "OP-2611-0111", text: "ขอบคุณมากค่ะ งานเรียบร้อยดี" }),
+    m(P4, "se", 119, { job: "OP-2611-0111", who: "ฝน", text: "ยินดีค่ะ มีอะไรให้ช่วยแจ้งได้เลยนะคะ" }),
+  ];
+  return {
+    msgs,
+    members: { [P1]: [{ nick: "สมชาย", role: "ทีมสำรวจ KIM", party: "KIM", mode: "internal" }] },
+    lastRead: { [P1]: hAgo(3), [P2]: hAgo(0.5), [P3]: hAgo(6), [P4]: hAgo(100) },
+  };
+}
