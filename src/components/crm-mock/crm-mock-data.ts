@@ -409,13 +409,25 @@ export function rightState(r: Right): "ok" | "soon" | "used" | "expired" {
   const left = (new Date(r.expiresAt).getTime() - NOW.getTime()) / 86400e3;
   return left < 0 ? "expired" : left <= 14 ? "soon" : "ok";
 }
+/* ---------- คำขอชำระเงิน (ค่าสำรวจ / มัดจำ / ปิดขาย) : จำลองการส่งทาง LINE OA ---------- */
+export type PayMethod = "qr" | "card" | "transfer" | "store";
+export const PAY_METHOD: Record<PayMethod, { label: string; icon: string; sub: string }> = {
+  qr: { label: "PromptPay QR", icon: "qr_code_2", sub: "สแกนจ่ายผ่านแอปธนาคาร ระบบยืนยันอัตโนมัติ" },
+  card: { label: "บัตรเครดิต / เดบิต", icon: "credit_card", sub: "ชำระออนไลน์ ระบบยืนยันอัตโนมัติ" },
+  transfer: { label: "โอนเงิน + แนบสลิป", icon: "receipt_long", sub: "ทีมขายตรวจสลิปแล้วยืนยัน" },
+  store: { label: "ชำระที่ร้าน / เงินสด", icon: "storefront", sub: "ทีมขายบันทึกรับเงินเอง" },
+};
+export interface PaymentReq {
+  id: string; step: "survey_fee" | "deposit" | "close"; label: string; amount: number; methods: PayMethod[]; dueAt: string;
+  status: "requested" | "slip" | "paid"; method?: PayMethod; requestedAt: string; paidAt?: string; surveyAt?: string; receiptNo?: string;
+}
 export interface JobLog { at: string; text: string }
 export interface Job {
   id: string; opsId: string; leadId?: string; customer: string; phone: string; province: string; segment: Segment; work: Work;
   value: number; quote1Value?: number; model: Model; revise?: Cat[]; intake?: Intake; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
   /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
   csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[]; /** ร้านที่รับงาน (คำนวณจากจังหวัด) */ store?: string;
-  scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string;
+  scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string; payments?: PaymentReq[];
 }
 export const stepsOf = (j: Job) => template(j.segment, j.work);
 export const currentStep = (j: Job): StepDef | null => (j.cancelReason ? null : stepsOf(j).find((s) => !j.done[s.key]) ?? null);
@@ -786,7 +798,7 @@ export interface ChatMsg {
   id: string; phone: string; kind: "cust" | "se" | "team" | "sys"; at: string;
   /** ป้ายงาน: รหัส Lead (L-...) หรือเลข Opp (OP-...) */ job?: string;
   /** true = โน้ตภายใน ลูกค้าไม่เห็น */ internal?: boolean;
-  who?: string; text?: string; img?: boolean; card?: { title: string; lines: string[] };
+  who?: string; text?: string; img?: boolean; card?: { title: string; lines: string[]; action?: string };
 }
 export interface ChatMember { nick: string; role: string; party: Party; mode: "internal" | "customer" }
 export interface ChatState { msgs: ChatMsg[]; members: Record<string, ChatMember[]>; lastRead: Record<string, string> }

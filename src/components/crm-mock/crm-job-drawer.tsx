@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
@@ -7,13 +8,15 @@ import {
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
 import { JourneyStrip } from "./crm-overview";
+import { PayStepPanel, PaymentsTab, isPayStep, type SendLine } from "./crm-payment";
 import { CsatCard } from "./crm-customer";
 import { NextBanner, oppGuide, oppScripts, scrollToId, useGuideOn } from "./crm-guide";
 import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type ScmEvent = "ordered" | "eta";
 
-export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, onOpenChat, toast }: {
+export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, onOpenChat, onSendLine, toast }: {
+  onSendLine: SendLine;
   onOpenChat: (phone: string, job?: string) => void;
   onPatchJob: (id: string, fn: (j: Job) => Job) => void;
   onEditIntake: (id: string) => void;
@@ -23,12 +26,13 @@ export function JobDrawer({ job, tasks, onClose, onComplete, onRevise, onScm, on
 }) {
   return (
     <Drawer open={!!job} onClose={onClose} wide title={job?.customer ?? ""} subtitle={job ? `${job.id} · ${job.opsId} · ${job.province}` : ""}>
-      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} onEditIntake={onEditIntake} onPatchJob={onPatchJob} onOpenChat={onOpenChat} toast={toast} />}
+      {job && <JobBody key={job.id} job={job} task={tasks.find((t) => t.ref.id === job.id)} onComplete={onComplete} onRevise={onRevise} onScm={onScm} onCancel={onCancel} onEditIntake={onEditIntake} onPatchJob={onPatchJob} onOpenChat={onOpenChat} onSendLine={onSendLine} toast={toast} />}
     </Drawer>
   );
 }
 
-function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, onOpenChat, toast }: {
+function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntake, onPatchJob, onOpenChat, onSendLine, toast }: {
+  onSendLine: SendLine;
   onOpenChat: (phone: string, job?: string) => void;
   onPatchJob: (id: string, fn: (j: Job) => Job) => void;
   onEditIntake: (id: string) => void;
@@ -47,7 +51,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
   const feeAt = job.work === "survey" ? job.done.survey_fee : job.done.deposit;
   const finished = isFinished(job);
   const closed = !!job.done.close;
-  const [tab, setTab] = useState<"info" | "chat" | "account">("info");
+  const [tab, setTab] = useState<"info" | "chat" | "pay" | "account">("info");
   const guide = useGuideOn();
   const gb = guide ? oppGuide(job) : null;
 
@@ -70,7 +74,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
 
       <JourneyStrip job={job} />
       <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 text-[12px] font-bold">
-        {([["info", "ข้อมูลงาน"], ["chat", "แชท"], ["account", "Account"]] as const).map(([k, lb]) => (
+        {([["info", "ข้อมูลงาน"], ["pay", "การเงิน"], ["chat", "แชท"], ["account", "Account"]] as const).map(([k, lb]) => (
           <button key={k} onClick={() => setTab(k)} className={cn("flex-1 rounded-lg px-3 py-1.5 transition", tab === k ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-indigo-600")}>{lb}</button>
         ))}
       </div>
@@ -103,7 +107,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
         <ol className="space-y-0">
           {steps.map((s, i) => (
             <StepRow key={s.key} s={s} job={job} last={i === steps.length - 1} isCur={cur?.key === s.key}
-              surveyAt={surveyAt} setSurveyAt={setSurveyAt} onComplete={onComplete} onScm={onScm} toast={toast} />
+              surveyAt={surveyAt} setSurveyAt={setSurveyAt} onComplete={onComplete} onScm={onScm} onPatchJob={onPatchJob} onSendLine={onSendLine} toast={toast} />
           ))}
         </ol>
       </div>
@@ -188,6 +192,8 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
       )}
         </>
       )}
+
+      {tab === "pay" && <PaymentsTab job={job} />}
 
       {tab === "chat" && (
         <div className={cn(glass, "p-5 text-center")}>
@@ -284,7 +290,8 @@ function TakeoffCard({ job, onRevise }: { job: Job; onRevise: (id: string, cats:
   );
 }
 
-function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm, toast }: {
+function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm, onPatchJob, onSendLine, toast }: {
+  onPatchJob: (id: string, fn: (j: Job) => Job) => void; onSendLine: SendLine;
   s: StepDef; job: Job; last: boolean; isCur: boolean; surveyAt: string; setSurveyAt: (v: string) => void;
   onComplete: (id: string, key: StepKey, extra?: { surveyAt?: string }) => void; onScm: (id: string, ev: ScmEvent) => void; toast: (m: string) => void;
 }) {
@@ -331,15 +338,19 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
                 </ul>
               </div>
             )}
-            <button
-              onClick={() => { if (s.key === "close") { setHandoff(true); return; } onComplete(job.id, s.key, s.key === "deposit" ? { surveyAt: new Date(`${surveyAt}:00+07:00`).toISOString() } : undefined); toast(outs.length ? `บันทึกแล้ว และส่งข้อมูลให้ ${outs.map((o) => PARTY[o.party].label).join(" + ")}` : `บันทึก "${s.label}" แล้ว`); }}
-              className={btnPrimary}>
-              <Icon name="task_alt" style={{ fontSize: 18 }} />{s.key === "survey_fee" ? "รับค่าสำรวจ (ปิดสำรวจ)" : s.key === "deposit" ? (job.work === "survey" ? "ล็อกคิว + ส่งงานให้ทีมสำรวจ" : "รับมัดจำ + ล็อกคิวสำรวจ") : s.key === "close" ? "บันทึกรับเงินครบ 100%" : `ทำเสร็จ: ${s.label}`}
-            </button>
+            {isPayStep(job, s.key) ? (
+              <PayStepPanel job={job} s={s} surveyAt={surveyAt} onComplete={onComplete} onPatchJob={onPatchJob} onSendLine={onSendLine} onConfirmClose={() => setHandoff(true)} toast={toast} />
+            ) : (
+              <button
+                onClick={() => { if (s.key === "close") { setHandoff(true); return; } onComplete(job.id, s.key, s.key === "deposit" ? { surveyAt: new Date(`${surveyAt}:00+07:00`).toISOString() } : undefined); toast(outs.length ? `บันทึกแล้ว และส่งข้อมูลให้ ${outs.map((o) => PARTY[o.party].label).join(" + ")}` : `บันทึก "${s.label}" แล้ว`); }}
+                className={btnPrimary}>
+                <Icon name="task_alt" style={{ fontSize: 18 }} />{s.key === "survey_fee" ? "รับค่าสำรวจ (ปิดสำรวจ)" : s.key === "deposit" ? (job.work === "survey" ? "ล็อกคิว + ส่งงานให้ทีมสำรวจ" : "รับมัดจำ + ล็อกคิวสำรวจ") : s.key === "close" ? "บันทึกรับเงินครบ 100%" : `ทำเสร็จ: ${s.label}`}
+              </button>
+              )}
           </div>
         )}
 
-        {handoff && (
+        {handoff && createPortal(
           <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={() => setHandoff(false)}>
             <div className="max-h-[92vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 text-emerald-600"><Icon name="verified" /></span><div><p className="text-[14px] font-bold text-slate-900">ยืนยันปิดขาย และส่งต่อให้งานหลังขาย</p><p className="text-[11px] text-slate-400">{job.id} · {job.customer}</p></div></div>
@@ -358,7 +369,8 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
                 <button onClick={() => { setHandoff(false); onComplete(job.id, s.key); toast(`ปิดขายแล้ว ส่งต่อ KIM + SCM · ดูต่อที่เมนู "งานหลังขาย"${siteContact.trim() ? "" : " (ยังไม่มีผู้ติดต่อหน้างาน)"}`); }} className={btnPrimary}>ยืนยันปิดขาย{siteContact.trim() ? "" : " (ขาดข้อมูล 1 ข้อ)"}</button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
 
         {isCur && s.owner !== "SE" && (

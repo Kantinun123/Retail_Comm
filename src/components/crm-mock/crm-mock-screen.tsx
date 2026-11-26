@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { chatRooms, seedChat, totalUnread, type ChatState, DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { chatRooms, seedChat, totalUnread, type ChatMsg, type ChatState, DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
 import { AreasView } from "./crm-areas";
@@ -155,6 +155,8 @@ export function CrmMockScreen() {
     }
     setView(v);
   };
+  /** ส่งข้อความ/การ์ดเข้าห้องแชท LINE OA ของงาน (จำลอง) */
+  const pushChat = (job: Job, m: Omit<ChatMsg, "id" | "at" | "phone" | "job">) => setChatSt((s) => ({ ...s, msgs: [...s.msgs, { ...m, phone: job.phone, job: job.opsId, id: `m${s.msgs.length + 1}-${Math.random().toString(36).slice(2, 6)}`, at: new Date(NOW.getTime() + (s.msgs.length % 3600) * 1000).toISOString() }] }));
   /** เปิดห้องแชทของลูกค้า (สร้างห้องให้ถ้ายังไม่มี) */
   const openChat = (phone: string, jobTag?: string) => {
     setChatSt((s) => ({
@@ -347,7 +349,7 @@ export function CrmMockScreen() {
       <LeadDrawer onOpenChat={openChat} me={seNick} isDealerView={role === "dealer"} lead={lead} tasks={tasks} onClose={() => setLeadId(null)} toast={setToastMsg}
         onPatch={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))}
         onConvert={(l) => { setLeadId(null); setOpp({ lead: l, editId: null, step: 1 }); }} onConvertSurvey={(l) => ctx.newSurvey(l)} />
-      <JobDrawer onOpenChat={openChat} job={job} onPatchJob={patchJob} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
+      <JobDrawer onOpenChat={openChat} onSendLine={pushChat} job={job} onPatchJob={patchJob} tasks={tasks} onClose={() => setJobId(null)} toast={setToastMsg}
         onEditIntake={(id) => { setJobId(null); setOpp({ lead: null, editId: id, step: 1 }); }}
         onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))}
         onRevise={(id, cats) => patchJob(id, (j) => ({ ...j, revise: cats, log: [...j.log, { at: NOW.toISOString(), text: "ทีมขายปรับหมวดที่ต้องถอดแบบใหม่หลังสำรวจ (Revise)" }] }))}

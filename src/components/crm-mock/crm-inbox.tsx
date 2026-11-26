@@ -86,6 +86,7 @@ function Bubble({ m, name, onUsePhoto }: { m: ChatMsg; name: string; onUsePhoto:
             <div className="mb-1 w-56 rounded-xl bg-white p-3 text-slate-800 shadow">
               <div className="mb-1 text-[12px] font-bold text-[#06a047]">{m.card.title}</div>
               {m.card.lines.map((l) => <div key={l} className="text-[11.5px] text-slate-600">{l}</div>)}
+              {m.card.action && <div className="mt-2 rounded-lg bg-[#06c755] py-1.5 text-center text-[11.5px] font-bold text-white">{m.card.action}</div>}
             </div>
           )}
           {m.text}
