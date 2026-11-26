@@ -41,7 +41,7 @@ export function ChatDrawer({ open, onClose, leads, jobs, tasks, onTask, onJob, t
     if (has("เก็บเงิน", "ยอด", "มัดจำ", "ชำระ")) {
       const list = jobs.filter((j) => dueMoney(j) > 0);
       const sum = list.reduce((s, j) => s + dueMoney(j), 0);
-      return { text: `ต้องเก็บอีก ${baht(sum)} จาก ${list.length} งานค่ะ`, items: list.map((j) => ({ label: j.customer, sub: `${currentStep(j)?.key === "deposit" ? "มัดจำ" : "ส่วนที่เหลือก่อนปิดขาย"} ${baht(dueMoney(j))} · กำหนด ${dateTh(dueOf(j, currentStep(j)!))}`, run: () => onJob(j.id) })) };
+      return { text: `ต้องเก็บอีก ${baht(sum)} จาก ${list.length} งานค่ะ`, items: list.map((j) => ({ label: j.customer, sub: `${(currentStep(j)?.key === "deposit" || currentStep(j)?.key === "survey_fee") ? "มัดจำ/ค่าสำรวจ" : "ส่วนที่เหลือก่อนปิดขาย"} ${baht(dueMoney(j))} · กำหนด ${dateTh(dueOf(j, currentStep(j)!))}`, run: () => onJob(j.id) })) };
     }
     if (has("วันนี้", "ก่อน", "ทำอะไร", "งาน")) {
       return { text: "เริ่มจาก 3 เรื่องนี้ค่ะ", items: tasks.slice(0, 3).map((t) => ({ label: t.title, sub: t.reason, run: () => onTask(t) })) };

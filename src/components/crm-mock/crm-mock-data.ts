@@ -211,7 +211,7 @@ export type Segment = "general" | "hbd";
 export type Work = "roof" | "truss" | "ase" | "survey";
 /** ค่าสำรวจของงานชนิดสำรวจ (ค่าสมมติ รอยืนยัน) หักจากค่าติดตั้งตอนปิดขาย */
 export const SURVEY_FEE = 1500;
-export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "quote1" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver" | "install" | "handover";
+export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "quote1" | "survey_fee" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver" | "install" | "handover";
 export interface Send { party: Party; title: string; at: "start" | "done" }
 export interface StepDef { key: StepKey; label: string; owner: Party; day: number; post: boolean; hint: string; sends: Send[]; result?: string }
 
@@ -223,13 +223,13 @@ const DAYS: Record<Segment, Record<Work, Partial<Record<StepKey, number>>>> = {
     roof: { plan_in: 1, quote1: 3, deposit: 4, survey: 9, quote2: 11, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
     truss: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 35, install: 42, handover: 43 },
     ase: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 37, install: 44, handover: 45 },
-    survey: { plan_in: 1, deposit: 2, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
+    survey: { plan_in: 1, survey_fee: 2, deposit: 3, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
   },
   hbd: {
     roof: { plan_in: 1, quote1: 3, close: 4, install_plan: 7, deliver: 15, install: 22, handover: 23 },
     truss: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 24, install: 31, handover: 32 },
     ase: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 26, install: 33, handover: 34 },
-    survey: { plan_in: 1, deposit: 2, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
+    survey: { plan_in: 1, survey_fee: 2, deposit: 3, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
   },
 };
 const ORDER: Record<Segment, Record<Work, StepKey[]>> = {
@@ -237,13 +237,13 @@ const ORDER: Record<Segment, Record<Work, StepKey[]>> = {
     roof: ["plan_in", "quote1", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
     truss: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
     ase: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
-    survey: ["plan_in", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
+    survey: ["plan_in", "survey_fee", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
   },
   hbd: {
     roof: ["plan_in", "quote1", "close", "install_plan", "deliver", "install", "handover"],
     truss: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
     ase: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
-    survey: ["plan_in", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
+    survey: ["plan_in", "survey_fee", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
   },
 };
 const POST: StepKey[] = ["install_plan", "deliver", "install", "handover"];
@@ -253,7 +253,8 @@ const INSTALL_LABEL: Record<Work, string> = { roof: "ติดตั้งกร
 function surveyMeta(key: StepKey): Omit<StepDef, "day" | "post" | "key"> | null {
   switch (key) {
     case "plan_in": return { label: "เปิด Opp รับความต้องการ", owner: "SE", hint: "ทีมขายเปิด Opp และสรุปความต้องการลูกค้า (งานชนิดสำรวจไม่มีขั้นรับแบบ/ถอดแบบ)", sends: [] };
-    case "deposit": return { label: "เก็บค่าสำรวจ + ส่งงานให้ทีมสำรวจ", owner: "SE", hint: "ลูกค้าชำระค่าสำรวจ ล็อกวันนัดสำรวจ แล้วส่งข้อมูลลูกค้า/หน้างานเข้าแอปทีมสำรวจ", sends: [{ party: "SURV", title: "ข้อมูลลูกค้า/หน้างาน + วันนัดสำรวจที่ล็อกคิวแล้ว", at: "done" }] };
+    case "survey_fee": return { label: "ปิดสำรวจ (เก็บค่าสำรวจ)", owner: "SE", hint: "ตกลงให้ลูกค้าจ้างสำรวจ แล้วเก็บค่าสำรวจ (หักจากค่าติดตั้งตอนปิดขาย)", sends: [] };
+    case "deposit": return { label: "ล็อกคิว + ส่งงานให้ทีมสำรวจ", owner: "SE", hint: "นัดวันเข้าสำรวจกับลูกค้า แล้วส่งข้อมูลลูกค้า/หน้างานเข้าแอปทีมสำรวจ", sends: [{ party: "SURV", title: "ข้อมูลลูกค้า/หน้างาน + วันนัดสำรวจที่ล็อกคิวแล้ว", at: "done" }] };
     case "survey": return { label: "ลงสำรวจ + ส่งรายงานสำรวจและใบเสนอราคา", owner: "SURV", hint: "ทีมสำรวจเข้าสำรวจหน้างาน แล้วส่งรายงานสำรวจและใบเสนอราคากลับมาให้ทีมขาย", sends: [], result: "รายงานสำรวจ + ใบเสนอราคา (ไฟล์)" };
     case "quote2": return { label: "นำเสนอราคาให้ลูกค้า", owner: "SE", hint: "ทีมขายนำใบเสนอราคาจากทีมสำรวจเสนอลูกค้า ตามผลและต่อรอง", sends: [] };
     case "close": return { label: "ปิดขาย + เก็บค่าติดตั้ง", owner: "SE", hint: "เก็บค่าติดตั้ง (หักค่าสำรวจแล้ว) แล้วส่งข้อมูลปิดขายให้ KIM และรายการสินค้าให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "รายการสินค้า/อุปกรณ์ (เตรียมของ + ขนส่ง)", at: "done" }] };
@@ -271,6 +272,7 @@ function meta(key: StepKey, seg: Segment, work: Work): Omit<StepDef, "day" | "po
         : { label: "ทำแบบทรัส + Cutting List", owner: "ROOM", hint: "ส่งรายงานสำรวจจาก KIM ให้ห้องแบบทำแบบทรัสและ Cutting List", sends: [{ party: "ROOM", title: "รายงานสำรวจ + แบบ ขอทำแบบทรัส/Cutting List", at: "start" }], result: "แบบทรัส + Cutting List (ไฟล์)" };
     case "quote1": return { label: "เสนอราคาจากแบบ", owner: "SE", hint: work === "roof" ? "ทีมขายถอดแบบรายหมวด ทำประมาณการ และส่งใบเสนอราคาให้ลูกค้า" : "ทีมขายถอดแบบรายหมวดโดยใช้ผลขีดแนวอะเสจากห้องแบบ ทำประมาณการ แล้วส่งใบเสนอราคาให้ลูกค้า", sends: [] };
     case "deposit": return { label: "ปิดมัดจำ + ล็อกคิวสำรวจ", owner: "SE", hint: "ลูกค้าจ่ายมัดจำบนแอป ล็อกวันเข้าสำรวจ แล้วส่งข้อมูลให้ KIM และรายการจองสินค้าให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลงานสำรวจ + วันนัดสำรวจที่ล็อกคิวแล้ว", at: "done" }, { party: "SCM", title: "รายการสินค้าที่ขอจอง (กันสินค้า)", at: "done" }] };
+    case "survey_fee": return { label: "เก็บค่าสำรวจ", owner: "SE", hint: "ใช้เฉพาะงานชนิดสำรวจ", sends: [] };
     case "survey": return { label: "สำรวจหน้างาน + รายงานสำรวจ", owner: "KIM", hint: "KIM เข้าสำรวจตามวันนัด และส่งไฟล์รายงานสำรวจกลับมา", sends: [], result: "รายงานสำรวจ (ไฟล์)" };
     case "quote2": return { label: "เสนอราคาหลังสำรวจ", owner: "SE", hint: work === "roof" ? "ทีมขายถอดแบบละเอียดตามรายงานสำรวจ (Confirm/Revise รายหมวด) แล้วเสนอราคาใหม่" : "ทีมขายถอดแบบละเอียด เช็ครายงานสำรวจ + แบบทรัส/Cutting List จากห้องแบบ แล้วทำใบเสนอราคาฉบับหลังสำรวจ", sends: [] };
     case "close": return { label: "ปิดขาย (ลูกค้าจ่ายครบ 100%)", owner: "SE", hint: "เก็บเงินครบ แล้วส่งข้อมูลปิดขายให้ KIM และใบเสนอราคาฉบับแก้ไขให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "ใบเสนอราคาฉบับแก้ไข (Map สินค้า + สั่งโรงงาน)", at: "done" }] };
@@ -446,7 +448,8 @@ export function colOf(j: Job): ColKey | null {
     case "plan_in": case "ase_mark": return "intake";
     case "truss_design": return j.segment === "hbd" ? "intake" : "post_survey";
     case "quote1": return "quote1";
-    case "deposit": return "deposit";
+    case "survey_fee": return "deposit";
+    case "deposit": return j.work === "survey" ? "survey" : "deposit";
     case "survey": return "survey";
     case "quote2": return "post_survey";
     case "close": return "close";
@@ -719,7 +722,7 @@ export function buildTasks(leads: Lead[], jobs: Job[]): Task[] {
     }
 
     if (cur.owner === "SE") {
-      if (cur.key === "deposit" && (idle > 48 || late > 0)) {
+      if (((cur.key === "deposit" && j.work !== "survey") || cur.key === "survey_fee") && (idle > 48 || late > 0)) {
         out.push({ ...base, id: `t-${j.id}`, kind: "deposit_chase", priority: 2, title: `ตามมัดจำ ${j.customer}`, reason: `รอมัดจำ ${baht(depositOf(j))} · ${late > 0 ? `เลยแผน ${late} วันทำการ` : `ลูกค้าเงียบมา ${durText(idle)}`}`, action: "แจ้งเตือน",
           draft: `สวัสดีค่ะ คุณ${fn} ขอแจ้งยอดมัดจำ ${baht(depositOf(j))} เพื่อล็อกคิวสำรวจหน้างานนะคะ ชำระผ่านแอปได้เลย หากโอนแล้วรบกวนส่งสลิปค่ะ` });
       } else if (cur.key === "close" && (idle > 48 || late > 0)) {
@@ -763,7 +766,7 @@ export function atRisk(leads: Lead[], jobs: Job[]) {
 export function dueMoney(j: Job): number {
   const c = currentStep(j);
   if (!c) return 0;
-  if (c.key === "deposit") return depositOf(j);
+  if ((c.key === "deposit" && j.work !== "survey") || c.key === "survey_fee") return depositOf(j);
   if (c.key === "close") return j.value - depositOf(j);
   return 0;
 }
