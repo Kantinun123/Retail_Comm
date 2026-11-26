@@ -17,6 +17,7 @@ import { BoardView, ExchangeView } from "./crm-board";
 import { HomeView } from "./crm-home";
 import { LeadsView, type Ctx, type View } from "./crm-views";
 import { ReportView, RoleBar, type Role } from "./crm-report";
+import { GuideCtx, setGuideOn, useGuidePref } from "./crm-guide";
 import { Customer360Drawer, CustomersView } from "./crm-customer";
 import { grad } from "./crm-ui";
 
@@ -52,6 +53,8 @@ export function CrmMockScreen() {
   /* ชื่อเล่น SE ของตัวเอง (เดโมเลือกจาก ?se=; ของจริงมาจาก profile) */
   const [seNick] = useState(() => sp.get("se") ?? "ฝน");
   const readOnly = role !== "se";
+  const guidePref = useGuidePref();
+  const guideOn = guidePref && !readOnly;
   const seFilter = role === "se" && sp.get("se");
   const [view, setView] = useState<View>((sp.get("v") as View) ?? (readOnly ? "report" : "home"));
   const [leads, setLeads] = useState<Lead[]>(() => seedLeads());
@@ -201,6 +204,7 @@ export function CrmMockScreen() {
   };
 
   return (
+    <GuideCtx.Provider value={guideOn}>
     <div className="min-h-screen bg-[#f5f6fb] text-slate-800">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-indigo-300/30 blur-3xl" />
@@ -245,7 +249,7 @@ export function CrmMockScreen() {
 
       <main className="relative z-10 px-4 pb-28 pt-5 md:px-8 lg:ml-64 lg:pb-10">
         <div className="mx-auto max-w-[1400px]">
-          <RoleBar role={role} onChange={changeRole} />
+          <RoleBar role={role} onChange={changeRole} guide={guidePref} onGuide={setGuideOn} />
           {opp ? (
             <NewOppPage key={`${opp.editId ?? "new"}-${opp.lead?.id ?? ""}`} lead={opp.lead} editJob={opp.editId ? jobs.find((j) => j.id === opp.editId) ?? null : null} jobs={jobs}
               initialStep={opp.step} onDirty={onDirty} toast={setToastMsg} onSave={save}
@@ -301,5 +305,6 @@ export function CrmMockScreen() {
         {toastMsg}
       </div>
     </div>
+    </GuideCtx.Provider>
   );
 }

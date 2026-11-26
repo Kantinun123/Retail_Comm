@@ -8,6 +8,7 @@ import {
   type ContactLog, type Interest, type Lead, type Task,
 } from "./crm-mock-data";
 import { InterestChips, InterestEditor } from "./crm-interests";
+import { NextBanner, Stepper, Tip, leadGuide, leadScripts, scrollToId, useGuideOn } from "./crm-guide";
 import { Avatar, Drawer, Field, KV, SlaBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 /* ---------------- Lead ---------------- */
@@ -44,6 +45,9 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
   const [cOutcome, setCOutcome] = useState<ContactLog["outcome"]>("คุยได้");
   const [cNote, setCNote] = useState("");
   const [cNext, setCNext] = useState("");
+  const guide = useGuideOn();
+  const [skipped, setSkipped] = useState<number[]>([]);
+  const [warn, setWarn] = useState<null | "opp" | "survey">(null);
 
   const allOk = checks.budget && checks.area && checks.ready;
   const open = lead.status === "waiting" || lead.status === "contacting" || lead.status === "qualified";
@@ -52,6 +56,13 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
   const draftClean = cleanInterests(draft);
   const changed = JSON.stringify(draftClean) !== JSON.stringify(saved);
   const route = suggestRoute(editing ? draftClean : saved);
+  const g = guide && open ? leadGuide(lead, { allOk, skipped }) : null;
+  const doConvert = (k: "opp" | "survey") => (k === "opp" ? onConvert({ ...lead, interest: interestText(lead) }) : onConvertSurvey({ ...lead, interest: interestText(lead) }));
+  const tryConvert = (k: "opp" | "survey") => (guide && !lead.reviewed ? setWarn(k) : doConvert(k));
+  const onGuideCta = (t: string) => {
+    if (t === "opp") tryConvert("opp");
+    else if (t.startsWith("id:")) scrollToId(t.slice(3));
+  };
 
   const saveReview = () => {
     const at = NOW.toISOString();
@@ -87,6 +98,12 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
 
   return (
     <>
+      {g && (
+        <div className="space-y-4">
+          <Stepper at={g.at} />
+          <NextBanner b={g.banner} scripts={leadScripts(lead)} onCta={onGuideCta} onSkip={() => setSkipped([...skipped, g.at])} toast={toast} />
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">
           <div className={cn(glass, "flex items-center gap-3 p-4")}>
@@ -121,7 +138,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
           </div>
 
           {/* ความสนใจ + ทวนความต้องการ */}
-          <div className={cn(glass, "space-y-3 p-4")}>
+          <div id="lead-interest" className={cn(glass, "space-y-3 p-4", g && g.at === 2 && "ring-2 ring-indigo-400 ring-offset-2")}>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[13px] font-bold text-slate-900">ความสนใจของลูกค้า</h3>
               {lead.source === "customer" && <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10.5px] font-semibold text-sky-700"><Icon name="language" style={{ fontSize: 12 }} />ลูกค้าเลือกเอง (เว็บ)</span>}
@@ -165,13 +182,14 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
           </div>
 
           {open && (
-            <div className={cn(glass, "space-y-3 p-4")}>
+            <div id="lead-screen" className={cn(glass, "space-y-3 p-4", g && g.at === 3 && "ring-2 ring-indigo-400 ring-offset-2")}>
               <h3 className="text-[13px] font-bold text-slate-900">สกรีน Lead</h3>
               {([["budget", "งบประมาณตรงกับที่รับงาน"], ["area", "หน้างานอยู่ในพื้นที่บริการ"], ["ready", "ลูกค้าพร้อมให้ทีมเข้าสำรวจ/ออกแบบ"]] as const).map(([k, label]) => (
                 <label key={k} className="flex cursor-pointer items-center gap-2.5 text-[12.5px] text-slate-700">
                   <input type="checkbox" checked={checks[k]} onChange={(e) => setChecks({ ...checks, [k]: e.target.checked })} className="h-4 w-4 accent-indigo-600" />{label}
                 </label>
               ))}
+              <Tip>ติ๊กหลังคุยกับลูกค้าแล้วเท่านั้น ผ่านครบ 3 ข้อระบบจะแนะนำให้เปิด Opp</Tip>
               {allOk && lead.status !== "qualified" && <p className="flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-700"><Icon name="check_circle" style={{ fontSize: 16 }} />ผ่านครบทุกเงื่อนไข น้องเลขาแนะนำให้เปิด Opp ได้เลย</p>}
               {lost && (
                 <Field label="เหตุผลที่ Loss">
@@ -206,7 +224,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
           )}
 
           {/* บันทึกการติดต่อ */}
-          <div className={cn(glass, "space-y-3 p-4")}>
+          <div id="lead-contact" className={cn(glass, "space-y-3 p-4", g && g.at === 1 && "ring-2 ring-indigo-400 ring-offset-2")}>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[13px] font-bold text-slate-900">บันทึกการติดต่อ</h3>
               <span className="text-[11px] text-slate-400">{lead.contacts?.length ?? 0} ครั้ง</span>
@@ -219,7 +237,9 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
                   <Field label="ผลการติดต่อ"><select value={cOutcome} onChange={(e) => setCOutcome(e.target.value as ContactLog["outcome"])} className={inputCls}>{CONTACT_OUTCOMES.map((c) => <option key={c}>{c}</option>)}</select></Field>
                 </div>
                 <Field label="สรุปสิ่งที่คุย"><textarea value={cNote} onChange={(e) => setCNote(e.target.value)} rows={3} className={inputCls} placeholder="เช่น ลูกค้าอยากเปลี่ยนกระเบื้องเป็นสีเทา ขอเทียบราคา" /></Field>
+                <Tip>เขียนให้เพื่อนร่วมทีมอ่านแล้วรู้เรื่อง: ลูกค้าต้องการอะไร ติดอะไรอยู่ และจะทำอะไรต่อ</Tip>
                 <Field label="นัดติดตามครั้งต่อไป (ถ้ามี)"><input type="datetime-local" value={cNext} onChange={(e) => setCNext(e.target.value)} className={inputCls} /></Field>
+                <Tip>ลูกค้าบอกว่า &ldquo;ขอคิดก่อน&rdquo; ให้ตั้งวันนัดติดตามเสมอ ระบบจะนับในแถบ นัดติดตามวันนี้</Tip>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={submitContact} className={btnPrimary}><Icon name="edit_note" style={{ fontSize: 18 }} />บันทึกการติดต่อ</button>
                   <button onClick={() => addContact({ channel: "โทร", outcome: "ไม่รับสาย", note: "โทรแล้วไม่รับสาย" })} className={btnGhost}><Icon name="phone_missed" style={{ fontSize: 18 }} />โทรแล้วไม่รับสาย</button>
@@ -251,7 +271,7 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
           </div>
 
           {open && (
-            <div className={cn(glass, "space-y-3 p-4")}>
+            <div id="lead-dealer" className={cn(glass, "space-y-3 p-4", g && g.at === 4 && suggestRoute(saved) === "product" && "ring-2 ring-indigo-400 ring-offset-2")}>
               <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-slate-900"><Icon name="storefront" style={{ fontSize: 18 }} />ลูกค้าสนใจเฉพาะสินค้า ไม่ต้องการแบบ</h3>
               <p className="text-[12px] text-slate-500">ส่งให้ร้านทำใบเสนอราคาในระบบร้าน แล้วร้านจะส่งสถานะและผล Win / Loss กลับมาที่นี่</p>
               <div className="flex flex-wrap gap-2">
@@ -287,10 +307,28 @@ function LeadBody({ lead, task, onPatch, onConvert, onConvertSurvey, isDealerVie
       {open && !isDealerView && (
         <div className="flex flex-wrap gap-2 pb-2">
           {allOk && lead.status !== "qualified" && <button onClick={() => { onPatch(lead.id, { status: "qualified", firstContactAt: lead.firstContactAt ?? NOW.toISOString() }); toast("ผ่านการสกรีน รอเปิด Opp"); }} className={btnGhost}>ผ่านเงื่อนไข</button>}
-          <button onClick={() => onConvert({ ...lead, interest: interestText(lead) })} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Opp (มีแบบ)</button>
-          <button onClick={() => onConvertSurvey({ ...lead, interest: interestText(lead) })} className={btnGhost}><Icon name="pin_drop" style={{ fontSize: 18 }} />เปิด Opp สำรวจ</button>
+          <button onClick={() => tryConvert("opp")} className={btnPrimary}><Icon name="rocket_launch" style={{ fontSize: 18 }} />เปิด Opp (มีแบบ)</button>
+          <button onClick={() => tryConvert("survey")} className={btnGhost}><Icon name="pin_drop" style={{ fontSize: 18 }} />เปิด Opp สำรวจ</button>
           {!lost ? <button onClick={() => setLost(true)} className="rounded-xl px-3.5 py-2.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50">Loss</button>
             : <button onClick={() => { onPatch(lead.id, { status: "lost", lostReason: reason, firstContactAt: lead.firstContactAt }); toast("บันทึก Loss แล้ว"); }} className="rounded-xl bg-rose-600 px-3.5 py-2.5 text-[13px] font-bold text-white">ยืนยัน Loss</button>}
+        </div>
+      )}
+
+      {warn && (
+        <div className="fixed inset-0 z-[70] grid place-items-start bg-slate-900/40 px-4 pt-32 backdrop-blur-[2px]">
+          <div className="mx-auto w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-center gap-2 text-[15px] font-bold text-slate-900"><span className="grid h-9 w-9 place-items-center rounded-full bg-amber-100 text-amber-700"><Icon name="warning" /></span>ยังไม่ได้ทวนความต้องการ</div>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-slate-600">
+              {saved.length
+                ? "เปิด Opp ตอนนี้ ใบเปิดงานจะใช้รายการที่ลูกค้าเลือกไว้เดิม ถ้าไม่ตรงกับที่ลูกค้าต้องการ ทีมห้องแบบและทีมสำรวจอาจเตรียมงานผิด"
+                : "ยังไม่ได้เลือกความสนใจของลูกค้า ทีมถัดไปจะไม่รู้ว่าลูกค้าต้องการอะไร ควรถามลูกค้าแล้วเลือกรายการก่อน"}
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button onClick={() => { const k = warn; setWarn(null); doConvert(k); }} className={btnGhost}>{warn === "opp" ? "เปิด Opp เลย" : "เปิด Opp สำรวจเลย"}</button>
+              <button onClick={() => { setWarn(null); scrollToId("lead-interest"); }} className={btnPrimary}><Icon name="task_alt" style={{ fontSize: 18 }} />ไปทวนความต้องการก่อน</button>
+            </div>
+            <p className="mt-3 text-center text-[11px] text-slate-400">เตือนเฉพาะตอนเปิดตัวช่วยแนะนำ ข้ามได้เสมอ</p>
+          </div>
         </div>
       )}
     </>

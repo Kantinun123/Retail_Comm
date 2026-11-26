@@ -5,6 +5,7 @@ import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { OWNERS, dayKey, isFinished, leadSla, NOW, type Job, type Lead } from "./crm-mock-data";
 import type { Ctx } from "./crm-views";
+import { GuideToggle } from "./crm-guide";
 import { glass } from "./crm-ui";
 
 export type Role = "se" | "coach" | "area" | "dealer";
@@ -15,7 +16,7 @@ export const ROLES: { k: Role; label: string; icon: string; scope: string }[] = 
   { k: "dealer", label: "ร้านค้า", icon: "storefront", scope: "เห็นเฉพาะร้านตัวเอง อ่านอย่างเดียว" },
 ];
 
-export function RoleBar({ role, onChange }: { role: Role; onChange: (r: Role) => void }) {
+export function RoleBar({ role, onChange, guide, onGuide }: { role: Role; onChange: (r: Role) => void; guide?: boolean; onGuide?: (v: boolean) => void }) {
   const cur = ROLES.find((r) => r.k === role) ?? ROLES[0];
   return (
     <div className={cn(glass, "mb-4 overflow-x-auto p-2.5")}>
@@ -27,6 +28,7 @@ export function RoleBar({ role, onChange }: { role: Role; onChange: (r: Role) =>
           </button>
         ))}
         <span className="ml-4 text-[11px] text-slate-400 whitespace-nowrap">{cur.scope} · เดโมสลับได้</span>
+        {role === "se" && onGuide && <span className="ml-4"><GuideToggle on={guide ?? true} onChange={onGuide} /></span>}
       </div>
     </div>
   );

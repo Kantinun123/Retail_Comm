@@ -5,6 +5,7 @@ import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import { CHANNELS, NOW, PRODUCTS, assignStore, cleanInterests, interestSummary, slaHoursOf, suggestRoute, type Coverage, type Interest, type Lead } from "./crm-mock-data";
 import { InterestEditor } from "./crm-interests";
+import { Tip, useGuideOn } from "./crm-guide";
 import { Drawer, Field, btnPrimary, inputCls } from "./crm-ui";
 
 export function AddLeadDrawer({ open, onClose, nextId, onAdd, coverage }: { open: boolean; onClose: () => void; nextId: string; onAdd: (l: Lead) => void; coverage: Coverage[] }) {
@@ -18,6 +19,7 @@ export function AddLeadDrawer({ open, onClose, nextId, onAdd, coverage }: { open
 function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: () => void; onAdd: (l: Lead) => void; coverage: Coverage[] }) {
   const [f, setF] = useState({ name: "", phone: "", province: "", district: "", channel: CHANNELS[0], interest: "", visit: false, contacted: false });
   const [interests, setInterests] = useState<Interest[]>([]);
+  const guide = useGuideOn();
   const picked = cleanInterests(interests);
   const route = suggestRoute(picked);
   const walkin = f.channel === "Walk-in";
@@ -37,18 +39,20 @@ function Body({ nextId, onClose, onAdd, coverage }: { nextId: string; onClose: (
     <>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="ชื่อลูกค้า *"><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} placeholder="เช่น คุณสมหมาย ใจดี" /></Field>
-        <Field label="เบอร์โทร *"><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className={inputCls} placeholder="08x-xxx-xxxx" /></Field>
-        <Field label="จังหวัดหน้างาน *"><input value={f.province} onChange={(e) => setF({ ...f, province: e.target.value })} className={inputCls} /></Field>
-        <Field label="อำเภอหน้างาน (ถ้ามี)"><input value={f.district} onChange={(e) => setF({ ...f, district: e.target.value })} className={inputCls} placeholder="เช่น หาดใหญ่" /></Field>
+        <Field label="เบอร์โทร *"><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className={inputCls} placeholder="08x-xxx-xxxx" /><Tip>ใช้เบอร์ที่ติดต่อได้จริง ระบบใช้เบอร์รวมประวัติลูกค้าคนเดียวกัน</Tip></Field>
+        <Field label="จังหวัดหน้างาน *"><input value={f.province} onChange={(e) => setF({ ...f, province: e.target.value })} className={inputCls} /><Tip>ใช้จ่ายงานให้ร้านที่รับพื้นที่นี้ ใส่จังหวัดของหน้างาน ไม่ใช่ที่อยู่ปัจจุบันของลูกค้า</Tip></Field>
+        <Field label="อำเภอหน้างาน (ถ้ามี)"><input value={f.district} onChange={(e) => setF({ ...f, district: e.target.value })} className={inputCls} placeholder="เช่น หาดใหญ่" /><Tip>ถ้าใส่ ระบบเลือกร้านในอำเภอนั้นก่อน</Tip></Field>
         <Field label="แหล่งที่มา">
           <select value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value })} className={inputCls}>{CHANNELS.map((c) => <option key={c}>{c}</option>)}</select>
         </Field>
       </div>
       <div className="space-y-3">
         <div className="text-[13px] font-bold text-slate-900">ลูกค้าสนใจอะไร <span className="font-normal text-slate-400">· เลือกได้หลายรายการ ทั้งบริการและสินค้า</span></div>
+        <Tip>ถามลูกค้าว่า &ldquo;อยากให้ทางเราช่วยเรื่องอะไรบ้าง&rdquo; เลือกได้หลายอย่าง ถ้ามีงานบริการ ระบบจะแนะนำให้เปิด Opp</Tip>
         <InterestEditor kind="service" value={interests} onChange={setInterests} />
         <InterestEditor kind="product" value={interests} onChange={setInterests} />
         <Field label="หมายเหตุความต้องการ (ถ้ามี)"><input value={f.interest} onChange={(e) => setF({ ...f, interest: e.target.value })} className={inputCls} placeholder="เช่น บ้านชั้นเดียว ประมาณ 180 ตร.ม." /></Field>
+        {guide && picked.length === 0 && <p className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900"><Icon name="warning" style={{ fontSize: 18 }} /><span><b>ยังไม่ได้เลือกความสนใจ</b> ทีมขายคนถัดไปจะไม่รู้ว่าลูกค้าต้องการอะไร ถ้าลูกค้ายังไม่แน่ใจ ใส่หมายเหตุแทนได้ บันทึกต่อได้ ไม่บังคับ</span></p>}
         {f.channel === "Home Online" && <p className="flex items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-800"><Icon name="language" style={{ fontSize: 16 }} />ช่องทาง Home Online: ในระบบจริงลูกค้าเลือกรายการเองจากหน้าเว็บ ฟอร์มนี้จำลองข้อมูลที่ติดมา ทีมขายต้องทวนความต้องการอีกครั้ง</p>}
         {route !== "none" && <p className={cn("flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px]", route === "solution" ? "bg-indigo-50 text-indigo-800" : "bg-fuchsia-50 text-fuchsia-800")}><Icon name="alt_route" style={{ fontSize: 16 }} />{route === "solution" ? "ระบบแนะนำ: เปิด Opp (มีงานบริการ)" : "ระบบแนะนำ: ส่งให้ร้านทำใบเสนอราคา (สินค้าอย่างเดียว) ถ้าลูกค้าต้องการแบบ ให้เปิด Opp"}</p>}
       </div>

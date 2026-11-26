@@ -7,6 +7,7 @@ import {
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
 import { CsatCard } from "./crm-customer";
+import { NextBanner, oppGuide, oppScripts, scrollToId, useGuideOn } from "./crm-guide";
 import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 export type ScmEvent = "ordered" | "eta";
@@ -42,6 +43,8 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
   const dep = depositOf(job);
   const finished = isFinished(job);
   const closed = !!job.done.close;
+  const guide = useGuideOn();
+  const gb = guide ? oppGuide(job) : null;
 
   return (
     <>
@@ -76,7 +79,9 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
         </div>
       )}
 
-      <div className={cn(glass, "p-4")}>
+      {gb && <NextBanner b={gb} scripts={oppScripts(job)} onCta={(t) => t.startsWith("id:") && scrollToId(t.slice(3))} toast={toast} />}
+
+      <div id="job-steps" className={cn(glass, "p-4", gb && "ring-2 ring-indigo-300")}>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-[13px] font-bold text-slate-900">ขั้นตอนตาม Project Timeline</h3>
           <span className="text-[11px] text-slate-400">{steps.filter((s) => job.done[s.key]).length}/{steps.length} ขั้น</span>
