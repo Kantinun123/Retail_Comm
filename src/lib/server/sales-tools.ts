@@ -1,7 +1,8 @@
 /* เครื่องมือและความรู้ประกอบการขาย — อ่านจาก Google Sheet (แชร์แบบทุกคนที่มีลิงก์) ทุก 10 นาที
    ทีมเจ้าของข้อมูลแก้ใน Sheet ได้เลย แอปเห็นเองโดยไม่ต้องนำเข้า
-   คอลัมน์: ลำดับ | รายละเอียด(ชื่อ) | (คำอธิบาย) | Link เข้าถึงข้อมูล | หมวดงาน | หมายเหตุ
-   แถวที่ไม่มีลำดับ = อีกเวอร์ชันของรายการก่อนหน้า (ใช้ลำดับเดียวกัน) */
+   คอลัมน์: ลำดับ | รายละเอียด(ชื่อ) | (คำอธิบาย) | Link เข้าถึงข้อมูล | หมวดงาน | หมายเหตุ | การใช้งาน
+   แถวที่ไม่มีลำดับ = อีกเวอร์ชันของรายการก่อนหน้า (ใช้ลำดับเดียวกัน)
+   การใช้งาน = "ใช้" เท่านั้นที่แสดง (ถ้าชีตไม่มีคอลัมน์นี้ = แสดงทุกแถว) */
 
 const DEFAULT_SHEET = "1f0HVKZKNE4BZqPKyoFzl9uovQgQ78Et4Xvh69c27AWc";
 const TTL = 10 * 60 * 1000;
@@ -56,6 +57,12 @@ function kindOf(url: string | null, note: string | null): SalesTool["kind"] {
   return "web";
 }
 
+/** "ใช้" / "ใช้งาน" (รองรับพิมพ์วรรณยุกต์ซ้ำ เช่น "ใช้้" และช่องว่าง) ; "ไม่ใช้งาน" / ว่าง = false */
+function isInUse(v: string | undefined): boolean {
+  const s = String(v ?? "").replace(/\s+/g, "").replace(/([\u0E48-\u0E4B])\1+/g, "$1");
+  return s === "ใช้" || s === "ใช้งาน";
+}
+
 let cache: { at: number; items: SalesTool[] } | null = null;
 
 export async function loadSalesTools(): Promise<{ items: SalesTool[]; fetchedAt: string }> {
@@ -67,6 +74,8 @@ export async function loadSalesTools(): Promise<{ items: SalesTool[]; fetchedAt:
     throw new Error(`อ่าน Google Sheet ไม่ได้ (HTTP ${res.status})`);
   }
   const rows = parseCsv(await res.text());
+  // คอลัมน์ "การใช้งาน" (หาจากชื่อหัว) : แสดงเฉพาะ "ใช้" ; "ไม่ใช้งาน" / ว่าง = ไม่แสดง (ผู้ใช้ยืนยัน 27 พ.ย. 69)
+  const statusCol = (rows[0] ?? []).findIndex((h) => clean(h) === "การใช้งาน");
   const items: SalesTool[] = [];
   let lastNo: number | null = null;
   for (const r of rows.slice(1)) {
@@ -75,6 +84,7 @@ export async function loadSalesTools(): Promise<{ items: SalesTool[]; fetchedAt:
     const n = Number(clean(r[0]));
     const no = Number.isFinite(n) && n > 0 ? n : lastNo;
     if (Number.isFinite(n) && n > 0) lastNo = n;
+    if (statusCol >= 0 && !isInUse(r[statusCol])) continue;
     const note = clean(r[5]) || null;
     const url = safeUrl(r[3]);
     items.push({
