@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { CHANNEL_DISCOUNT, GT_ESTIMATE_FEE, MODEL_LABEL, NOW, SCG_COMMISSION_PCT, baht, channelNet, dateTh, poNoOf, type EstimatePo, type Job } from "./crm-mock-data";
+import { CHANNEL_DISCOUNT, GT_ESTIMATE_FEE, MODEL_LABEL, NOW, SCG_COMMISSION_PCT, baht, channelNet, dateTh, poNoOf, type EstimatePo, type Job, type StoreLoop } from "./crm-mock-data";
 import { btnGhost, btnPrimary, inputCls } from "./crm-ui";
 
 const APPROVERS: { name: string; role: EstimatePo["role"] }[] = [
@@ -83,3 +83,52 @@ export function PoTrackPanel({ job, label, amount, onConfirm }: { job: Job; labe
 }
 
 export const SCG_HOME_NOTE = `SCG Home: ลูกค้าชำระผ่าน CRM · ไม่มีส่วนลดช่องทาง · ร้านได้คอมมิชชั่น ${SCG_COMMISSION_PCT}% ภายหลัง`;
+
+const LOSS = ["ลูกค้าเปรียบเทียบราคา ไปซื้อร้านอื่น", "ลูกค้ายังไม่ตัดสินใจ", "ยกเลิกแผนต่อเติม"];
+/* GT : ส่งรายการสินค้าให้ร้านเปิดใบเสนอราคาเอง -> ร้านส่งยอด/รายการ/Win-Loss กลับ (จำลองระบบฝั่งร้าน) */
+export function StoreLoopPanel({ job, onPatchJob, toast }: { job: Job; onPatchJob: (id: string, fn: (j: Job) => Job) => void; toast: (m: string) => void }) {
+  const sl = job.storeLoop;
+  const set = (fn: (s: StoreLoop) => StoreLoop, text: string, t?: string) => {
+    const at = NOW.toISOString();
+    onPatchJob(job.id, (j) => ({ ...j, lastTouchAt: at, storeLoop: fn(j.storeLoop as StoreLoop), log: [...j.log, { at, text }] }));
+    toast(t ?? text);
+  };
+  const send = () => {
+    const at = NOW.toISOString();
+    onPatchJob(job.id, (j) => ({ ...j, lastTouchAt: at, storeLoop: { status: "sent", sentAt: at }, log: [...j.log, { at, text: `ส่งรายการสินค้า (ผลประมาณการ) ให้ร้าน ${j.store ?? ""} เปิดใบเสนอราคาเอง` }] }));
+    toast("ส่งรายการสินค้าให้ร้านแล้ว");
+  };
+  const stat = sl?.status;
+  return (
+    <div className="space-y-2 rounded-2xl border border-teal-200 bg-teal-50/60 p-4 text-[12px]">
+      <p className="flex items-center gap-1.5 font-bold text-teal-900"><Icon name="swap_horiz" className="!text-[18px]" />GT : ร้านเสนอราคาลูกค้าเอง (ส่งเฉพาะรายการสินค้า)</p>
+      {!sl && (<>
+        <p className="text-slate-600">ถ้าร้านต้องการแค่รายการสินค้า ส่งให้ร้านไปเปิดใบเสนอราคาในระบบของร้านได้ ถ้าลูกค้าซื้อบริการติดตั้งให้ใช้ใบเสนอราคาด้านล่างแทน</p>
+        <button onClick={send} className={btnPrimary}><Icon name="inventory_2" style={{ fontSize: 18 }} />ส่งรายการสินค้าให้ร้านค้า</button>
+      </>)}
+      {sl && (
+        <>
+          <ol className="flex flex-wrap gap-1.5 text-[11px] font-semibold">
+            {([["sent", "ส่งรายการให้ร้าน"], ["quoted", "ร้านเปิดใบเสนอราคา"], ["won", "Win / Loss"]] as const).map(([k, l], i) => {
+              const idx = stat === "sent" ? 0 : stat === "quoted" ? 1 : 2;
+              return <li key={k} className={cn("rounded-full px-2.5 py-1", i <= idx ? "bg-teal-600 text-white" : "bg-white text-slate-400")}>{i + 1}. {l}</li>;
+            })}
+          </ol>
+          {stat === "sent" && (<>
+            <p className="text-slate-600">ส่งเมื่อ {dateTh(sl.sentAt)} · รอร้านเปิดใบเสนอราคา</p>
+            <button onClick={() => set((s) => ({ ...s, status: "quoted", quotedAt: NOW.toISOString(), amount: Math.round(job.value * 1.04), items: 21 }), "ร้านเปิดใบเสนอราคาให้ลูกค้า (ยอด/รายการส่งกลับจากระบบร้าน)", "จำลอง: ร้านเปิดใบเสนอราคาแล้ว")} className={btnGhost}><Icon name="storefront" style={{ fontSize: 17 }} />จำลอง: ร้านเปิดใบเสนอราคา</button>
+          </>)}
+          {stat === "quoted" && (<>
+            <p className="text-slate-600">ร้านเสนอราคา <b>{baht(sl.amount ?? 0)}</b> · {sl.items} รายการ · {dateTh(sl.quotedAt ?? sl.sentAt)}</p>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => set((s) => ({ ...s, status: "won", closedAt: NOW.toISOString() }), `ร้านแจ้ง Win · ยอดขายจริง ${baht(sl.amount ?? 0)} ${sl.items} รายการ`, "จำลอง: ร้านแจ้ง Win")} className={btnPrimary}><Icon name="emoji_events" style={{ fontSize: 17 }} />จำลอง: ร้านแจ้ง Win</button>
+              <button onClick={() => set((s) => ({ ...s, status: "lost", closedAt: NOW.toISOString(), reason: LOSS[0] }), `ร้านแจ้ง Loss: ${LOSS[0]}`, "จำลอง: ร้านแจ้ง Loss")} className={cn(btnGhost, "!text-rose-600")}>จำลอง: ร้านแจ้ง Loss</button>
+            </div>
+          </>)}
+          {stat === "won" && <p className="font-bold text-emerald-700">Win · ยอดขาย {baht(sl.amount ?? 0)} · {sl.items} รายการ · {dateTh(sl.closedAt ?? "")}</p>}
+          {stat === "lost" && <p className="font-bold text-rose-600">Loss · {sl.reason} · {dateTh(sl.closedAt ?? "")}</p>}
+        </>
+      )}
+    </div>
+  );
+}

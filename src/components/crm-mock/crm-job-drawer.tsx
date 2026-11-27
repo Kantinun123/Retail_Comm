@@ -7,7 +7,7 @@ import {
   CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, heldBy, instNet, planOf, usesRoomEstimate, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
-import { GtEstimatePanel } from "./crm-gt";
+import { GtEstimatePanel, StoreLoopPanel } from "./crm-gt";
 import { QuoteBuilder } from "./crm-quote";
 import { SurveyReportCard } from "./crm-corners";
 import { JourneyStrip } from "./crm-overview";
@@ -85,6 +85,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
       {tab === "info" && (
         <>
       {job.model === "gt" && job.estimateBy === "room" && !job.done.estimate_room && <GtEstimatePanel job={job} onPatchJob={onPatchJob} toast={toast} />}
+      {job.model === "gt" && job.estimateBy === "room" && job.done.estimate_room && !job.cancelReason && <StoreLoopPanel job={job} onPatchJob={onPatchJob} toast={toast} />}
       {job.work !== "survey" && !job.cancelReason && (job.model !== "gt" || job.estimateBy !== "room" || job.done.estimate_room || job.estimatePo) && <QuoteBuilder job={job} onPatchJob={onPatchJob} toast={toast} />}
       {task && (
         <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-4">

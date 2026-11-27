@@ -409,6 +409,7 @@ export const channelNet = (gross: number, m: Model) => Math.round(gross * (100 -
 /** GT : ค่าบริการประมาณการ (แจ้งทำประมาณการ / ประมาณการพร้อมค่าบริการ ราคาเท่ากัน) ร้านเซ็น PO ถึง SCG */
 export const GT_ESTIMATE_FEE = 2500;
 export const poNoOf = (j: { id: string; model: Model }, tag: string) => `PO-${j.model.toUpperCase()}-${j.id.slice(2)}-${tag}`;
+export interface StoreLoop { status: "sent" | "quoted" | "won" | "lost"; sentAt: string; quotedAt?: string; amount?: number; items?: number; closedAt?: string; reason?: string }
 export interface QuoteVer { v: number; pkg: string; promo: string; prep: number; gross: number; total: number; agentNet?: number; at: string; sent?: boolean }
 export interface EstimatePo { no: string; fee: number; approver: string; role: "owner" | "delegate"; at: string }
 /** หมวดงานที่ห้องแบบถอดแบบ */
@@ -462,7 +463,7 @@ export interface Job {
   /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
   csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[]; /** ร้านที่รับงาน (คำนวณจากจังหวัด) */ store?: string;
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string; payments?: PaymentReq[]; plan?: PayPlan;
-  /** ใครทำประมาณการ (เฉพาะงาน HBD / ทรัส / อะเส ; GT = ห้องแบบกลางทุกงาน) */ estimateBy?: "self" | "room"; /** ใบเสนอราคาที่บันทึกไว้ (หลายเวอร์ชัน) */ quotes?: QuoteVer[]; /** GT : PO ค่าประมาณการที่ร้านอนุมัติแล้ว (CRM รันเลขให้เอง) */ estimatePo?: EstimatePo;
+  /** ใครทำประมาณการ (เฉพาะงาน HBD / ทรัส / อะเส ; GT = ห้องแบบกลางทุกงาน) */ estimateBy?: "self" | "room"; /** GT : วงจรส่งรายการสินค้าให้ร้านเสนอราคาเอง แล้วร้านส่งผลกลับ */ storeLoop?: StoreLoop; /** ใบเสนอราคาที่บันทึกไว้ (หลายเวอร์ชัน) */ quotes?: QuoteVer[]; /** GT : PO ค่าประมาณการที่ร้านอนุมัติแล้ว (CRM รันเลขให้เอง) */ estimatePo?: EstimatePo;
   /** ห้องแบบที่กดรับงานของแต่ละขั้น (คนแรกที่กดรับได้งาน) */ roomClaims?: Partial<Record<StepKey, { by: string; at: string }>>;
   /** รายงานสำรวจจาก KIM / ทีมสำรวจ */ surveyReport?: SurveyReport;
 }
@@ -806,6 +807,7 @@ function seedJobsRaw(): Job[] {
     mk({ id: "J-2611-0122", customer: "คุณวีระ ตั้งใจดี", phone: "081-555-0122", province: "สงขลา", segment: "general", work: "ase", value: 1250000, quote1Value: 1250000, at: "deliver_frame", daysIn: 24, surveyOffset: -16, scm: { ordered: hAgo(120), readyEta: addWd(NOW.toISOString(), 3) }, touchH: 30 }),
     mk({ id: "J-2611-0124", customer: "คุณวิโรจน์ ศรีสุข", phone: "081-555-0124", province: "ขอนแก่น", segment: "general", work: "roof", value: 237170, at: "estimate_room", daysIn: 2, touchH: 10, model: "gt", estimateBy: "room", store: "บจก. กิตติพงษ์ โฮมมาร์ท" }),
   mk({ id: "J-2611-0125", customer: "คุณอารี มีสุข", phone: "081-555-0125", province: "สงขลา", segment: "general", work: "roof", value: 180000, at: "estimate_room", daysIn: 1, touchH: 6, model: "gt", estimateBy: "room", store: "ร้านสหชัยรุ่งเรือง", estimatePo: { no: "PO-GT-2611-0125-E", fee: 2500, approver: "คุณสุดา (เจ้าของร้าน)", role: "owner", at: NOW.toISOString() } }),
+  mk({ id: "J-2611-0126", customer: "คุณนภา ทองดี", phone: "081-555-0126", province: "ขอนแก่น", segment: "general", work: "roof", value: 312000, at: "quote1", daysIn: 5, touchH: 12, model: "gt", estimateBy: "room", store: "บจก. กิตติพงษ์ โฮมมาร์ท", estimatePo: { no: "PO-GT-2611-0126-E", fee: 2500, approver: "คุณสุดา (เจ้าของร้าน)", role: "owner", at: NOW.toISOString() } }),
   mk({ id: "J-2611-0123", customer: "คุณธนา วัฒนกุล", phone: "089-555-0123", province: "ขอนแก่น", segment: "hbd", work: "truss", value: 360000, at: "estimate_room", daysIn: 3, touchH: 18, estimateBy: "room" }),
     mk({ id: "J-2611-0118", customer: "คุณอรทัย สมบูรณ์", phone: "084-555-0118", province: "นครสวรรค์", segment: "hbd", work: "ase", value: 640000, at: "deliver", daysIn: 20, scm: { ordered: hAgo(240), readyEta: addWd(NOW.toISOString(), 2) }, touchH: 30 }),
     mk({ id: "J-2611-0109", customer: "คุณบุญเรือง ทองคำ", phone: "080-555-0109", province: "ภูเก็ต", segment: "general", work: "truss", value: 310000, quote1Value: 300000, at: "install", daysIn: 36, surveyOffset: -28, scm: { ordered: hAgo(500), readyEta: hAgo(200) }, touchH: 8 }),
