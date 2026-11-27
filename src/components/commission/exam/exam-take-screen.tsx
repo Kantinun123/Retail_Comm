@@ -199,8 +199,8 @@ export function ExamTakeScreen({ roundId, topicId }: { roundId: number; topicId:
         {error && <p className="rounded-xl bg-rose-50 text-rose-700 text-[12.5px] p-3">{error}</p>}
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3">
-        <div className="max-w-md mx-auto flex gap-2">
+      <div className="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 lg:left-60">
+        <div className="max-w-md md:max-w-2xl lg:max-w-3xl mx-auto flex gap-2">
           <button type="button" disabled={idx === 0} onClick={() => setIdx(idx - 1)} className={cn(btn, "border border-slate-200 bg-white text-slate-700")}>
             ก่อนหน้า
           </button>

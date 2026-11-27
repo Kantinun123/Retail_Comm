@@ -40,9 +40,11 @@ export function NotificationBell({
 }: {
   /** "header" = ปุ่มกลมใน header (dropdown เปิดลงล่าง)
    *  "nav" = ช่องใน bottom-nav (ไอคอน+label, dropdown เปิดขึ้นบน) */
-  variant?: "header" | "nav";
+  variant?: "header" | "nav" | "sidebar";
 }) {
+  /* "sidebar" = แถวในเมนูซ้ายบนโน้ตบุ๊ก (dropdown เปิดไปทางขวา) */
   const isNav = variant === "nav";
+  const isSide = variant === "sidebar";
   const { session } = useSession();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -131,10 +133,25 @@ export function NotificationBell({
   return (
     <>
       <div
-        className={cn("relative", isNav ? "flex" : "shrink-0")}
+        className={cn("relative", isNav ? "flex" : isSide ? "block" : "shrink-0")}
         ref={panelRef}
       >
-        {isNav ? (
+        {isSide ? (
+          <button
+            type="button"
+            onClick={toggleOpen}
+            aria-label="การแจ้งเตือน"
+            className={cn("w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition", open ? "bg-red-50 text-[#d32029]" : "text-slate-600 hover:bg-slate-50")}
+          >
+            <Icon name="notifications" style={{ fontSize: 20 }} fill={badge > 0 || open} />
+            <span className="flex-1 text-left">แจ้งเตือน</span>
+            {badge > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#d32029] text-white text-[10px] font-bold flex items-center justify-center">
+                {badge > 9 ? "9+" : badge}
+              </span>
+            )}
+          </button>
+        ) : isNav ? (
           <button
             type="button"
             onClick={toggleOpen}
@@ -183,7 +200,9 @@ export function NotificationBell({
               "absolute w-[290px] max-h-[380px] rounded-2xl bg-white border border-slate-100 shadow-xl z-50 overflow-hidden flex flex-col",
               isNav
                 ? "bottom-full right-0 mb-2"
-                : "right-0 mt-2"
+                : isSide
+                  ? "left-full bottom-0 ml-2"
+                  : "right-0 mt-2"
             )}
           >
             <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100">
