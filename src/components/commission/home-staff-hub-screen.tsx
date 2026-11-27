@@ -242,14 +242,16 @@ export function HomeStaffHubScreen() {
             doLogout();
             router.replace("/");
           }}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
+          className="inline-flex lg:hidden items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
         >
           <Icon name="logout" style={{ fontSize: 16 }} />
           ออกจากระบบ
         </button>
       </header>
 
-      <div className="space-y-5 pb-4">
+      {/* โน้ตบุ๊ก: 2 คอลัมน์ ซ้าย = โปรไฟล์ + งานที่ต้องทำ, ขวา = ช่วงเวลา + ผลประโยชน์ + ยอดขาย */}
+      <div className="space-y-5 pb-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-6 lg:items-start">
+      <div className="space-y-5">
         {session.isAdmin && <ViewModeBar />}
 
         {staffView && (
@@ -274,7 +276,9 @@ export function HomeStaffHubScreen() {
         {session.isSales && <RefundHomeCard variant="sales" />}
         {session.isSales && <ExamHomeCard variant="sales" />}
         {session.isSales && <SalesToolsCard />}
+      </div>
 
+      <div className="space-y-5">
         <PeriodBar pick={pick} onChange={setPick} years={years} completeness={completeness} />
 
         <section>
@@ -338,6 +342,7 @@ export function HomeStaffHubScreen() {
         <p className="text-[11px] text-slate-400 text-center">
           แสดงเฉพาะของคุณ · ทุกการ์ดตามช่วงเวลาด้านบน ({viewTitle})
         </p>
+      </div>
       </div>
 
       <BottomNav active="home" />

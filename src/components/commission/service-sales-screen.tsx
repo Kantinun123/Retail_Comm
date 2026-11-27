@@ -695,7 +695,7 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
             doLogout();
             router.replace("/");
           }}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
+          className="inline-flex lg:hidden items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
         >
           <Icon name="logout" style={{ fontSize: 16 }} />
           ออกจากระบบ
@@ -928,6 +928,8 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
               ))}
             </div>
 
+            {/* โน้ตบุ๊ก: 3 กลุ่มงานบริการ กับ พนักงานขาย คู่กัน */}
+            <div className={cn("space-y-4", showPeople && vPeople.length > 0 && "lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start")}>
             <section key={`g-${vKey}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 animate-fade-up">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <h3 className="text-[14px] font-bold text-slate-900 flex items-center gap-1.5">
@@ -973,6 +975,7 @@ export function ServiceSalesScreen({ source = null }: { source?: SsSource | null
                 />
               </section>
             )}
+            </div>
 
             {adminAll && storesYear.length > 0 && (
               <section key={`s-${vKey}`} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 animate-fade-up">

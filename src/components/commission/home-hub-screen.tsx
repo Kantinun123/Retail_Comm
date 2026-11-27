@@ -508,7 +508,7 @@ export function HomeHubScreen() {
               doLogout();
               router.replace("/");
             }}
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
+            className="inline-flex lg:hidden items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
           >
             <Icon name="logout" style={{ fontSize: 16 }} />
             ออกจากระบบ
@@ -565,6 +565,8 @@ export function HomeHubScreen() {
         <PerformanceCards loading={loading} view={view} evalSum={evalSum} csSum={csSum} di={di} scopeAll={adminAllStores} diTarget={diT} />
         {!adminAllStores && hasPerf && <AttentionList loading={attentionLoading} items={attention} />}
 
+        {/* โน้ตบุ๊ก: ผลประโยชน์ร้าน กับ ผลประโยชน์พนักงาน คู่กัน */}
+        <div className="space-y-5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-5 lg:items-start">
         {/* กลุ่มร้านค้า (เงินล้วน) */}
         <section id="store-benefits" className="scroll-mt-28">
           <h3 className="text-[13px] font-bold text-[#8f1114] mb-2 flex items-center gap-1.5">
@@ -608,6 +610,7 @@ export function HomeHubScreen() {
             ))}
           </div>
         </section>
+        </div>
 
         {/* กลุ่มยอดขาย */}
         {(showServiceSales || showProductSales) && (
@@ -617,8 +620,10 @@ export function HomeHubScreen() {
               ยอดขาย · {view.mode === "month" ? periodShort(view.period) : viewTitle}
               {view.mode === "month" && view.period === curP && <span className="text-[10.5px] font-normal text-slate-400">(ถึงวันนี้)</span>}
             </h3>
+            {/* โน้ตบุ๊ก: ยอดขายสินค้า กับ งานบริการ คู่กัน */}
+            <div className={showProductSales && showServiceSales ? "lg:grid lg:grid-cols-2 lg:gap-5 lg:items-start" : ""}>
             {showProductSales && (
-              <div className={showServiceSales ? "mb-2.5" : ""}>
+              <div className={showServiceSales ? "mb-2.5 lg:mb-0" : ""}>
                 <SummaryBar
                   icon="shopping_cart"
                   label="ยอดขายสินค้า"
@@ -668,6 +673,7 @@ export function HomeHubScreen() {
                 )}
               </div>
             )}
+            <div>
             {showServiceSales && (
               <SummaryBar
                 icon="construction"
@@ -718,6 +724,8 @@ export function HomeHubScreen() {
                 ))}
               </div>
             )}
+            </div>
+            </div>
           </section>
         )}
 

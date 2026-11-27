@@ -345,7 +345,7 @@ export function AreaHomeScreen() {
             doLogout();
             router.replace("/");
           }}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
+          className="inline-flex lg:hidden items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-[#a11119] bg-white border border-slate-200 px-3 py-1.5 rounded-full active:scale-95 transition"
         >
           <Icon name="logout" style={{ fontSize: 16 }} />
           ออกจากระบบ
@@ -353,6 +353,8 @@ export function AreaHomeScreen() {
       </header>
 
       <div className="space-y-5 pb-4">
+        {/* โน้ตบุ๊ก: โปรไฟล์ + คืนเงิน + ข้อสอบ เรียงเป็นแถวเดียว */}
+        <div className="space-y-5 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-4 lg:items-start">
         <Link
           href="/app/member"
           className="flex items-center gap-3 rounded-2xl bg-white border border-slate-100 shadow-sm p-3 hover:border-red-200 active:scale-[0.99] transition"
@@ -371,10 +373,14 @@ export function AreaHomeScreen() {
 
         <RefundHomeCard variant="approver" />
         <ExamHomeCard variant="viewer" />
+        </div>
 
         <p className="text-[13.5px] font-bold text-[#231313] px-1">เลือกเรื่องที่ต้องการดู</p>
 
-        {isCoach ? [workSection, viewSection] : [viewSection, workSection]}
+        {/* โน้ตบุ๊ก: "ดูข้อมูล" กับ "งานของฉัน" คู่กัน */}
+        <div className="space-y-5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-5 lg:items-start">
+          {isCoach ? [workSection, viewSection] : [viewSection, workSection]}
+        </div>
         <SalesToolsCard />
         <BoqSummaryCard title="BOQ DECAAR ร้านที่ดูแล" sub={`${storeCount} ร้านที่ดูแล · แตะเพื่อดูรายร้าน/รายพนักงาน`} showAttention rowsBy="stores" />
 

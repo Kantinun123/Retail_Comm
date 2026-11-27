@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DesktopSidebar } from "./desktop-sidebar";
 /** หน้าที่จัด layout จอกว้างแล้ว (เพิ่มทีละหน้าเมื่อปรับ layout แล้ว) */
-export const WIDE_PREFIXES = ["/app/boq", "/app/refund", "/app/tools"];
+export const WIDE_PREFIXES = ["/app/boq", "/app/refund", "/app/tools", "/app/home", "/app/home-staff", "/app/area-home", "/app/product-sales", "/app/service-sales"];
 export const isWidePath = (p: string | null) => !!p && WIDE_PREFIXES.some((w) => p === w || p.startsWith(w + "/"));
 export function AppMain({ children }: { children: React.ReactNode }) {
   const wide = isWidePath(usePathname());
