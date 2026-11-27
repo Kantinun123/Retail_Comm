@@ -8,12 +8,14 @@ import type { Ctx } from "./crm-views";
 import { GuideToggle } from "./crm-guide";
 import { glass } from "./crm-ui";
 
-export type Role = "se" | "coach" | "area" | "dealer";
+export type Role = "se" | "coach" | "area" | "dealer" | "room" | "kim";
 export const ROLES: { k: Role; label: string; icon: string; scope: string }[] = [
   { k: "se", label: "พนักงานขาย (SE)", icon: "badge", scope: "เห็นเฉพาะ Lead/Opp ของตัวเอง ทำงานได้เต็มที่" },
   { k: "coach", label: "โค้ช", icon: "sports", scope: "เห็นทีมขายในร้านที่ดูแล อ่านอย่างเดียว" },
   { k: "area", label: "Area", icon: "map", scope: "เห็นทุกร้านในพื้นที่ อ่านอย่างเดียว" },
   { k: "dealer", label: "ร้านค้า", icon: "storefront", scope: "เห็นเฉพาะร้านตัวเอง อ่านอย่างเดียว" },
+  { k: "room", label: "ห้องแบบ", icon: "architecture", scope: "รับงานขีดแนว/แบบทรัส/ประมาณการ ส่งไฟล์กลับให้ทีมขาย" },
+  { k: "kim", label: "KIM / ทีมสำรวจ", icon: "engineering", scope: "นัดสำรวจ ทำรายงานสำรวจ อัปเดตงานติดตั้ง" },
 ];
 
 export function RoleBar({ role, onChange, guide, onGuide }: { role: Role; onChange: (r: Role) => void; guide?: boolean; onGuide?: (v: boolean) => void }) {
@@ -39,7 +41,7 @@ const Pill = ({ cls, children }: { cls: string; children: React.ReactNode }) => 
 );
 
 interface Row { name: string; sub: string; lead: number; sla: number | null; visit: number; quote: number; win: number; csat: number | null }
-const SCOPE: Record<Exclude<Role, "se">, string> = { area: "Area แดง · ทุกร้านในพื้นที่", coach: "โค้ชเนม · 3 ร้านที่ดูแล", dealer: "ร้านหาดใหญ่โฮม (ร้านเดียว)" };
+const SCOPE: Record<Exclude<Role, "se">, string> = { area: "Area แดง · ทุกร้านในพื้นที่", coach: "โค้ชเนม · 3 ร้านที่ดูแล", dealer: "ร้านหาดใหญ่โฮม (ร้านเดียว)", room: "ห้องแบบ · ทุกงานที่ส่งมา", kim: "KIM · ทุกงานในเดโม" };
 
 function rowOf(name: string, sub: string, leads: Lead[], jobs: Job[]): Row {
   const met = leads.filter((l) => leadSla(l).state === "met").length;

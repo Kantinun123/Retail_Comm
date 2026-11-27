@@ -18,6 +18,7 @@ import { HomeView } from "./crm-home";
 import { AftersaleView, OverviewView } from "./crm-overview";
 import { PerformanceView } from "./crm-performance";
 import { PaceView, unreadNudges } from "./crm-pace";
+import { KimCorner, RoomCorner } from "./crm-corners";
 import { familyMessage, type FamilyState } from "./crm-timeline";
 import { LeadsView, type Ctx, type View } from "./crm-views";
 import { ReportView, RoleBar, type Role } from "./crm-report";
@@ -43,6 +44,16 @@ const NAV: { key: View; label: string; icon: string }[] = [
 const MOBILE_MAIN: View[] = ["home", "overview", "leads", "inbox"];
 const MOBILE_MORE: View[] = ["pace", "perf", "board", "aftersale", "customers", "areas", "exchange"];
 
+const NAV_ROOM: { key: View; label: string; icon: string }[] = [
+  { key: "room", label: "มุมห้องแบบ", icon: "architecture" },
+  { key: "overview", label: "ภาพรวมงาน", icon: "timeline" },
+  { key: "exchange", label: "เชื่อมข้อมูล", icon: "sync_alt" },
+];
+const NAV_KIM: { key: View; label: string; icon: string }[] = [
+  { key: "kim", label: "มุม KIM", icon: "engineering" },
+  { key: "overview", label: "ภาพรวมงาน", icon: "timeline" },
+  { key: "aftersale", label: "งานหลังขาย", icon: "construction" },
+];
 const NAV_RO: { key: View; label: string; icon: string }[] = [
   { key: "pace", label: "เป้าและจังหวะ", icon: "speed" },
   { key: "report", label: "รายงานทีม", icon: "monitoring" },
@@ -65,14 +76,14 @@ function completeStep(j: Job, key: StepKey, extra?: { surveyAt?: string }): Job 
 
 export function CrmMockScreen() {
   const sp = useSearchParams();
-  const [role, setRole] = useState<Role>(() => (["coach", "area", "dealer"].includes(sp.get("role") ?? "") ? (sp.get("role") as Role) : "se"));
+  const [role, setRole] = useState<Role>(() => (["coach", "area", "dealer", "room", "kim"].includes(sp.get("role") ?? "") ? (sp.get("role") as Role) : "se"));
   /* ชื่อเล่น SE ของตัวเอง (เดโมเลือกจาก ?se=; ของจริงมาจาก profile) */
   const [seNick] = useState(() => sp.get("se") ?? "ฝน");
   const readOnly = role !== "se";
   const guidePref = useGuidePref();
   const guideOn = guidePref && !readOnly;
   const seFilter = role === "se" && sp.get("se");
-  const [view, setView] = useState<View>((sp.get("v") as View) ?? (readOnly ? "pace" : "home"));
+  const [view, setView] = useState<View>((sp.get("v") as View) ?? (role === "room" ? "room" : role === "kim" ? "kim" : readOnly ? "pace" : "home"));
   const [leads, setLeads] = useState<Lead[]>(() => seedLeads());
   const [jobs, setJobs] = useState<Job[]>(() => seedJobs());
   const [leadId, setLeadId] = useState<string | null>(sp.get("lead"));
@@ -143,9 +154,10 @@ export function CrmMockScreen() {
     dirtyRef.current = false;
     setOpp(null); setLeadId(null); setJobId(null); setAddingLead(false); setSurvey(null);
     setRole(r);
-    setView(r === "se" ? "home" : "pace");
+    setView(r === "se" ? "home" : r === "room" ? "room" : r === "kim" ? "kim" : "pace");
   };
-  const nav = readOnly ? NAV_RO : NAV;
+  const roNav = role === "room" ? NAV_ROOM : role === "kim" ? NAV_KIM : NAV_RO;
+  const nav = readOnly ? roNav : NAV;
   const roView = (what: string) => setToastMsg(`มุมมองนี้อ่านอย่างเดียว เปิดรายละเอียด${what}ได้เฉพาะพนักงานขาย`);
   const markRead = (ph: string) => setChatSt((s) => ({ ...s, lastRead: { ...s.lastRead, [ph]: NOW.toISOString() } }));
   const goView = (v: View) => {
@@ -224,7 +236,7 @@ export function CrmMockScreen() {
     const now = NOW.toISOString();
     if (editId) {
       patchJob(editId, (j) => ({
-        ...j, customer: i.customer, phone: i.phone, province: i.province, segment: i.segment, work: i.work, model: i.model, value: i.value, owner: i.owner,
+        ...j, customer: i.customer, phone: i.phone, province: i.province, segment: i.segment, work: i.work, model: i.model, value: i.value, owner: i.owner, estimateBy: i.estimateBy,
         intake: i.intake, lastTouchAt: now, log: [...j.log, { at: now, text: "แก้ไขใบเปิดงาน" }],
       }));
       dirtyRef.current = false;
@@ -236,7 +248,7 @@ export function CrmMockScreen() {
     const id = `J-2611-${String(101 + jobs.length).padStart(4, "0")}`;
     const created: Job = {
       id, opsId: id.replace("J-", "OP-"), leadId: i.leadId, customer: i.customer, phone: i.phone, province: i.province, segment: i.segment, work: i.work,
-      value: i.value, model: i.model, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, intake: i.intake, lastTouchAt: now,
+      value: i.value, model: i.model, owner: i.owner, startedAt: now, done: { plan_in: now }, scm: {}, intake: i.intake, estimateBy: i.estimateBy, lastTouchAt: now,
       log: [{ at: now, text: (i.leadId ? `เปิด Opp จาก Lead ${i.leadId} และรับแบบจากลูกค้า` : "เปิด Opp และรับแบบจากลูกค้า") + (draft ? " (บันทึกร่าง)" : "") }],
     };
     setJobs((all) => [created, ...all]);
@@ -311,7 +323,9 @@ export function CrmMockScreen() {
           ) : (
             <>
               {view === "home" && <HomeView c={ctx} />}
-              {view === "pace" && <PaceView c={ctx} role={role} stores={role === "se" ? [] : roleStores} />}
+              {view === "room" && role === "room" && <RoomCorner jobs={jobs} onPatch={patchJob} onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))} toast={setToastMsg} />}
+          {view === "kim" && role === "kim" && <KimCorner jobs={jobs} onPatch={patchJob} onComplete={(id, key, extra) => patchJob(id, (j) => completeStep(j, key, extra))} toast={setToastMsg} />}
+          {view === "pace" && <PaceView c={ctx} role={role} stores={role === "se" ? [] : roleStores} />}
           {view === "perf" && !readOnly && <PerformanceView c={ctx} />}
           {view === "overview" && <OverviewView c={ctx} />}
           {view === "aftersale" && <AftersaleView c={ctx} />}
@@ -332,13 +346,13 @@ export function CrmMockScreen() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/70 bg-white/90 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-xl lg:hidden">
-        {(readOnly ? NAV_RO.slice(0, 3) : MOBILE_MAIN.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
+        {(readOnly ? roNav.slice(0, 3) : MOBILE_MAIN.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
           <button key={n.key} onClick={() => goView(n.key)} className={cn("relative flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
             <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
             {n.key === "inbox" && chatUnread > 0 && <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-rose-500" />}
           </button>
         ))}
-        <button onClick={() => setMore(true)} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", (readOnly ? NAV_RO.slice(3) : MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!)).some((n) => isActive(n.key)) ? "text-indigo-600" : "text-slate-400")}><Icon name="apps" />เพิ่มเติม</button>
+        <button onClick={() => setMore(true)} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", (readOnly ? roNav.slice(3) : MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!)).some((n) => isActive(n.key)) ? "text-indigo-600" : "text-slate-400")}><Icon name="apps" />เพิ่มเติม</button>
       </nav>
 
       {more && (
@@ -347,7 +361,7 @@ export function CrmMockScreen() {
           <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white p-4 pb-[max(env(safe-area-inset-bottom),16px)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <p className="mb-3 text-[13px] font-bold text-slate-900">เมนูเพิ่มเติม</p>
             <div className="grid grid-cols-3 gap-2">
-              {(readOnly ? NAV_RO.slice(3) : MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
+              {(readOnly ? roNav.slice(3) : MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
                 <button key={n.key} onClick={() => { setMore(false); goView(n.key); }} className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 py-3 text-[11px] font-semibold text-slate-700 active:scale-95"><Icon name={n.icon} className="text-indigo-600" />{n.label}</button>
               ))}
               <button onClick={() => { setMore(false); setChat(true); }} className="flex flex-col items-center gap-1 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-[11px] font-semibold text-violet-700 active:scale-95"><Icon name="auto_awesome" />น้องเลขา</button>

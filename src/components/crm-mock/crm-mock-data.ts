@@ -221,7 +221,7 @@ export type Segment = "general" | "hbd";
 export type Work = "roof" | "truss" | "ase" | "survey";
 /** ค่าสำรวจของงานชนิดสำรวจ (ค่าสมมติ รอยืนยัน) หักจากค่าติดตั้งตอนปิดขาย */
 export const SURVEY_FEE = 1500;
-export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "quote1" | "survey_fee" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver_frame" | "install_frame" | "deliver" | "install" | "handover";
+export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "estimate_room" | "quote1" | "survey_fee" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver_frame" | "install_frame" | "deliver" | "install" | "handover";
 export interface Send { party: Party; title: string; at: "start" | "done" }
 export interface StepDef { key: StepKey; label: string; owner: Party; day: number; post: boolean; hint: string; sends: Send[]; result?: string }
 
@@ -275,6 +275,7 @@ function meta(key: StepKey, seg: Segment, work: Work): Omit<StepDef, "day" | "po
   if (work === "survey") { const m = surveyMeta(key); if (m) return m; }
   switch (key) {
     case "plan_in": return { label: "รับแบบ", owner: "SE", hint: "ทีมขายรับแบบจากลูกค้า และเปิด Opp", sends: [] };
+    case "estimate_room": return { label: "ห้องแบบทำประมาณการ", owner: "ROOM", hint: "ห้องแบบถอดแบบและทำประมาณการให้ทีมขาย ส่งไฟล์กลับมาเพื่อทำใบเสนอราคา", sends: [{ party: "ROOM", title: "แบบแปลน + ใบเปิดงาน ขอทำประมาณการ", at: "start" }], result: "ประมาณการ (ไฟล์)" };
     case "ase_mark": return { label: "ขีดแนวอะเส", owner: "ROOM", hint: "ห้องแบบขีดแนวอะเส ส่งผลกลับมาให้ทีมขายใช้ทำประมาณการ", sends: [{ party: "ROOM", title: "ข้อมูลลูกค้า + แบบแปลน ขอขีดแนวอะเส", at: "start" }], result: "ผลขีดแนวอะเส (ไฟล์)" };
     case "truss_design":
       return seg === "hbd"
@@ -294,8 +295,20 @@ function meta(key: StepKey, seg: Segment, work: Work): Omit<StepDef, "day" | "po
     case "handover": return { label: "ส่งมอบงาน + ใบรับประกัน", owner: "KIM", hint: "KIM ส่งมอบงานกับลูกค้า และออกใบรับประกัน", sends: [], result: "ใบส่งมอบงาน + ใบรับประกัน" };
   }
 }
-export function template(seg: Segment, work: Work): StepDef[] {
-  return ORDER[seg][work].map((key) => ({ key, day: DAYS[seg][work][key] ?? 0, post: POST.includes(key), ...meta(key, seg, work) }));
+/** งานที่เลือก "ส่งห้องแบบทำประมาณการ" เพิ่มขั้นก่อนเสนอราคา และเลื่อนวันของขั้นถัดไป */
+export const ROOM_EST_DAYS = 2;
+export function template(seg: Segment, work: Work, room = false): StepDef[] {
+  const order = ORDER[seg][work];
+  const qi = order.indexOf("quote1");
+  const withRoom = room && qi >= 0;
+  const keys: StepKey[] = withRoom ? [...order.slice(0, qi), "estimate_room", ...order.slice(qi)] : order;
+  return keys.map((key, idx) => {
+    const days = DAYS[seg][work];
+    let day = days[key] ?? 0;
+    if (withRoom && key === "estimate_room") day = (days[keys[idx - 1]] ?? 0) + ROOM_EST_DAYS;
+    else if (withRoom && idx > qi) day += ROOM_EST_DAYS;
+    return { key, day, post: POST.includes(key), ...meta(key, seg, work) };
+  });
 }
 export const planTotals = (steps: StepDef[]) => {
   const close = steps.find((s) => s.key === "close")?.day ?? 0;
@@ -411,6 +424,9 @@ export function rightState(r: Right): "ok" | "soon" | "used" | "expired" {
   const left = (new Date(r.expiresAt).getTime() - NOW.getTime()) / 86400e3;
   return left < 0 ? "expired" : left <= 14 ? "soon" : "ok";
 }
+/** รายงานสำรวจหน้างาน (กรอกโดย KIM / ทีมสำรวจ) */
+export interface SurveyReport { at: string; by: string; area: number; shape: string; slope: number; condition: string; access: string; photos: number; notes: string }
+export const ROOM_DESIGNERS = ["ปลา", "อิ้งค์", "แบงค์"];
 /** คำเตือนงานค้างจากผู้จัดการถึงพนักงาน (จำลอง) */
 export interface Nudge { id: string; se: string; by: string; at: string; text: string; readAt?: string }
 
@@ -435,8 +451,12 @@ export interface Job {
   /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
   csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[]; /** ร้านที่รับงาน (คำนวณจากจังหวัด) */ store?: string;
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string; payments?: PaymentReq[]; plan?: PayPlan;
+  /** ใครทำประมาณการ (เฉพาะงาน HBD / ทรัส / อะเส) */ estimateBy?: "self" | "room";
+  /** ห้องแบบที่กดรับงานของแต่ละขั้น (คนแรกที่กดรับได้งาน) */ roomClaims?: Partial<Record<StepKey, { by: string; at: string }>>;
+  /** รายงานสำรวจจาก KIM / ทีมสำรวจ */ surveyReport?: SurveyReport;
 }
-export const stepsOf = (j: Job) => template(j.segment, j.work);
+export const usesRoomEstimate = (j: Pick<Job, "estimateBy" | "segment" | "work">) => j.estimateBy === "room" && (j.segment === "hbd" || j.work === "truss" || j.work === "ase");
+export const stepsOf = (j: Job) => template(j.segment, j.work, usesRoomEstimate(j));
 export const currentStep = (j: Job): StepDef | null => (j.cancelReason ? null : stepsOf(j).find((s) => !j.done[s.key]) ?? null);
 export const isFinished = (j: Job) => !j.cancelReason && stepsOf(j).every((s) => j.done[s.key]);
 export const hasDeposit = (j: Job) => j.segment === "general";
@@ -552,7 +572,7 @@ export function colOf(j: Job): ColKey | null {
   const c = currentStep(j);
   if (!c) return "done";
   switch (c.key) {
-    case "plan_in": case "ase_mark": return "intake";
+    case "plan_in": case "ase_mark": case "estimate_room": return "intake";
     case "truss_design": return j.segment === "hbd" ? "intake" : "post_survey";
     case "quote1": return "quote1";
     case "survey_fee": return "deposit";
@@ -711,7 +731,7 @@ function seedLeadsRaw(): Lead[] {
 
 interface Spec {
   id: string; customer: string; phone: string; province: string; segment: Segment; work: Work; value: number; quote1Value?: number;
-  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string; model?: Model; draft?: boolean; scope?: string;
+  at: StepKey | "done"; /** วันทำการที่ผ่านไปแล้วนับจากวันรับแบบ */ daysIn: number; owner?: string; surveyOffset?: number; scm?: Job["scm"]; touchH?: number; cancel?: string; model?: Model; draft?: boolean; scope?: string; estimateBy?: Job["estimateBy"];
 }
 function mk(sp: Spec): Job {
   const job: Job = {
@@ -723,6 +743,7 @@ function mk(sp: Spec): Job {
   if (sp.draft) { intake.files = []; intake.shape = undefined; intake.deg = undefined; }
   job.intake = sp.work === "survey" ? undefined : intake;
   if (sp.scope) job.scope = sp.scope;
+  if (sp.estimateBy) job.estimateBy = sp.estimateBy;
   if (sp.cancel) { job.cancelReason = sp.cancel; }
   const steps = stepsOf(job);
   for (const s of steps) {
@@ -747,6 +768,8 @@ export function seedJobs(): Job[] {
     a.csat = { r1: done(4.5, 9, "ทีมงานให้คำแนะนำดี อธิบายใบเสนอราคาชัดเจน", 900), r2: done(4.9, 10, "ติดตั้งเรียบร้อยตรงเวลา", 100) };
     a.rights = RIGHT_TEMPLATES.map((t, i) => ({ id: `${a.id}-R${i + 1}`, name: t.name, expiresAt: addDays(hAgo(900), t.days), usedAt: i === 0 ? hAgo(300) : undefined }));
   }
+  const rc = js.find((j) => j.id === "J-2611-0116");
+  if (rc) rc.roomClaims = { truss_design: { by: "อิ้งค์", at: hAgo(20) } };
   const b = js.find((j) => j.id === "J-2611-0110");
   if (b) b.csat = { r1: { sentAt: hAgo(30) } };
   return js;
@@ -768,6 +791,7 @@ function seedJobsRaw(): Job[] {
     mk({ id: "J-2611-0119", customer: "คุณนิรันดร์ เจริญสุข", phone: "086-555-0119", province: "นครราชสีมา", segment: "general", work: "roof", value: 205000, quote1Value: 205000, at: "install_plan", daysIn: 14, surveyOffset: -8, touchH: 20 }),
     mk({ id: "J-2611-0108", owner: "นุ้ย", customer: "คุณลักขณา สายทอง", phone: "082-555-0108", province: "สงขลา", segment: "general", work: "roof", value: 245000, quote1Value: 240000, at: "install_plan", daysIn: 15, surveyOffset: -9, scm: { ordered: hAgo(60), readyEta: addWd(NOW.toISOString(), 6) }, touchH: 40 }),
     mk({ id: "J-2611-0122", customer: "คุณวีระ ตั้งใจดี", phone: "081-555-0122", province: "สงขลา", segment: "general", work: "ase", value: 1250000, quote1Value: 1250000, at: "deliver_frame", daysIn: 24, surveyOffset: -16, scm: { ordered: hAgo(120), readyEta: addWd(NOW.toISOString(), 3) }, touchH: 30 }),
+    mk({ id: "J-2611-0123", customer: "คุณธนา วัฒนกุล", phone: "089-555-0123", province: "ขอนแก่น", segment: "hbd", work: "truss", value: 360000, at: "estimate_room", daysIn: 3, touchH: 18, estimateBy: "room" }),
     mk({ id: "J-2611-0118", customer: "คุณอรทัย สมบูรณ์", phone: "084-555-0118", province: "นครสวรรค์", segment: "hbd", work: "ase", value: 640000, at: "deliver", daysIn: 20, scm: { ordered: hAgo(240), readyEta: addWd(NOW.toISOString(), 2) }, touchH: 30 }),
     mk({ id: "J-2611-0109", customer: "คุณบุญเรือง ทองคำ", phone: "080-555-0109", province: "ภูเก็ต", segment: "general", work: "truss", value: 310000, quote1Value: 300000, at: "install", daysIn: 36, surveyOffset: -28, scm: { ordered: hAgo(500), readyEta: hAgo(200) }, touchH: 8 }),
     mk({ id: "J-2611-0110", customer: "คุณไพโรจน์ ดวงดี", phone: "087-555-0110", province: "ขอนแก่น", segment: "hbd", work: "roof", value: 175000, at: "handover", daysIn: 22, scm: { ordered: hAgo(700), readyEta: hAgo(500) }, touchH: 52 }),

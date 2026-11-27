@@ -15,7 +15,7 @@ import { KV, btnGhost, btnPrimary, glass, inputCls, labelCls } from "./crm-ui";
 import { TH_PROVINCES, districtsOf } from "./th-geo";
 
 export interface NewJobInput {
-  customer: string; phone: string; province: string; segment: Segment; work: Work; model: Model; value: number; owner: string; leadId?: string; intake: Intake;
+  customer: string; phone: string; province: string; segment: Segment; work: Work; model: Model; value: number; owner: string; leadId?: string; intake: Intake; estimateBy?: "self" | "room";
 }
 
 const PHONE_RE = /^0\d{1,2}-?[\dx]{3}-?[\dx]{3,4}$/i;
@@ -31,7 +31,7 @@ interface Form {
   ref: string; svc: string[]; pkgType: "total" | "standard"; pkg: string; det: Cat[]; round: "all" | "top" | "bottom";
   ase: string; chc: string; st2: "yes" | "no"; truss: string; muk: string; rc: string; eave: number;
   tile: string; tileModel: string; color: string; shape: string; deg: string; ins: string;
-  value: string; owner: string; files: { name: string; size: string }[];
+  value: string; owner: string; estimateBy: "self" | "room"; files: { name: string; size: string }[];
 }
 
 /** รายละเอียดกระเบื้องที่พนักงานกรอกไว้ตอนคีย์ Lead (ถ้ามี) ใช้เติมใบเปิดงาน */
@@ -48,7 +48,7 @@ function initForm(lead: Lead | null): Form {
     ref: "", svc: ["sol"], pkgType: "total", pkg: PKG_OPTS[0], det, round: "all",
     ase: ASE_OPTS[0], chc: CHC_OPTS[0], st2: "no", truss: "", muk: "", rc: "", eave: 2,
     tile: pickOpt(TILE_OPTS, leadDetail(lead)?.brand), tileModel: pickOpt(TILE_MODEL_OPTS, leadDetail(lead)?.model), color: pickOpt(COLOR_OPTS, leadDetail(lead)?.color), shape: "", deg: "", ins: INS_OPTS[2],
-    value: "", owner: OWNERS[0], files: [],
+    value: "", owner: OWNERS[0], estimateBy: "self", files: [],
   };
 }
 function formFromJob(j: Job): Form {
@@ -63,7 +63,7 @@ function formFromJob(j: Job): Form {
     ref: i?.refJob ?? "", svc: i?.svc ?? b.svc, pkgType: i?.pkgType ?? b.pkgType, pkg: i?.pkg ?? b.pkg, det: i?.det ?? b.det, round: i?.round ?? b.round,
     ase: i?.ase ?? b.ase, chc: i?.chc ?? b.chc, st2: i?.st2 ? "yes" : "no", truss: i?.truss ?? "", muk: i?.muk ?? "", rc: i?.rc ?? "", eave: i?.eave ?? b.eave,
     tile: i?.tile ?? b.tile, tileModel: i?.tileModel ?? b.tileModel, color: i?.color ?? b.color, shape: i?.shape ?? "", deg: i?.deg ?? "", ins: i?.ins ?? b.ins,
-    value: j.value > 0 ? j.value.toLocaleString("en-US") : "", owner: j.owner, files: i?.files ?? [],
+    value: j.value > 0 ? j.value.toLocaleString("en-US") : "", owner: j.owner, estimateBy: j.estimateBy ?? "self", files: i?.files ?? [],
   };
 }
 
@@ -254,7 +254,7 @@ export function NewOppPage({ lead, editJob, jobs, initialStep, onDirty, onCancel
   };
 
   const toInput = (): NewJobInput => ({
-    customer: f.name.trim(), phone: f.tel.trim(), province: f.prov.trim(), segment, work, model: f.model, value, owner: f.owner, leadId: f.lead || undefined, intake: toIntake(f),
+    customer: f.name.trim(), phone: f.tel.trim(), province: f.prov.trim(), segment, work, model: f.model, value, owner: f.owner, leadId: f.lead || undefined, intake: toIntake(f), estimateBy: segment === "hbd" || work === "truss" || work === "ase" ? f.estimateBy : "self",
   });
   const next = () => {
     const e = step === 1 ? validate1(f) : validate4(f, true);
@@ -515,6 +515,15 @@ export function NewOppPage({ lead, editJob, jobs, initialStep, onDirty, onCancel
                     <input inputMode="numeric" value={f.value} onChange={(e) => set("value", e.target.value.replace(/[^\d]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","))} placeholder="เช่น 250,000" className={cn(errCls(errs.value), "text-right tabular-nums")} />
                   </Fld>
                   <Fld label="ผู้ดูแล"><select value={f.owner} onChange={(e) => set("owner", e.target.value)} className={inputCls}>{OWNERS.map((o) => <option key={o}>{o}</option>)}</select></Fld>
+                  {(segment === "hbd" || work === "truss" || work === "ase") && (
+                    <Fld label="ใครทำประมาณการ" hint="งานที่มีทรัส/อะเส หรือ HBD เลือกส่งห้องแบบทำประมาณการได้ (ใช้เวลาเพิ่ม 2 วันทำการ)">
+                      <div className="grid grid-cols-2 gap-2">
+                        {([["self", "ทีมขายทำเอง", "ถอดแบบรายหมวดเองในแอป"], ["room", "ส่งห้องแบบทำ", "ห้องแบบรับงานแล้วส่งไฟล์ประมาณการกลับ"]] as const).map(([k, l, s]) => (
+                          <button key={k} type="button" onClick={() => set("estimateBy", k)} className={cn("rounded-xl border p-2.5 text-left transition", f.estimateBy === k ? "border-indigo-500 bg-indigo-50" : "border-slate-200 bg-white hover:border-indigo-300")}><b className="block text-[12px] text-slate-900">{l}</b><span className="text-[10.5px] text-slate-500">{s}</span></button>
+                        ))}
+                      </div>
+                    </Fld>
+                  )}
                 </div>
               </Sec>
             </>

@@ -7,7 +7,7 @@ import { InterestChips } from "./crm-interests";
 import { BoardFrame } from "./crm-overview";
 import { Avatar, PresetBanner, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
-export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas" | "inbox" | "overview" | "aftersale" | "perf" | "pace";
+export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas" | "inbox" | "overview" | "aftersale" | "perf" | "pace" | "room" | "kim";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;

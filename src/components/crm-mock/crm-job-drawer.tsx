@@ -4,9 +4,10 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, heldBy, instNet, planOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
+  CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, heldBy, instNet, planOf, usesRoomEstimate, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
+import { SurveyReportCard } from "./crm-corners";
 import { JourneyStrip } from "./crm-overview";
 import { GatePanel, PayStepPanel, PaymentsTab, PlanEditor, isPayStep, type SendLine } from "./crm-payment";
 import { CsatCard } from "./crm-customer";
@@ -62,6 +63,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
           <span className={cn("rounded-full px-3 py-1 text-[11.5px] font-bold", job.segment === "hbd" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600")}>{SEGMENT_LABEL[job.segment]}</span>
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-[11.5px] font-bold text-indigo-700">{WORK_LABEL[job.work]}</span>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-[11.5px] font-bold text-amber-800">{MODEL_LABEL[job.model]}</span>
+          {usesRoomEstimate(job) && <span className="rounded-full bg-fuchsia-50 px-3 py-1 text-[11.5px] font-bold text-fuchsia-700">ห้องแบบทำประมาณการ</span>}
           <button onClick={() => onOpenChat(job.phone, job.opsId)} className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-[#06a047] hover:bg-emerald-50"><Icon name="chat" style={{ fontSize: 17 }} />เปิดแชท</button>
           <span className="text-[20px] font-bold tracking-tight text-indigo-700">{valueText(job)}</span>
         </div>
@@ -115,6 +117,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
       {job.done.close && <CsatCard job={job} onPatch={onPatchJob} toast={toast} />}
 
       {job.work !== "survey" && <IntakeCard job={job} onEdit={() => onEditIntake(job.id)} />}
+      {job.surveyReport && <SurveyReportCard r={job.surveyReport} />}
 
       {job.work !== "survey" && <TakeoffCard job={job} onRevise={onRevise} />}
 

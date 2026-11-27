@@ -26,7 +26,7 @@ export function jobPhase(j: Job): number {
   if (!c) return 9;
   const b = flowOf(j) === "b";
   switch (c.key) {
-    case "plan_in": case "ase_mark": case "quote1": return 3;
+    case "plan_in": case "ase_mark": case "estimate_room": case "quote1": return 3;
     case "truss_design": return j.segment === "hbd" ? 3 : 5;
     case "survey_fee": return 3;
     case "deposit": return 4;

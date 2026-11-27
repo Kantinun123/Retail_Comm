@@ -226,7 +226,7 @@ export function PaceMini({ c }: { c: Ctx }) {
 export const unreadNudges = (nudges: Nudge[], nick: string) => nudges.filter((n) => n.se === nick && !n.readAt).length;
 
 /* ---------- หน้าหลัก ---------- */
-const ROLE_NAME: Record<Role, string> = { se: "พนักงานขาย", coach: "โค้ช", area: "Area", dealer: "ร้านค้า" };
+const ROLE_NAME: Record<Role, string> = { se: "พนักงานขาย", coach: "โค้ช", area: "Area", dealer: "ร้านค้า", room: "ห้องแบบ", kim: "KIM" };
 export function PaceView({ c, role, stores }: { c: Ctx; role: Role; stores: string[] }) {
   const [mode, setMode] = useState<Mode>("sales");
   const [open, setOpen] = useState<string[]>([]);
