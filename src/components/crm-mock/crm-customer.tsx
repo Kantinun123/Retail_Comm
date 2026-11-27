@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { CSAT_Q, NOW, RIGHT_TEMPLATES, addDays, baht, dtTh, dateTh, rightState, type Job, type Right } from "./crm-mock-data";
-import { Avatar, Drawer, KV, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
+import { CSAT_Q, NOW, RIGHT_TEMPLATES, addDays, baht, dateTh, dtTh, rightState, type ChatState, type Job, type Lead, type Right } from "./crm-mock-data";
+import { FAMILY_URL, TimelineCard, type FamilyState } from "./crm-timeline";
+import { Avatar, Drawer, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
 
 type Patch = (id: string, fn: (j: Job) => Job) => void;
 const nowIso = () => NOW.toISOString();
-const familyCode = (phone: string) => `SF-${phone.replace(/\D/g, "").slice(-7).padStart(7, "0")}`;
+export const familyCode = (phone: string) => `SF-${phone.replace(/\D/g, "").slice(-7).padStart(7, "0")}`;
 
 /* ---------------- CSAT ใน Drawer ของงาน ---------------- */
 export function CsatCard({ job, onPatch, toast }: { job: Job; onPatch: Patch; toast: (m: string) => void }) {
@@ -78,37 +79,40 @@ export function CsatCard({ job, onPatch, toast }: { job: Job; onPatch: Patch; to
 
 /* ---------------- รายชื่อลูกค้า ---------------- */
 interface Cust { phone: string; name: string; province: string; jobs: Job[] }
-function groupCustomers(jobs: Job[]): Cust[] {
+function groupCustomers(jobs: Job[], leads: Lead[]): Cust[] {
   const m = new Map<string, Cust>();
   for (const j of jobs) {
     const c = m.get(j.phone) ?? { phone: j.phone, name: j.customer, province: j.province, jobs: [] };
     c.jobs.push(j);
     m.set(j.phone, c);
   }
+  /* ลูกค้าที่ยังมีแต่ Lead (ยังไม่เปิด Opp) ก็ค้นไทม์ไลน์ได้ */
+  for (const l of leads) if (!m.has(l.phone)) m.set(l.phone, { phone: l.phone, name: l.name, province: l.province, jobs: [] });
   return [...m.values()];
 }
+const famText = (f?: { sentAt: string; registeredAt?: string }, phone = "") => (f?.registeredAt ? familyCode(phone) : f ? "ส่งลิงก์แล้ว" : "ยังไม่สมัคร");
 const csatAvg = (c: Cust) => {
   const v = c.jobs.flatMap((j) => [j.csat?.r1?.done?.avg, j.csat?.r2?.done?.avg]).filter((x): x is number => typeof x === "number");
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 };
 const activeRights = (c: Cust) => c.jobs.flatMap((j) => j.rights ?? []).filter((r) => rightState(r) === "ok" || rightState(r) === "soon").length;
 
-export function CustomersView({ jobs, openCustomer }: { jobs: Job[]; openCustomer: (phone: string) => void }) {
+export function CustomersView({ jobs, leads, family, openCustomer }: { jobs: Job[]; leads: Lead[]; family: FamilyState; openCustomer: (phone: string) => void }) {
   const [q, setQ] = useState("");
   const list = useMemo(() => {
     const rank = (c: Cust) => (c.jobs.some((j) => j.done.close) ? 1 : 0) * 2 + (activeRights(c) > 0 ? 1 : 0);
-    return groupCustomers(jobs).filter((c) => !q || `${c.name}${c.phone}${c.province}`.includes(q)).sort((a, b) => rank(b) - rank(a));
-  }, [jobs, q]);
+    return groupCustomers(jobs, leads).filter((c) => !q || `${c.name}${c.phone}${c.province}`.includes(q)).sort((a, b) => rank(b) - rank(a));
+  }, [jobs, leads, q]);
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-[22px] font-bold tracking-tight text-slate-900">ลูกค้า 360°</h1>
-        <p className="text-[12.5px] text-slate-500">รวมทุก Opp, คะแนนความพึงพอใจ และสิทธิพิเศษของลูกค้าแต่ละคน ผูกด้วยรหัส SCG Family</p>
+        <p className="text-[12.5px] text-slate-500">รวมทุก Opp, คะแนนความพึงพอใจ และสิทธิพิเศษของลูกค้าแต่ละคน ผูกด้วยเบอร์โทร · กดแถวเพื่อดูไทม์ไลน์ของลูกค้า</p>
       </div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อ เบอร์ หรือจังหวัด" className={cn(inputCls, "max-w-md")} />
       <div className={cn(glass, "overflow-x-auto")}>
         <table className="w-full min-w-[760px] text-left text-[12.5px]">
-          <thead className="bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500"><tr>{["ลูกค้า", "รหัส SCG Family", "Opp", "ยอดปิดขาย", "CSAT เฉลี่ย", "สิทธิพิเศษที่ใช้ได้"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr></thead>
+          <thead className="bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500"><tr>{["ลูกค้า", "SCG Family", "Opp", "ยอดปิดขาย", "CSAT เฉลี่ย", "สิทธิพิเศษที่ใช้ได้"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr></thead>
           <tbody>
             {list.map((c) => {
               const avg = csatAvg(c);
@@ -117,7 +121,7 @@ export function CustomersView({ jobs, openCustomer }: { jobs: Job[]; openCustome
               return (
                 <tr key={c.phone} onClick={() => openCustomer(c.phone)} className="cursor-pointer border-t border-slate-100 hover:bg-indigo-50/40">
                   <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={c.name} /><div><div className="font-semibold text-slate-900">{c.name}</div><div className="text-[11px] text-slate-400">{c.phone} · {c.province}</div></div></div></td>
-                  <td className="px-4 py-3 text-slate-500">{familyCode(c.phone)}</td>
+                  <td className="px-4 py-3"><span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", family[c.phone]?.registeredAt ? "bg-rose-50 text-rose-700" : family[c.phone] ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-400")}>{famText(family[c.phone], c.phone)}</span></td>
                   <td className="px-4 py-3">{c.jobs.length}</td>
                   <td className="px-4 py-3 font-semibold text-slate-800">{sum ? baht(sum) : "-"}</td>
                   <td className="px-4 py-3">{avg === null ? <span className="text-slate-300">-</span> : <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", avg >= 4 ? "bg-emerald-50 text-emerald-700" : avg >= 3 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700")}>{avg.toFixed(1)}</span>}</td>
@@ -137,39 +141,61 @@ export function CustomersView({ jobs, openCustomer }: { jobs: Job[]; openCustome
 const RIGHT_CLS = { ok: "bg-emerald-50 text-emerald-700", soon: "bg-amber-50 text-amber-700", used: "bg-sky-50 text-sky-700", expired: "bg-slate-100 text-slate-500" } as const;
 const RIGHT_TXT = { ok: "ใช้ได้", soon: "ใกล้หมดอายุ", used: "ใช้แล้ว", expired: "หมดอายุ" } as const;
 
-export function Customer360Drawer({ phone, jobs, onClose, openJob, onUseRight, onOpenChat }: {
+export function Customer360Drawer({ phone, jobs, leads, chat, family, onClose, openJob, openLead, onUseRight, onOpenChat, onSendFamily, onFamilyRegistered, toast }: {
   onOpenChat: (phone: string, job?: string) => void;
-  phone: string | null; jobs: Job[]; onClose: () => void; openJob: (id: string) => void; onUseRight: (j: Job, r: Right) => void;
+  phone: string | null; jobs: Job[]; leads: Lead[]; chat: ChatState; family: FamilyState; onClose: () => void; openJob: (id: string) => void; openLead: (id: string) => void; onUseRight: (j: Job, r: Right) => void;
+  onSendFamily: (phone: string, name: string) => void; onFamilyRegistered: (phone: string) => void; toast: (m: string) => void;
 }) {
   const mine = phone ? jobs.filter((j) => j.phone === phone) : [];
+  const myLeads = phone ? leads.filter((l) => l.phone === phone) : [];
   const c = mine[0];
+  const name = c?.customer ?? myLeads[0]?.name ?? "";
+  const province = c?.province ?? myLeads[0]?.province ?? "";
   const rights = mine.flatMap((j) => (j.rights ?? []).map((r) => ({ r, j })));
-  const events = mine.flatMap((j) => j.log.map((e) => ({ ...e, job: j.id }))).sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 12);
-  const avg = c ? csatAvg({ phone: c.phone, name: c.customer, province: c.province, jobs: mine }) : null;
+  const avg = phone ? csatAvg({ phone, name, province, jobs: mine }) : null;
+  const fam = phone ? family[phone] : undefined;
   return (
-    <Drawer open={!!phone} onClose={onClose} wide title={c?.customer ?? ""} subtitle={c ? `${c.phone} · ${c.province}` : ""}>
-      {c && (
+    <Drawer open={!!phone} onClose={onClose} wide title={name} subtitle={phone ? `${phone} · ${province}` : ""}>
+      {phone && (c || myLeads.length > 0) && (
         <>
           <div className={cn(glass, "p-4")}>
-            <div className="flex items-center gap-2 rounded-xl bg-indigo-50 px-3 py-2 text-[12px]"><Icon name="badge" style={{ fontSize: 17 }} />รหัส SCG Family <b className="ml-auto text-indigo-700">{familyCode(c.phone)}</b></div>
-            <button onClick={() => onOpenChat(c.phone)} className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-semibold text-[#06a047] hover:bg-emerald-50"><Icon name="chat" style={{ fontSize: 17 }} />เปิดแชท LINE OA</button>
+            <div className={cn("flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-[12px]", fam?.registeredAt ? "bg-rose-50" : "bg-indigo-50")}>
+              <Icon name="badge" style={{ fontSize: 17 }} />
+              <b className="text-slate-800">SCG Family</b>
+              {fam?.registeredAt ? <span className="ml-auto font-bold text-rose-700">สมัครแล้ว · {familyCode(phone)}</span> : fam ? (
+                <>
+                  <span className="text-amber-700">ส่งลิงก์แล้ว {dateTh(fam.sentAt)} · รอลูกค้าสมัคร</span>
+                  <button onClick={() => onFamilyRegistered(phone)} className={cn(btnGhost, "ml-auto !px-2.5 !py-1 !text-[11px]")}>จำลอง: ลูกค้าสมัครแล้ว</button>
+                </>
+              ) : <span className="text-slate-500">ยังไม่ได้สมัคร</span>}
+            </div>
+            {!fam?.registeredAt && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button onClick={() => onSendFamily(phone, name)} className={cn(btnPrimary, "!px-3 !py-1.5 !text-[12px]")}><Icon name="send" style={{ fontSize: 16 }} />{fam ? "ส่งลิงก์อีกครั้งทาง LINE" : "ส่งลิงก์สมัคร SCG Family ทาง LINE"}</button>
+                <a href={FAMILY_URL} target="_blank" rel="noreferrer" className={cn(btnGhost, "!px-3 !py-1.5 !text-[12px]")}><Icon name="open_in_new" style={{ fontSize: 16 }} />เปิดหน้าสมัคร</a>
+              </div>
+            )}
+            <button onClick={() => onOpenChat(phone)} className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12.5px] font-semibold text-[#06a047] hover:bg-emerald-50"><Icon name="chat" style={{ fontSize: 17 }} />เปิดแชท LINE OA</button>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               {[[String(mine.length), "Opp"], [baht(mine.filter((j) => j.done.close).reduce((a, j) => a + j.value, 0)), "ยอดปิดขาย"], [avg === null ? "-" : avg.toFixed(1), "CSAT เฉลี่ย"]].map(([a, b]) => (
                 <div key={b} className="rounded-xl bg-white/70 p-2"><div className="text-[15px] font-bold text-slate-900">{a}</div><div className="text-[10.5px] text-slate-500">{b}</div></div>
               ))}
             </div>
           </div>
-          <div className={cn(glass, "p-4")}>
-            <h3 className="mb-2 text-[13px] font-bold text-slate-900">Opp ทั้งหมดของลูกค้า</h3>
-            {mine.map((j) => (
-              <button key={j.id} onClick={() => openJob(j.id)} className="flex w-full flex-wrap items-center gap-3 border-b border-slate-100 py-2.5 text-left last:border-0 hover:bg-indigo-50/40">
-                <span className="text-[11px] text-slate-400">{j.opsId}</span>
-                <span className="text-[13px] font-semibold text-slate-800">{j.scope ?? "งานหลังคา"}</span>
-                <span className="text-[12px] text-slate-500">{j.value > 0 ? baht(j.value) : "ยังไม่ประเมิน"}</span>
-                <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold", j.done.handover ? "bg-emerald-100 text-emerald-800" : j.done.close ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700")}>{j.done.handover ? "ส่งมอบแล้ว" : j.done.close ? "ปิดขายแล้ว" : "กำลังดำเนินการ"}</span>
-              </button>
-            ))}
-          </div>
+          <TimelineCard phone={phone} name={name} jobs={jobs} leads={leads} chat={chat} fam={fam} openJob={openJob} openLead={openLead} onCopy={(t) => { void navigator.clipboard?.writeText(t); toast("คัดลอกสรุปเคสแล้ว"); }} />
+          {mine.length > 0 && (
+            <div className={cn(glass, "p-4")}>
+              <h3 className="mb-2 text-[13px] font-bold text-slate-900">Opp ทั้งหมดของลูกค้า</h3>
+              {mine.map((j) => (
+                <button key={j.id} onClick={() => openJob(j.id)} className="flex w-full flex-wrap items-center gap-3 border-b border-slate-100 py-2.5 text-left last:border-0 hover:bg-indigo-50/40">
+                  <span className="text-[11px] text-slate-400">{j.opsId}</span>
+                  <span className="text-[13px] font-semibold text-slate-800">{j.scope ?? "งานหลังคา"}</span>
+                  <span className="text-[12px] text-slate-500">{j.value > 0 ? baht(j.value) : "ยังไม่ประเมิน"}</span>
+                  <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold", j.done.handover ? "bg-emerald-100 text-emerald-800" : j.done.close ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700")}>{j.done.handover ? "ส่งมอบแล้ว" : j.done.close ? "ปิดขายแล้ว" : "กำลังดำเนินการ"}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className={cn(glass, "p-4")}>
             <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-bold text-slate-900"><Icon name="redeem" style={{ fontSize: 18 }} />สิทธิพิเศษของลูกค้า</h3>
             {rights.length === 0 ? <p className="text-[12px] text-slate-400">ยังไม่มีสิทธิ์ ระบบมอบให้หลังลูกค้าตอบแบบประเมินรอบ 1</p> : rights.map(({ r, j }) => {
@@ -182,13 +208,6 @@ export function Customer360Drawer({ phone, jobs, onClose, openJob, onUseRight, o
                 </div>
               );
             })}
-          </div>
-          <div className={cn(glass, "p-4")}>
-            <h3 className="mb-2 text-[13px] font-bold text-slate-900">เหตุการณ์ล่าสุด</h3>
-            <KV k="จำนวนเหตุการณ์" v={`${events.length} รายการล่าสุด`} />
-            <ul className="mt-1 space-y-1.5">
-              {events.map((e, i) => <li key={i} className="flex gap-2 text-[12px] text-slate-600"><span className="w-28 shrink-0 text-[11px] text-slate-400">{dtTh(e.at)}</span><span>{e.text} <span className="text-slate-400">· {e.job}</span></span></li>)}
-            </ul>
           </div>
         </>
       )}

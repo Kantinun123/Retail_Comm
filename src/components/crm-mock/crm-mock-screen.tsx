@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { chatRooms, seedChat, totalUnread, type ChatMsg, type ChatState, type Nudge, DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { addDays, chatRooms, seedChat, totalUnread, type ChatMsg, type ChatState, type Nudge, DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
 import { AreasView } from "./crm-areas";
@@ -18,6 +18,7 @@ import { HomeView } from "./crm-home";
 import { AftersaleView, OverviewView } from "./crm-overview";
 import { PerformanceView } from "./crm-performance";
 import { PaceView, unreadNudges } from "./crm-pace";
+import { familyMessage, type FamilyState } from "./crm-timeline";
 import { LeadsView, type Ctx, type View } from "./crm-views";
 import { ReportView, RoleBar, type Role } from "./crm-report";
 import { GuideCtx, setGuideOn, useGuidePref } from "./crm-guide";
@@ -94,6 +95,11 @@ export function CrmMockScreen() {
   const [toastMsg, setToastMsg] = useState("");
   const [more, setMore] = useState(false);
   const [nudges, setNudges] = useState<Nudge[]>([]);
+  /* สถานะการชวนสมัคร SCG Family ต่อเบอร์ลูกค้า (จำลอง) */
+  const [family, setFamily] = useState<FamilyState>(() => ({
+    "086-555-0111": { sentAt: addDays(NOW.toISOString(), -30), registeredAt: addDays(NOW.toISOString(), -29) },
+    "087-555-0110": { sentAt: addDays(NOW.toISOString(), -6) },
+  }));
   const [preset, setPreset] = useState<{ key: string; label: string } | null>(null);
 
   useEffect(() => {
@@ -160,7 +166,7 @@ export function CrmMockScreen() {
     setView(v);
   };
   /** ส่งข้อความ/การ์ดเข้าห้องแชท LINE OA ของงาน (จำลอง) */
-  const pushChat = (job: Job, m: Omit<ChatMsg, "id" | "at" | "phone" | "job">) => setChatSt((s) => ({ ...s, msgs: [...s.msgs, { ...m, phone: job.phone, job: job.opsId, id: `m${s.msgs.length + 1}-${Math.random().toString(36).slice(2, 6)}`, at: new Date(NOW.getTime() + (s.msgs.length % 3600) * 1000).toISOString() }] }));
+  const pushChat = (job: { phone: string; opsId: string }, m: Omit<ChatMsg, "id" | "at" | "phone" | "job">) => setChatSt((s) => ({ ...s, msgs: [...s.msgs, { ...m, phone: job.phone, job: job.opsId, id: `m${s.msgs.length + 1}-${Math.random().toString(36).slice(2, 6)}`, at: new Date(NOW.getTime() + (s.msgs.length % 3600) * 1000).toISOString() }] }));
   /** เปิดห้องแชทของลูกค้า (สร้างห้องให้ถ้ายังไม่มี) */
   const openChat = (phone: string, jobTag?: string) => {
     setChatSt((s) => ({
@@ -318,7 +324,7 @@ export function CrmMockScreen() {
                   onPatchLead={(id, p) => setLeads((all) => all.map((l) => (l.id === id ? { ...l, ...p } : l)))} onPatchJob={patchJob}
                   openLead={setLeadId} openJob={setJobId} openAccount={setCustPhone} toast={setToastMsg} />
               )}
-              {view === "customers" && !readOnly && <CustomersView jobs={jobs} openCustomer={setCustPhone} />}
+              {view === "customers" && !readOnly && <CustomersView jobs={jobs} leads={leads} family={family} openCustomer={setCustPhone} />}
               {view === "report" && readOnly && <ReportView role={role as Exclude<Role, "se">} c={ctx} stores={roleStores} />}
             </>
           )}
@@ -366,7 +372,14 @@ export function CrmMockScreen() {
       <AddLeadDrawer coverage={coverage} open={addingLead} onClose={() => setAddingLead(false)} nextId={nextLeadId()}
         onAdd={(l) => { setLeads((all) => [l, ...all]); setView("leads"); setToastMsg(`เพิ่ม Lead ${l.id} แล้ว`); }} />
       <NewSurveyDrawer open={!!survey} lead={survey?.lead ?? null} prefill={survey?.prefill} onClose={() => setSurvey(null)} onCreate={createSurvey} />
-      <Customer360Drawer onOpenChat={openChat} phone={custPhone} jobs={jobs} onClose={() => setCustPhone(null)} openJob={(id) => { setCustPhone(null); setJobId(id); }}
+      <Customer360Drawer onOpenChat={openChat} phone={custPhone} jobs={jobs} leads={leads} chat={chatSt} family={family} toast={setToastMsg} onClose={() => setCustPhone(null)} openJob={(id) => { setCustPhone(null); setJobId(id); }} openLead={(id) => { setCustPhone(null); setLeadId(id); }}
+        onSendFamily={(ph, nm) => {
+          const anchor = jobs.find((j) => j.phone === ph)?.opsId ?? leads.find((l) => l.phone === ph)?.id ?? "";
+          pushChat({ phone: ph, opsId: anchor }, { kind: "se", who: seNick, text: familyMessage(nm) });
+          setFamily((f) => ({ ...f, [ph]: { sentAt: NOW.toISOString() } }));
+          setToastMsg("ส่งลิงก์สมัคร SCG Family ทาง LINE OA แล้ว (จำลอง)");
+        }}
+        onFamilyRegistered={(ph) => { setFamily((f) => ({ ...f, [ph]: { ...(f[ph] ?? { sentAt: NOW.toISOString() }), registeredAt: NOW.toISOString() } })); setToastMsg("ลูกค้าสมัคร SCG Family แล้ว (จำลอง)"); }}
         onUseRight={(j, r) => { setCustPhone(null); setSurvey({ lead: null, prefill: { customer: j.customer, phone: j.phone, province: j.province, scope: r.name }, right: { jobId: j.id, rightId: r.id } }); }} />
       <ChatDrawer open={chat} onClose={() => setChat(false)} leads={leads} jobs={jobs} tasks={tasks} onTask={openTask} onJob={(id) => { setChat(false); setJobId(id); }} onLead={(id) => { setChat(false); setLeadId(id); }} toast={setToastMsg} />
 
