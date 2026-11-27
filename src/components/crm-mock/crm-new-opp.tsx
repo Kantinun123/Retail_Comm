@@ -104,7 +104,7 @@ function toIntake(f: Form): Intake {
   };
 }
 /** โมเดลร้านในแอป Retail Comm -> โมเดลที่ CRM มีกติกามัดจำ (GT / XP ยังไม่มี) */
-const modelOf = (m: string | null): Model | undefined => (m === "Housing Expert" ? "he" : m === "SCG Home" ? "scg" : undefined);
+const modelOf = (m: string | null): Model | undefined => (m === "Housing Expert" ? "he" : m === "SCG Home" ? "scg" : m === "GT" ? "gt" : undefined);
 const fmtSize = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const toggleIn = (arr: string[], v: string) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 const errCls = (err?: string) => cn(inputCls, err && "border-rose-400 bg-rose-50/50 focus:border-rose-400 focus:ring-rose-100");
@@ -254,7 +254,7 @@ export function NewOppPage({ lead, editJob, jobs, initialStep, onDirty, onCancel
   };
 
   const toInput = (): NewJobInput => ({
-    customer: f.name.trim(), phone: f.tel.trim(), province: f.prov.trim(), segment, work, model: f.model, value, owner: f.owner, leadId: f.lead || undefined, intake: toIntake(f), estimateBy: segment === "hbd" || work === "truss" || work === "ase" ? f.estimateBy : "self",
+    customer: f.name.trim(), phone: f.tel.trim(), province: f.prov.trim(), segment, work, model: f.model, value, owner: f.owner, leadId: f.lead || undefined, intake: toIntake(f), estimateBy: f.model === "gt" ? "room" : segment === "hbd" || work === "truss" || work === "ase" ? f.estimateBy : "self",
   });
   const next = () => {
     const e = step === 1 ? validate1(f) : validate4(f, true);
@@ -368,8 +368,8 @@ export function NewOppPage({ lead, editJob, jobs, initialStep, onDirty, onCancel
                   </Fld>
                   <div>
                     <Group label="โมเดล">
-                      {(["he", "scg"] as const).map((m) => (
-                        <Radio key={m} checked={f.model === m} disabled={modelLocked} onChange={() => set("model", m)} label={<span><b>{MODEL_LABEL[m]}</b> <span className="text-slate-400">· {m === "he" ? `มัดจำ ${DEPOSIT_PCT}% ของราคา` : `มัดจำคงที่ ${baht(DEPOSIT_SCG)}`}</span></span>} />
+                      {(["he", "scg", "gt"] as const).map((m) => (
+                        <Radio key={m} checked={f.model === m} disabled={modelLocked} onChange={() => set("model", m)} label={<span><b>{MODEL_LABEL[m]}</b> <span className="text-slate-400">· {m === "he" ? `ร้านเก็บเงินเอง · ลด 7% เมื่อเปิด PO` : m === "gt" ? `ร้านเก็บเงินเอง · ลด 5% เมื่อเปิด PO · ประมาณการ ฿2,500` : `มัดจำคงที่ ${baht(DEPOSIT_SCG)} · คอมมิชชั่น 7% ภายหลัง`}</span></span>} />
                       ))}
                     </Group>
                     {storeModel !== undefined && <p className="mt-1 text-[11px] text-emerald-700">กำหนดตามโมเดลร้านในแอป Retail Comm</p>}

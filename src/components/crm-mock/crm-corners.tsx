@@ -36,7 +36,7 @@ const startOf = (j: Job, key: StepKey) => { const st = stepsOf(j); const i = st.
 export function RoomCorner({ jobs, onPatch, onComplete, toast }: { jobs: Job[]; onPatch: Patch; onComplete: Complete; toast: (m: string) => void }) {
   const [me, setMe] = useState(ROOM_DESIGNERS[0]);
   const [checks, setChecks] = useState<Record<string, boolean[]>>({});
-  const tasks = jobs.flatMap((j) => { if (j.cancelReason) return []; const s = currentStep(j); return s && ROOM_KEYS.includes(s.key) ? [{ j, s, left: (ROOM_SLA[s.key] ?? 3) - wdBetween(startOf(j, s.key), NOW.toISOString()) }] : []; }).sort((a, b) => a.left - b.left);
+  const tasks = jobs.flatMap((j) => { if (j.cancelReason) return []; const s = currentStep(j); return s && ROOM_KEYS.includes(s.key) && !(j.model === "gt" && s.key === "estimate_room" && !j.estimatePo) ? [{ j, s, left: (ROOM_SLA[s.key] ?? 3) - wdBetween(startOf(j, s.key), NOW.toISOString()) }] : []; }).sort((a, b) => a.left - b.left);
   const done = jobs.flatMap((j) => ROOM_KEYS.filter((k) => j.done[k] && j.roomClaims?.[k]).map((k) => ({ j, k, at: j.done[k]!, by: j.roomClaims![k]!.by }))).sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 5);
   const waiting = tasks.filter((t) => !t.j.roomClaims?.[t.s.key]);
   const mine = tasks.filter((t) => t.j.roomClaims?.[t.s.key]?.by === me);

@@ -10,6 +10,7 @@ import {
   type ChatMsg, type Installment, type Job, type PayMethod, type PaymentReq, type StepDef, type StepKey,
 } from "./crm-mock-data";
 import { btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
+import { PoTrackPanel } from "./crm-gt";
 
 export type SendLine = (job: { phone: string; opsId: string }, m: Omit<ChatMsg, "id" | "at" | "phone" | "job">) => void;
 type PayKey = PaymentReq["step"];
@@ -311,6 +312,17 @@ export function PayStepPanel({ job, s, payKey, surveyAt, onComplete, onPatchJob,
   const viaPo = req?.pending === "po";
 
   if (blocked) return <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-[12px] font-semibold text-amber-800"><Icon name="lock" className="!text-[16px] align-middle" /> ขอรับชำระงวดแรกไม่ได้ แผนชำระต่ำกว่าขั้นต่ำ {minFirstPct()}% ต้องให้ Area อนุมัติแผนชำระก่อน (ดูแผนชำระในแท็บ &ldquo;การเงิน&rdquo;)</p>;
+  if (job.model !== "scg" && !req) {
+    const amt = amountFor(job, key).amount;
+    const confirmPo = (poNo: string) => {
+      const no = `RC-${job.id.slice(-4)}-${(job.payments?.length ?? 0) + 1}`;
+      const r: PaymentReq = { id: `PAY-${job.id.slice(-4)}-${(job.payments?.length ?? 0) + 1}`, step: key, label: stepLabel(job, key), amount: amt, methods: ["po"], dueAt: stamp(), status: "paid", method: "po", po: poNo, requestedAt: stamp(), paidAt: stamp(), receiptNo: no };
+      onPatchJob(job.id, (j) => ({ ...j, lastTouchAt: stamp(), payments: [...(j.payments ?? []), r], log: [...j.log, { at: stamp(), text: `ร้านส่ง PO ${poNo} ถึง SCG สำหรับ${r.label} ${baht(amt)}` }] }));
+      if (completes) onComplete(job.id, s.key, key === "deposit" ? { surveyAt: new Date(`${surveyAt}:00+07:00`).toISOString() } : undefined);
+      toast(key === "close" ? "บันทึก PO จากร้านแล้ว กดยืนยันปิดขายต่อได้เลย" : `บันทึก PO จากร้านแล้ว`);
+    };
+    return <PoTrackPanel job={job} label={stepLabel(job, key)} amount={amt} onConfirm={confirmPo} />;
+  }
   return (
     <div className="space-y-2">
       {!req && <button onClick={() => setModal(true)} className={btnPrimary}><Icon name="request_quote" style={{ fontSize: 18 }} />ขอรับชำระ {stepLabel(job, key)} {baht(amountFor(job, key).amount)} ทาง LINE OA</button>}
