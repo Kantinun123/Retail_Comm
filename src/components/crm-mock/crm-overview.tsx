@@ -33,7 +33,7 @@ export function jobPhase(j: Job): number {
     case "survey": return 4;
     case "quote2": return 5;
     case "close": return 6;
-    case "install_plan": case "deliver": case "install": return 7;
+    case "install_plan": case "deliver_frame": case "install_frame": case "deliver": case "install": return 7;
     default: return 8;
   }
 }
@@ -237,8 +237,8 @@ function laneOf(j: Job): Lane | null {
   if (!c) return "warranty";
   switch (c.key) {
     case "install_plan": return "plan";
-    case "deliver": return "prep";
-    case "install": return "install";
+    case "deliver_frame": case "deliver": return "prep";
+    case "install_frame": case "install": return "install";
     case "handover": return "handover";
     default: return null;
   }

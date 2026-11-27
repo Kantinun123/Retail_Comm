@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useSyncExternalStore } from "react
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  PARTY, baht, cleanInterests, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, interestSummary, isFinished, leadSla, missingOf, slaHoursOf, stepsOf, suggestRoute,
+  PARTY, baht, cleanInterests, currentStep, dateTh, depositOf, instNet, planOf, dtTh, dueLabel, dueOf, interestSummary, isFinished, leadSla, missingOf, slaHoursOf, stepsOf, suggestRoute,
   type Job, type Lead,
 } from "./crm-mock-data";
 import { btnGhost, btnPrimary, glass } from "./crm-ui";
@@ -185,8 +185,8 @@ export function oppGuide(job: Job): BannerData | null {
       tips: [`แจ้งลูกค้าชำระ${survey ? "ค่าสำรวจ" : "มัดจำ"} ${baht(depositOf(job))}`, "ล็อกวันนัดสำรวจกับลูกค้า (เลือกวันที่ในช่องด้านล่าง)", survey ? "กดบันทึก ระบบส่งงานให้ทีมสำรวจเอง" : "กดบันทึก ระบบส่งข้อมูลให้ KIM และ SCM เอง"] };
   }
   if (key === "close") {
-    return { ...base, note, title: cur.label, why: cur.hint, cta: "บันทึกรับเงินครบ 100%",
-      tips: [`ตรวจยอดคงเหลือที่ลูกค้าต้องชำระ ${baht(Math.max(0, job.value - depositOf(job)))}`, "เก็บเงินครบแล้วบันทึกรับเงิน 100%", "ระบบส่งข้อมูลปิดขายให้ KIM และ SCM เอง"] };
+    return { ...base, note, title: cur.label, why: cur.hint, cta: "ขอรับชำระงวดแรก",
+      tips: [`งวดแรก ${planOf(job).items[0].pct}% เก็บจริง ${baht(instNet(job, 1))} (หักที่ชำระแล้ว)`, "ส่งแผนชำระให้ลูกค้าดูพร้อมใบเสนอราคา แล้วขอรับชำระงวดแรกทาง LINE", "ชำระแล้วกดยืนยันปิดขาย ระบบส่งข้อมูลให้ KIM และ SCM เอง"] };
   }
   if (key === "quote1" || key === "quote2") {
     return { ...base, note, script: "follow", title: cur.label, why: cur.hint, cta: `ทำขั้น "${cur.label}"`,
@@ -236,11 +236,17 @@ export function chatGuide(o: { name: string; lead?: Lead; job?: Job }): ChatGuid
         return { stage: "เสนอราคาหลังสำรวจ", goal: "อธิบายผลสำรวจและรายการที่เปลี่ยนจากใบเสนอราคาแรก", ask: ["ลูกค้าเห็นรายงานสำรวจและรูปหน้างานหรือยัง", "รายการไหนเปลี่ยนจากใบแรก เพราะอะไร", "พร้อมชำระส่วนที่เหลือเมื่อไร"],
           messages: [{ label: "ส่งใบเสนอราคาหลังสำรวจ", text: `${n} ค่ะ ทีมสำรวจเสร็จแล้ว ส่งรายงานสำรวจและใบเสนอราคาฉบับปรับตามหน้างานให้แล้วนะคะ${amount} มีรายการไหนอยากให้อธิบายเพิ่มบอกได้เลยค่ะ` }, { label: "ตามผลใบเสนอราคา", text: `ติดตามใบเสนอราคาที่ส่งไปนะคะ ตอนนี้มีข้อสงสัยตรงไหนอยากให้ช่วยอธิบายเพิ่มไหมคะ หรืออยากให้ทีมเข้าไปดูหน้างานอีกครั้งไหมคะ` }] };
       case "close":
-        return { stage: "ปิดขาย", goal: "ขอรับชำระส่วนที่เหลือและยืนยันแผนงาน", ask: ["ยอดคงเหลือที่ต้องชำระ", "ช่องทางชำระเงิน", "วันที่อยากให้เริ่มงาน"],
-          messages: [{ label: "ขอรับชำระส่วนที่เหลือ", text: `${n} ค่ะ ยอดคงเหลือที่ต้องชำระ ${baht(Math.max(0, job.value - depositOf(job)))} (หักที่ชำระแล้ว) ถ้าพร้อมแล้วโอนตามนี้ได้เลยนะคะ ส่งสลิปทางแชทนี้ จากนั้นเราจะส่งแผนติดตั้งให้ค่ะ` }] };
+        return { stage: "ปิดขาย", goal: "อธิบายแผนชำระ ขอรับชำระงวดแรก และยืนยันแผนงาน", ask: ["เข้าใจแผนแบ่งงวดชำระแล้วหรือยัง", "ช่องทางชำระเงิน (หรือเปิด PO)", "วันที่อยากให้เริ่มงาน"],
+          messages: [{ label: "ขอรับชำระงวดแรก", text: `${n} ค่ะ งวดแรก ${planOf(job).items[0].pct}% ยอด ${baht(instNet(job, 1))} (หักที่ชำระแล้ว) ถ้าพร้อมแล้วชำระตามนี้ได้เลยนะคะ ที่เหลือชำระก่อนส่งของและก่อนติดตั้งตามแผนค่ะ ส่งสลิปทางแชทนี้ จากนั้นเราจะส่งแผนติดตั้งให้ค่ะ` }] };
       case "install_plan":
         return { stage: "แจ้งแผนติดตั้ง", goal: "แจ้งวันเริ่มงานให้ลูกค้าเตรียมตัว", ask: ["วันที่ลูกค้าไม่สะดวกให้ช่างเข้า", "จุดวางวัสดุและทางเข้า-ออก"],
           messages: [{ label: "แจ้งแผนติดตั้ง", text: `${n} ค่ะ ทีมวางแผนติดตั้งไว้ว่าจะเริ่มงานประมาณ ${due} จะส่งวันและเวลาแน่นอนให้อีกครั้งนะคะ มีวันไหนที่ไม่สะดวก แจ้งล่วงหน้าได้เลยค่ะ` }] };
+      case "deliver_frame":
+        return { stage: "ส่งทรัส/อะเสเข้าหน้างาน", goal: "ยืนยันชำระงวดที่ถึงกำหนด และให้ลูกค้าเตรียมที่วางโครง", ask: ["ชำระงวดที่กำหนดแล้วหรือยัง", "มีคนรับของวันที่ส่งไหม", "รถขนส่งเข้าหน้างานได้ไหม"],
+          messages: [{ label: "แจ้งวันส่งโครง", text: `${n} ค่ะ ทรัส/อะเสจะส่งเข้าหน้างานประมาณ ${due} รบกวนชำระงวดที่ถึงกำหนดก่อนนะคะ จากนั้นทีมจะจัดส่งและติดตั้งตามแผนค่ะ` }] };
+      case "install_frame":
+        return { stage: "ติดตั้งทรัส/อะเส", goal: "อัปเดตความคืบหน้า และแจ้งงวดก่อนส่งกระเบื้อง", ask: ["เห็นปัญหาระหว่างติดตั้งไหม", "พร้อมชำระงวดก่อนส่งกระเบื้องไหม"],
+          messages: [{ label: "แจ้งความคืบหน้าโครง", text: `${n} ค่ะ ทีมช่างติดตั้งโครงตามแผนแล้วนะคะ ใกล้เสร็จแล้วจะส่งกระเบื้องเข้าหน้างาน รบกวนเตรียมชำระงวดถัดไปล่วงหน้าด้วยค่ะ` }] };
       case "deliver":
         return { stage: "ส่งสินค้าเข้าหน้างาน", goal: "ให้ลูกค้าเตรียมที่วางวัสดุและมีคนรับของ", ask: ["มีคนรับของวันที่ส่งไหม", "รถขนส่งเข้าหน้างานได้ไหม"],
           messages: [{ label: "แจ้งวันส่งของ", text: `${n} ค่ะ สินค้าจะส่งเข้าหน้างานประมาณ ${due} รบกวนเตรียมที่วางวัสดุและให้มีคนรับของด้วยนะคะ` }] };

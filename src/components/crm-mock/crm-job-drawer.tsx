@@ -4,11 +4,11 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
+  CAT_LABEL, MODEL_LABEL, NOW, PARTY, catsOf, depositLabel, lockedOf, reviseOf, SEGMENT_LABEL, WORK_LABEL, addWd, agoText, baht, currentStep, dateTh, depositOf, heldBy, instNet, planOf, dtTh, dueLabel, dueOf, hasDeposit, isFinished, isToday, lateWd, packetsOf, planTotals, stepsOf, type Cat, type Job, type StepDef, type StepKey, type Task, valueText,
 } from "./crm-mock-data";
 import { IntakeCard } from "./crm-intake-card";
 import { JourneyStrip } from "./crm-overview";
-import { PayStepPanel, PaymentsTab, isPayStep, type SendLine } from "./crm-payment";
+import { GatePanel, PayStepPanel, PaymentsTab, PlanEditor, isPayStep, type SendLine } from "./crm-payment";
 import { CsatCard } from "./crm-customer";
 import { NextBanner, oppGuide, oppScripts, scrollToId, useGuideOn } from "./crm-guide";
 import { Drawer, KV, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
@@ -125,7 +125,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
           {hasDeposit(job) && <KV k="ใบเสนอราคาหลังสำรวจ" v={job.done.quote2 ? `ส่งแล้ว ${dateTh(job.done.quote2)} · ${baht(job.value)}` : !job.done.survey ? (job.work === "survey" ? "รอรายงานสำรวจจากทีมสำรวจ" : "รอรายงานสำรวจจาก KIM") : job.work !== "roof" && job.work !== "survey" && !job.done.truss_design ? "รอแบบทรัส + Cutting List จากห้องแบบ" : "พร้อมทำใบเสนอราคา"} />}
           {hasDeposit(job) && <KV k={job.work === "survey" ? "หักค่าสำรวจออกจากค่าติดตั้ง" : "หักส่วนลดค่าเตรียมการ (มัดจำที่ชำระแล้ว)"} v={<span className={feeAt ? "text-rose-600" : "text-slate-400"}>{feeAt ? `−${baht(dep)}` : `จะหักเมื่อรับมัดจำ ${baht(dep)}`} {job.value > 0 ? ` · ยอดส่วนที่เหลือ ${baht(job.value - dep)}` : " · รอใบเสนอราคา"}</span>} />}
           {hasDeposit(job) && <KV k={depositLabel(job)} v={<span className={feeAt ? "text-emerald-700" : "text-amber-700"}>{baht(dep)} · {feeAt ? `รับแล้ว ${dateTh(feeAt)}` : "ยังไม่ได้รับ"}</span>} />}
-          <KV k="เก็บครบ 100%" v={<span className={closed ? "text-emerald-700" : "text-slate-800"}>{baht(job.value)} · {closed ? `ครบ ${dateTh(job.done.close)}` : (job.value > 0 ? `คงเหลือ ${baht(job.value - dep)}` : "รอใบเสนอราคา")}</span>} />
+          <KV k="ยอดรวม" v={<span className={closed ? "text-emerald-700" : "text-slate-800"}>{baht(job.value)} · {closed ? `ปิดขาย ${dateTh(job.done.close)}` : (job.value > 0 ? `คงเหลือ ${baht(job.value - dep)}` : "รอใบเสนอราคา")}</span>} />
           {job.surveyAt && <KV k="วันนัดสำรวจ" v={<span className={isToday(job.surveyAt) ? "text-cyan-700" : ""}>{dtTh(job.surveyAt)}{isToday(job.surveyAt) ? " (วันนี้)" : ""}</span>} />}
           {job.scope && <KV k="งาน" v={job.scope} />}
           <KV k="ผู้ดูแล" v={job.owner} />
@@ -193,7 +193,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
         </>
       )}
 
-      {tab === "pay" && <PaymentsTab job={job} />}
+      {tab === "pay" && <PaymentsTab job={job} onPatchJob={onPatchJob} onSendLine={onSendLine} toast={toast} />}
 
       {tab === "chat" && (
         <div className={cn(glass, "p-5 text-center")}>
@@ -305,6 +305,13 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
   const [startWish, setStartWish] = useState("ภายใน 15 วัน");
   const [caution, setCaution] = useState("");
   const [mapOk, setMapOk] = useState(true);
+  const allSteps = stepsOf(job);
+  const stepIdx = allSteps.findIndex((x) => x.key === s.key);
+  const curStep = currentStep(job);
+  const prevIsCur = stepIdx > 0 && allSteps[stepIdx - 1].key === curStep?.key;
+  const gateIt = !done ? heldBy(job, s.key) : null;
+  const held = isCur && !!gateIt;
+  const showPlan = isCur && (s.key === "quote2" || s.key === "close" || (s.key === "quote1" && job.segment === "hbd"));
   return (
     <li className="relative flex gap-3 pb-4 last:pb-0">
       {!last && <span className={cn("absolute left-[15px] top-8 h-[calc(100%-18px)] w-0.5", done ? "bg-emerald-400" : "bg-slate-200")} />}
@@ -321,6 +328,8 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
           {done && new Date(done).getTime() > new Date(due).getTime() + 86400e3 ? <span className="ml-1 text-amber-600">(ช้ากว่าแผน)</span> : null}
         </div>
         {isCur && <p className="mt-1 text-[11.5px] leading-relaxed text-slate-500">{s.hint}</p>}
+        {showPlan && <div className="mt-2"><PlanEditor job={job} onPatchJob={onPatchJob} onSendLine={onSendLine} toast={toast} /></div>}
+        {gateIt && (isCur || prevIsCur) && <GatePanel job={job} step={s} it={gateIt} held={held} onComplete={onComplete} onPatchJob={onPatchJob} onSendLine={onSendLine} toast={toast} />}
 
         {isCur && s.owner === "SE" && (
           <div className="mt-2 space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
@@ -356,7 +365,7 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
               <div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 text-emerald-600"><Icon name="verified" /></span><div><p className="text-[14px] font-bold text-slate-900">ยืนยันปิดขาย และส่งต่อให้งานหลังขาย</p><p className="text-[11px] text-slate-400">{job.id} · {job.customer}</p></div></div>
               <p className="text-[12px] text-slate-500">ตรวจข้อมูลที่ KIM และ SCM ต้องใช้ ถ้าขาดจะต้องโทรถามลูกค้าซ้ำ</p>
               <ul className="space-y-1.5 text-[12px]">
-                <li className="flex gap-2 rounded-xl border border-slate-200 p-2.5"><Icon name="check_circle" className="text-emerald-500" /><span><b>ชำระครบ 100%</b><br />{baht(job.value)} (หัก{job.work === "survey" ? "ค่าสำรวจ" : "มัดจำ"} {baht(depositOf(job))} · ส่วนที่เหลือ {baht(Math.max(0, job.value - depositOf(job)))})</span></li>
+                <li className="flex gap-2 rounded-xl border border-slate-200 p-2.5"><Icon name="check_circle" className="text-emerald-500" /><span><b>ชำระงวดแรก ({planOf(job).items[0].pct}%)</b><br />{baht(instNet(job, 1))} · ที่เหลือชำระอีก {planOf(job).items.length - 1} งวด ก่อนส่งของและก่อนติดตั้ง</span></li>
                 <li className="flex gap-2 rounded-xl border border-slate-200 p-2.5"><Icon name="check_circle" className="text-emerald-500" /><span><b>ใบเสนอราคาฉบับแก้ไข</b><br />ส่งให้ SCM เพื่อ Map สินค้าและสั่งโรงงาน</span></li>
                 <li className="flex items-center gap-2 rounded-xl border border-slate-200 p-2.5"><Icon name={mapOk ? "check_circle" : "error"} className={mapOk ? "text-emerald-500" : "text-amber-500"} /><span className="flex-1"><b>ที่อยู่และ Location หน้างาน</b><br />{job.province} · แนบ Google Maps แล้ว</span><label className="flex items-center gap-1 text-[11px] text-slate-500"><input type="checkbox" checked={mapOk} onChange={(e) => setMapOk(e.target.checked)} />ครบ</label></li>
               </ul>
@@ -375,9 +384,11 @@ function StepRow({ s, job, last, isCur, surveyAt, setSurveyAt, onComplete, onScm
 
         {isCur && s.owner !== "SE" && (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-            <span className="text-[11.5px] text-slate-600">รอ <b>{owner.label}</b> ส่ง &quot;{s.result}&quot; กลับมา</span>
-            <button onClick={() => { onComplete(job.id, s.key); toast(`${owner.label} ส่ง "${s.result}" กลับมาแล้ว (จำลอง)`); }} className={cn(btnGhost, "!px-3 !py-1.5 !text-[11.5px]")}>จำลอง: {owner.label}ส่งข้อมูลกลับ</button>
-            {s.key === "deliver" && job.done.close && !job.scm.ordered && <button onClick={() => { onScm(job.id, "ordered"); toast("SCM แจ้งสั่งซื้อโรงงานแล้ว (จำลอง)"); }} className={cn(btnGhost, "!px-3 !py-1.5 !text-[11.5px]")}>จำลอง: SCM สั่งซื้อแล้ว</button>}
+            {held
+              ? <span className="text-[11.5px] font-semibold text-rose-700"><Icon name="lock" className="!text-[15px] align-middle" /> {owner.label} ถูกระงับ ปุ่มจำลองปิดไว้จนกว่าลูกค้าจะชำระงวดที่ถึงกำหนด</span>
+              : <span className="text-[11.5px] text-slate-600">รอ <b>{owner.label}</b> ส่ง &quot;{s.result}&quot; กลับมา</span>}
+            <button disabled={held} onClick={() => { onComplete(job.id, s.key); toast(`${owner.label} ส่ง "${s.result}" กลับมาแล้ว (จำลอง)`); }} className={cn(btnGhost, "!px-3 !py-1.5 !text-[11.5px] disabled:cursor-not-allowed disabled:opacity-40")}>จำลอง: {owner.label}ส่งข้อมูลกลับ</button>
+            {(s.key === "deliver" || s.key === "deliver_frame") && job.done.close && !job.scm.ordered && <button onClick={() => { onScm(job.id, "ordered"); toast("SCM แจ้งสั่งซื้อโรงงานแล้ว (จำลอง)"); }} className={cn(btnGhost, "!px-3 !py-1.5 !text-[11.5px]")}>จำลอง: SCM สั่งซื้อแล้ว</button>}
           </div>
         )}
       </div>

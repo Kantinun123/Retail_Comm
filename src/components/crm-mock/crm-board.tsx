@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  COLS, dueMoney, isFinished, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, colOf, missingOf, valueText, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
+  COLS, baht, dueMoney, heldBy, instNet, isFinished, MODEL_LABEL, PARTY, SEGMENT_LABEL, WORK_LABEL, colOf, missingOf, valueText, currentStep, dateTh, dtTh, dueLabel, dueOf, lateWd, packetsOf,
   type Job, type Packet, type Party,
 } from "./crm-mock-data";
 import { Avatar, PartyBadge, PresetBanner, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
@@ -163,6 +163,8 @@ export function ExchangeView({ c }: { c: Ctx }) {
     .filter((p) => (party === "all" || p.party === party) && (dir === "all" ? true : dir === "waiting" ? p.state === "waiting" : p.dir === dir))
     .sort((a, b) => +new Date(b.at ?? b.due ?? 0) - +new Date(a.at ?? a.due ?? 0));
   const parties: Party[] = ["KIM", "SCM", "ROOM", "SURV"];
+  /* งานที่ถูกระงับเพราะรอลูกค้าชำระงวด : KIM/SCM ห้ามสั่ง ส่ง หรือติดตั้งจนกว่าจะปลดล็อก */
+  const holds = c.jobs.flatMap((j) => { const s = currentStep(j); const it = s ? heldBy(j, s.key) : null; return s && it ? [{ j, s, it }] : []; });
 
   return (
     <div className="space-y-4">
@@ -189,6 +191,20 @@ export function ExchangeView({ c }: { c: Ctx }) {
           );
         })}
       </div>
+      {holds.length > 0 && (
+        <div className={cn(glass, "space-y-2 border-rose-200 p-4")}>
+          <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-rose-700"><Icon name="lock" className="!text-[18px]" />ระงับ: รอลูกค้าชำระเงิน ({holds.length} งาน)</h3>
+          <p className="text-[11.5px] text-slate-500">KIM และ SCM ได้รับแจ้งแล้ว ยังสั่ง ส่ง หรือติดตั้งไม่ได้จนกว่าลูกค้าจะชำระงวดที่ถึงกำหนด</p>
+          <ul className="space-y-1.5">
+            {holds.map(({ j, s, it }) => (
+              <li key={j.id}><button onClick={() => c.openJob(j.id)} className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-rose-100 bg-rose-50/60 px-3 py-2 text-left text-[12px] hover:border-rose-300">
+                <PartyBadge party={s.owner} /><span className="min-w-0 flex-1"><b className="block truncate text-slate-800">{j.customer} · {s.label}</b><span className="text-[10.5px] text-slate-500">{j.opsId} · รอชำระ {it.label.split(" · ")[0]} · ต้องชำระก่อน: {it.unlocks.join(", ")}</span></span>
+                <b className="text-rose-700">{baht(instNet(j, it.no))}</b>
+              </button></li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {([["all", "ทั้งหมด"], ["out", "ส่งออก"], ["in", "รับเข้า"], ["waiting", "ยังรอ"]] as [Dir, string][]).map(([k, label]) => (
           <button key={k} onClick={() => setDir(k)} className={cn("rounded-full border px-3 py-1.5 text-[12px] font-semibold transition", dir === k ? "border-indigo-600 bg-indigo-600 text-white shadow" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300")}>{label}</button>

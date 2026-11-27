@@ -221,7 +221,7 @@ export type Segment = "general" | "hbd";
 export type Work = "roof" | "truss" | "ase" | "survey";
 /** ค่าสำรวจของงานชนิดสำรวจ (ค่าสมมติ รอยืนยัน) หักจากค่าติดตั้งตอนปิดขาย */
 export const SURVEY_FEE = 1500;
-export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "quote1" | "survey_fee" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver" | "install" | "handover";
+export type StepKey = "plan_in" | "ase_mark" | "truss_design" | "quote1" | "survey_fee" | "deposit" | "survey" | "quote2" | "close" | "install_plan" | "deliver_frame" | "install_frame" | "deliver" | "install" | "handover";
 export interface Send { party: Party; title: string; at: "start" | "done" }
 export interface StepDef { key: StepKey; label: string; owner: Party; day: number; post: boolean; hint: string; sends: Send[]; result?: string }
 
@@ -231,34 +231,34 @@ export const WORK_LABEL: Record<Work, string> = { roof: "มุงหลัง�
 const DAYS: Record<Segment, Record<Work, Partial<Record<StepKey, number>>>> = {
   general: {
     roof: { plan_in: 1, quote1: 3, deposit: 4, survey: 9, quote2: 11, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
-    truss: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 35, install: 42, handover: 43 },
-    ase: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver: 37, install: 44, handover: 45 },
+    truss: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver_frame: 28, install_frame: 34, deliver: 36, install: 43, handover: 44 },
+    ase: { plan_in: 1, ase_mark: 4, quote1: 6, deposit: 7, survey: 12, truss_design: 16, quote2: 18, close: 19, install_plan: 21, deliver_frame: 29, install_frame: 35, deliver: 37, install: 44, handover: 45 },
     survey: { plan_in: 1, survey_fee: 2, deposit: 3, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
   },
   hbd: {
     roof: { plan_in: 1, quote1: 3, close: 4, install_plan: 7, deliver: 15, install: 22, handover: 23 },
-    truss: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 24, install: 31, handover: 32 },
-    ase: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver: 26, install: 33, handover: 34 },
+    truss: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver_frame: 17, install_frame: 23, deliver: 25, install: 32, handover: 33 },
+    ase: { plan_in: 1, truss_design: 5, quote1: 7, close: 8, install_plan: 11, deliver_frame: 18, install_frame: 24, deliver: 26, install: 33, handover: 34 },
     survey: { plan_in: 1, survey_fee: 2, deposit: 3, survey: 7, quote2: 10, close: 12, install_plan: 15, deliver: 23, install: 30, handover: 31 },
   },
 };
 const ORDER: Record<Segment, Record<Work, StepKey[]>> = {
   general: {
     roof: ["plan_in", "quote1", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
-    truss: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
-    ase: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver", "install", "handover"],
+    truss: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver_frame", "install_frame", "deliver", "install", "handover"],
+    ase: ["plan_in", "ase_mark", "quote1", "deposit", "survey", "truss_design", "quote2", "close", "install_plan", "deliver_frame", "install_frame", "deliver", "install", "handover"],
     survey: ["plan_in", "survey_fee", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
   },
   hbd: {
     roof: ["plan_in", "quote1", "close", "install_plan", "deliver", "install", "handover"],
-    truss: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
-    ase: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver", "install", "handover"],
+    truss: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver_frame", "install_frame", "deliver", "install", "handover"],
+    ase: ["plan_in", "truss_design", "quote1", "close", "install_plan", "deliver_frame", "install_frame", "deliver", "install", "handover"],
     survey: ["plan_in", "survey_fee", "deposit", "survey", "quote2", "close", "install_plan", "deliver", "install", "handover"],
   },
 };
-const POST: StepKey[] = ["install_plan", "deliver", "install", "handover"];
-const DELIVER_LABEL: Record<Work, string> = { roof: "ส่งกระเบื้อง", truss: "ส่งทรัส & กระเบื้อง", ase: "ส่งอะเส + ทรัส & กระเบื้อง", survey: "ส่งอุปกรณ์เข้าหน้างาน" };
-const INSTALL_LABEL: Record<Work, string> = { roof: "ติดตั้งกระเบื้อง", truss: "ติดตั้งทรัส & กระเบื้อง", ase: "ติดตั้งอะเส & ทรัส & กระเบื้อง", survey: "ติดตั้งหน้างาน" };
+const POST: StepKey[] = ["install_plan", "deliver_frame", "install_frame", "deliver", "install", "handover"];
+const DELIVER_LABEL: Record<Work, string> = { roof: "ส่งกระเบื้อง", truss: "ส่งกระเบื้อง", ase: "ส่งกระเบื้อง", survey: "ส่งอุปกรณ์เข้าหน้างาน" };
+const INSTALL_LABEL: Record<Work, string> = { roof: "ติดตั้งกระเบื้อง", truss: "ติดตั้งกระเบื้อง", ase: "ติดตั้งกระเบื้อง", survey: "ติดตั้งหน้างาน" };
 
 function surveyMeta(key: StepKey): Omit<StepDef, "day" | "post" | "key"> | null {
   switch (key) {
@@ -267,7 +267,7 @@ function surveyMeta(key: StepKey): Omit<StepDef, "day" | "post" | "key"> | null 
     case "deposit": return { label: "ล็อกคิว + ส่งงานให้ทีมสำรวจ", owner: "SE", hint: "นัดวันเข้าสำรวจกับลูกค้า แล้วส่งข้อมูลลูกค้า/หน้างานเข้าแอปทีมสำรวจ", sends: [{ party: "SURV", title: "ข้อมูลลูกค้า/หน้างาน + วันนัดสำรวจที่ล็อกคิวแล้ว", at: "done" }] };
     case "survey": return { label: "ลงสำรวจ + ส่งรายงานสำรวจและใบเสนอราคา", owner: "SURV", hint: "ทีมสำรวจเข้าสำรวจหน้างาน แล้วส่งรายงานสำรวจและใบเสนอราคากลับมาให้ทีมขาย", sends: [], result: "รายงานสำรวจ + ใบเสนอราคา (ไฟล์)" };
     case "quote2": return { label: "นำเสนอราคาให้ลูกค้า", owner: "SE", hint: "ทีมขายนำใบเสนอราคาจากทีมสำรวจเสนอลูกค้า ตามผลและต่อรอง", sends: [] };
-    case "close": return { label: "ปิดขาย + เก็บค่าติดตั้ง", owner: "SE", hint: "เก็บค่าติดตั้ง (หักค่าสำรวจแล้ว) แล้วส่งข้อมูลปิดขายให้ KIM และรายการสินค้าให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "รายการสินค้า/อุปกรณ์ (เตรียมของ + ขนส่ง)", at: "done" }] };
+    case "close": return { label: "ปิดขาย (ลูกค้าชำระงวดแรก)", owner: "SE", hint: "ลูกค้าชำระงวดแรกตามแผนชำระ (หักค่าสำรวจที่จ่ายแล้ว) แล้วส่งข้อมูลปิดขายให้ KIM และรายการสินค้าให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "รายการสินค้า/อุปกรณ์ (เตรียมของ + ขนส่ง)", at: "done" }] };
     default: return null;
   }
 }
@@ -285,9 +285,11 @@ function meta(key: StepKey, seg: Segment, work: Work): Omit<StepDef, "day" | "po
     case "survey_fee": return { label: "เก็บค่าสำรวจ", owner: "SE", hint: "ใช้เฉพาะงานชนิดสำรวจ", sends: [] };
     case "survey": return { label: "สำรวจหน้างาน + รายงานสำรวจ", owner: "KIM", hint: "KIM เข้าสำรวจตามวันนัด และส่งไฟล์รายงานสำรวจกลับมา", sends: [], result: "รายงานสำรวจ (ไฟล์)" };
     case "quote2": return { label: "เสนอราคาหลังสำรวจ", owner: "SE", hint: work === "roof" ? "ทีมขายถอดแบบละเอียดตามรายงานสำรวจ (Confirm/Revise รายหมวด) แล้วเสนอราคาใหม่" : "ทีมขายถอดแบบละเอียด เช็ครายงานสำรวจ + แบบทรัส/Cutting List จากห้องแบบ แล้วทำใบเสนอราคาฉบับหลังสำรวจ", sends: [] };
-    case "close": return { label: "ปิดขาย (ลูกค้าจ่ายครบ 100%)", owner: "SE", hint: "เก็บเงินครบ แล้วส่งข้อมูลปิดขายให้ KIM และใบเสนอราคาฉบับแก้ไขให้ SCM", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "ใบเสนอราคาฉบับแก้ไข (Map สินค้า + สั่งโรงงาน)", at: "done" }] };
+    case "close": return { label: "ปิดขาย (ลูกค้าชำระงวดแรก)", owner: "SE", hint: "ลูกค้าชำระงวดแรกตามแผนชำระ (ไม่ต่ำกว่าต้นทุนสินค้า) แล้วส่งข้อมูลปิดขายให้ KIM และใบเสนอราคาฉบับแก้ไขให้ SCM เพื่อสั่งสินค้า", sends: [{ party: "KIM", title: "ข้อมูลปิดขาย เพื่อเตรียมแผนติดตั้ง", at: "done" }, { party: "SCM", title: "ใบเสนอราคาฉบับแก้ไข (Map สินค้า + สั่งโรงงาน)", at: "done" }] };
     case "install_plan": return { label: "แจ้งแผนติดตั้งลูกค้า", owner: "KIM", hint: "KIM วางแผนติดตั้งจากวันที่สินค้าครบ แล้วแจ้งลูกค้าใน Line กลุ่ม", sends: [], result: "แผนติดตั้ง (วันเริ่ม-วันจบ)" };
-    case "deliver": return { label: DELIVER_LABEL[work], owner: "SCM", hint: "SCM สั่งโรงงานและขนส่งสินค้าเข้าหน้างาน", sends: [], result: "สถานะจัดส่งสินค้า" };
+    case "deliver_frame": return { label: work === "ase" ? "ส่งอะเส + ทรัส เข้าหน้างาน" : "ส่งโครงทรัส เข้าหน้างาน", owner: "SCM", hint: "SCM ส่งทรัส (และอะเส) ที่สั่งตัดเข้าหน้างาน ต้องชำระงวดที่ถึงกำหนดก่อน", sends: [], result: "สถานะจัดส่งโครง" };
+    case "install_frame": return { label: work === "ase" ? "ติดตั้งอะเส + ทรัส" : "ติดตั้งโครงทรัส", owner: "KIM", hint: "ช่างติดตั้งโครง เมื่อใกล้เสร็จให้แจ้ง SCM ส่งกระเบื้องเข้าหน้างาน", sends: [], result: "ความคืบหน้าติดตั้งโครง" };
+    case "deliver": return { label: DELIVER_LABEL[work], owner: "SCM", hint: work === "roof" || work === "survey" ? "SCM สั่งโรงงานและขนส่งสินค้าเข้าหน้างาน" : "SCM ส่งกระเบื้องเข้าหน้างาน เมื่อติดตั้งโครงใกล้เสร็จ", sends: [], result: "สถานะจัดส่งสินค้า" };
     case "install": return { label: INSTALL_LABEL[work], owner: "KIM", hint: "ช่างเข้าติดตั้ง และ KIM เข้าตรวจงาน", sends: [], result: "ความคืบหน้าติดตั้ง / ผลตรวจงาน" };
     case "handover": return { label: "ส่งมอบงาน + ใบรับประกัน", owner: "KIM", hint: "KIM ส่งมอบงานกับลูกค้า และออกใบรับประกัน", sends: [], result: "ใบส่งมอบงาน + ใบรับประกัน" };
   }
@@ -413,15 +415,17 @@ export function rightState(r: Right): "ok" | "soon" | "used" | "expired" {
 export interface Nudge { id: string; se: string; by: string; at: string; text: string; readAt?: string }
 
 /* ---------- คำขอชำระเงิน (ค่าสำรวจ / มัดจำ / ปิดขาย) : จำลองการส่งทาง LINE OA ---------- */
-export type PayMethod = "qr" | "card" | "transfer" | "store";
+export type PayMethod = "qr" | "card" | "transfer" | "store" | "po";
 export const PAY_METHOD: Record<PayMethod, { label: string; icon: string; sub: string }> = {
   qr: { label: "PromptPay QR", icon: "qr_code_2", sub: "สแกนจ่ายผ่านแอปธนาคาร ระบบยืนยันอัตโนมัติ" },
   card: { label: "บัตรเครดิต / เดบิต", icon: "credit_card", sub: "ชำระออนไลน์ ระบบยืนยันอัตโนมัติ" },
   transfer: { label: "โอนเงิน + แนบสลิป", icon: "receipt_long", sub: "ทีมขายตรวจสลิปแล้วยืนยัน" },
   store: { label: "ชำระที่ร้าน / เงินสด", icon: "storefront", sub: "ทีมขายบันทึกรับเงินเอง" },
+  po: { label: "เปิด PO / ใบแจ้งหนี้", icon: "description", sub: "ลูกค้าองค์กรส่งเลข PO แล้วชำระตามเครดิตเทอม" },
 };
 export interface PaymentReq {
-  id: string; step: "survey_fee" | "deposit" | "close"; label: string; amount: number; methods: PayMethod[]; dueAt: string;
+  id: string; step: "survey_fee" | "deposit" | "close" | "inst2" | "inst3"; label: string; amount: number; methods: PayMethod[]; dueAt: string;
+  /** ผู้รับเงิน: ร้านตัวแทน หรือ ลูกค้าจ่ายตรงเข้า SCG */ payee?: "store" | "scg"; /** เลข PO / เครดิตเทอม (วัน) เมื่อเปิด PO */ po?: string; poTerm?: number; /** วิธีที่ลูกค้าเลือกไว้ตอนส่งสลิป/PO */ pending?: PayMethod;
   status: "requested" | "slip" | "paid"; method?: PayMethod; requestedAt: string; paidAt?: string; surveyAt?: string; receiptNo?: string;
 }
 export interface JobLog { at: string; text: string }
@@ -430,7 +434,7 @@ export interface Job {
   value: number; quote1Value?: number; model: Model; revise?: Cat[]; intake?: Intake; owner: string; startedAt: string; done: Partial<Record<StepKey, string>>; surveyAt?: string;
   /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
   csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[]; /** ร้านที่รับงาน (คำนวณจากจังหวัด) */ store?: string;
-  scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string; payments?: PaymentReq[];
+  scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string; payments?: PaymentReq[]; plan?: PayPlan;
 }
 export const stepsOf = (j: Job) => template(j.segment, j.work);
 export const currentStep = (j: Job): StepDef | null => (j.cancelReason ? null : stepsOf(j).find((s) => !j.done[s.key]) ?? null);
@@ -438,7 +442,85 @@ export const isFinished = (j: Job) => !j.cancelReason && stepsOf(j).every((s) =>
 export const hasDeposit = (j: Job) => j.segment === "general";
 export const depositOf = (j: Job) => (!hasDeposit(j) ? 0 : j.work === "survey" ? SURVEY_FEE : j.model === "scg" ? DEPOSIT_SCG : Math.round(((j.quote1Value ?? j.value) * DEPOSIT_PCT) / 100));
 export const depositLabel = (j: Job) => (j.work === "survey" ? "ค่าสำรวจ (หักจากค่าติดตั้ง)" : j.model === "scg" ? "มัดจำคงที่ ฿30,000 (SCG Home)" : "มัดจำ 30% (Housing Expert)");
-/** ทีมขายเป็นผู้ถอดแบบรายหมวด หลังสำรวจเลือก Confirm (ใช้ผลเดิม) หรือ Revise (ถอดใหม่) — โครงทรัส/อะเสต้อง Revise เสมอ เพราะใช้แบบทรัส + Cutting List ใหม่จากห้องแบบ */
+
+/* ---------- แผนชำระเงินในใบเสนอราคา (แบ่งงวด) : ผูกกับด่านการชำระก่อนส่งของ/ติดตั้ง ---------- */
+export const PLAN_THRESHOLD = 1_000_000; // ตั้งแต่ 1 ล้านบาท (รวม VAT) ขึ้นไป = 3 งวด
+export const COST_RATIO = 0.5; // ต้นทุนสินค้าต่อราคาขาย (ตัวอย่าง) ทีมขายเห็นแค่ % ขั้นต่ำของงวดแรก ไม่เห็นต้นทุน
+export const minFirstPct = () => Math.max(40, Math.ceil((COST_RATIO * 100) / 5) * 5);
+export interface Installment { no: 1 | 2 | 3; pct: number; label: string; when: string; unlocks: string[]; gate: StepKey[] }
+export interface PayPlan { tier: "lt1m" | "gte1m"; items: Installment[]; approval?: "pending" | "approved"; sentAt?: string }
+export const hasFrame = (j: Pick<Job, "work">) => j.work === "truss" || j.work === "ase";
+export const planTier = (value: number): "lt1m" | "gte1m" => (value >= PLAN_THRESHOLD ? "gte1m" : "lt1m");
+export function defaultPlan(j: Pick<Job, "value" | "work">): PayPlan {
+  const tier = planTier(j.value);
+  if (tier === "lt1m") {
+    return { tier, items: [
+      { no: 1, pct: 50, label: "งวดที่ 1 · ปิดขาย", when: "วันปิดขาย (ก่อนสั่งสินค้า)", unlocks: ["สั่งกระเบื้อง และสั่งตัดโครง/ทรัส"], gate: [] },
+      { no: 2, pct: 50, label: "งวดที่ 2 · ก่อนส่งของเข้าหน้างาน", when: "ก่อนส่งของเข้าหน้างาน 5 วันทำการ", unlocks: ["ส่งสินค้าเข้าหน้างาน", "ติดตั้ง", "ส่งมอบ + ใบรับประกัน"], gate: ["deliver_frame", "deliver"] },
+    ] };
+  }
+  if (hasFrame(j)) {
+    return { tier, items: [
+      { no: 1, pct: 50, label: "งวดที่ 1 · ปิดขาย", when: "วันปิดขาย (ก่อนสั่งสินค้า)", unlocks: ["สั่งกระเบื้อง และสั่งตัดทรัส/อะเส"], gate: [] },
+      { no: 2, pct: 30, label: "งวดที่ 2 · ก่อนส่งทรัส/อะเส", when: "ก่อนส่งทรัส/อะเสเข้าหน้างาน 5 วันทำการ", unlocks: ["ส่งและติดตั้งทรัส/อะเส"], gate: ["deliver_frame"] },
+      { no: 3, pct: 20, label: "งวดที่ 3 · ก่อนส่งกระเบื้อง", when: "ทรัส/อะเสใกล้ติดตั้งเสร็จ ก่อนส่งกระเบื้อง", unlocks: ["ส่งกระเบื้อง", "ติดตั้งกระเบื้อง", "ส่งมอบ + ใบรับประกัน"], gate: ["deliver"] },
+    ] };
+  }
+  return { tier, items: [
+    { no: 1, pct: 50, label: "งวดที่ 1 · ปิดขาย", when: "วันปิดขาย (ก่อนสั่งสินค้า)", unlocks: ["สั่งกระเบื้อง"], gate: [] },
+    { no: 2, pct: 30, label: "งวดที่ 2 · ก่อนส่งสินค้า", when: "ก่อนส่งสินค้าเข้าหน้างาน 5 วันทำการ", unlocks: ["ส่งสินค้าเข้าหน้างาน"], gate: ["deliver"] },
+    { no: 3, pct: 20, label: "งวดที่ 3 · ของถึงหน้างาน ก่อนติดตั้ง", when: "สินค้าถึงหน้างานแล้ว ก่อนช่างเข้าติดตั้ง", unlocks: ["ติดตั้ง", "ส่งมอบ + ใบรับประกัน"], gate: ["install"] },
+  ] };
+}
+export const planOf = (j: Job): PayPlan => {
+  const d = defaultPlan(j);
+  if (!j.plan || j.plan.tier !== d.tier) return d;
+  return j.plan;
+};
+/** ปรับ % งวดแรก/งวดสอง แล้วคำนวณงวดที่เหลือให้รวม 100% */
+export function withPcts(p: PayPlan, first: number, second?: number): PayPlan {
+  const rest = 100 - first;
+  const pcts = p.items.length === 2 ? [first, rest] : (() => { const s2 = second ?? Math.round((rest * 0.6) / 5) * 5; const s = Math.min(Math.max(5, s2), rest - 5); return [first, s, rest - s]; })();
+  return { ...p, items: p.items.map((it, i) => ({ ...it, pct: pcts[i] })) };
+}
+export const needsApproval = (p: PayPlan) => p.items[0].pct < minFirstPct();
+export const planReady = (p: PayPlan) => !needsApproval(p) || p.approval === "approved";
+export const creditOf = (j: Job) => ((j.done.survey_fee || j.done.deposit) && hasDeposit(j) ? depositOf(j) : 0);
+/** ยอดงวดที่ no (ก่อนหักเครดิตค่าสำรวจ/มัดจำ) */
+export function instGross(j: Job, no: 1 | 2 | 3): number {
+  const p = planOf(j);
+  const g1 = Math.round((j.value * p.items[0].pct) / 100);
+  if (no === 1) return g1;
+  if (p.items.length === 2) return j.value - g1;
+  const g2 = Math.round((j.value * p.items[1].pct) / 100);
+  return no === 2 ? g2 : j.value - g1 - g2;
+}
+export const instNet = (j: Job, no: 1 | 2 | 3) => (no === 1 ? Math.max(0, instGross(j, 1) - creditOf(j)) : instGross(j, no));
+/** ชำระงวดนี้แล้วหรือยัง: มีรายการชำระ หรือ (งานเดิมก่อนมีระบบ) ขั้นที่ถูกกั้นเสร็จไปแล้ว */
+export function instPaid(j: Job, no: 1 | 2 | 3): boolean {
+  if (no === 1) return !!j.done.close || !!j.payments?.some((p) => p.step === "close" && p.status === "paid");
+  const step = no === 2 ? "inst2" : "inst3";
+  if (j.payments?.some((p) => p.step === step && p.status === "paid")) return true;
+  const it = planOf(j).items.find((x) => x.no === no);
+  return !!it && it.gate.some((g) => !!j.done[g]);
+}
+/** ขั้นนี้ถูกระงับเพราะรอชำระงวดไหน (เฉพาะหลังปิดขาย) */
+export function heldBy(j: Job, key: StepKey): Installment | null {
+  if (j.cancelReason || !j.done.close) return null;
+  const keys = stepsOf(j).map((s) => s.key);
+  return planOf(j).items.find((it) => it.no > 1 && it.gate.includes(key) && it.gate.some((g) => keys.includes(g)) && !instPaid(j, it.no)) ?? null;
+}
+/** งวดถัดไปที่ยังไม่ชำระ พร้อมขั้นแรกที่ถูกกั้น */
+export function nextGate(j: Job): { it: Installment; step: StepDef } | null {
+  if (j.cancelReason || !j.done.close) return null;
+  const steps = stepsOf(j);
+  for (const it of planOf(j).items) {
+    if (it.no === 1 || instPaid(j, it.no)) continue;
+    const step = steps.find((s) => it.gate.includes(s.key) && !j.done[s.key]);
+    if (step) return { it, step };
+  }
+  return null;
+}/** ทีมขายเป็นผู้ถอดแบบรายหมวด หลังสำรวจเลือก Confirm (ใช้ผลเดิม) หรือ Revise (ถอดใหม่) — โครงทรัส/อะเสต้อง Revise เสมอ เพราะใช้แบบทรัส + Cutting List ใหม่จากห้องแบบ */
 export const lockedOf = (j: Job): Cat[] => (j.segment !== "general" ? [] : j.work === "ase" ? ["ase", "truss"] : j.work === "truss" ? ["truss"] : []);
 export const reviseOf = (j: Job): Cat[] => (j.segment !== "general" ? [] : catsOf(j.work).filter((c) => lockedOf(j).includes(c) || (j.revise ?? []).includes(c)));
 
@@ -460,7 +542,7 @@ export const COLS: { key: ColKey; label: string; hint: string; icon: string; ton
   { key: "deposit", label: "รอมัดจำ", hint: `ปิดมัดจำ ${DEPOSIT_PCT}% + ล็อกคิวสำรวจ`, icon: "payments", tone: "#d97706" },
   { key: "survey", label: "รอสำรวจ / รายงาน", hint: "KIM สำรวจและส่งรายงาน", icon: "pin_drop", tone: "#0891b2" },
   { key: "post_survey", label: "หลังสำรวจ", hint: "แบบทรัส + ราคาหลังสำรวจ", icon: "edit_note", tone: "#7c3aed" },
-  { key: "close", label: "รอปิดขาย", hint: "รอลูกค้าจ่ายครบ 100%", icon: "account_balance_wallet", tone: "#ea580c" },
+  { key: "close", label: "รอปิดขาย", hint: "รอลูกค้าชำระงวดแรก", icon: "account_balance_wallet", tone: "#ea580c" },
   { key: "prep", label: "เตรียมสินค้า + แผนติดตั้ง", hint: "SCM สั่งของ · KIM วางแผน", icon: "local_shipping", tone: "#0d9488" },
   { key: "install", label: "ติดตั้ง / ส่งมอบ", hint: "KIM + ช่าง", icon: "construction", tone: "#059669" },
   { key: "done", label: "จบงาน", hint: "ส่งมอบและออกใบรับประกันแล้ว", icon: "verified", tone: "#475569" },
@@ -478,7 +560,7 @@ export function colOf(j: Job): ColKey | null {
     case "survey": return "survey";
     case "quote2": return "post_survey";
     case "close": return "close";
-    case "install_plan": case "deliver": return "prep";
+    case "install_plan": case "deliver_frame": case "deliver": return "prep";
     default: return "install";
   }
 }
@@ -501,7 +583,7 @@ export function packetsOf(j: Job): Packet[] {
     if (s.result && s.owner !== "SE") {
       const done = j.done[s.key];
       if (done) out.push({ id: `${j.id}-${s.key}-i`, jobId: j.id, customer: j.customer, party: s.owner, dir: "in", title: s.result, stepKey: s.key, state: "received", at: done });
-      else if (startAt && !j.cancelReason) out.push({ id: `${j.id}-${s.key}-i`, jobId: j.id, customer: j.customer, party: s.owner, dir: "in", title: s.result, stepKey: s.key, state: "waiting", due: dueOf(j, s) });
+      else if (startAt && !j.cancelReason && !heldBy(j, s.key)) out.push({ id: `${j.id}-${s.key}-i`, jobId: j.id, customer: j.customer, party: s.owner, dir: "in", title: s.result, stepKey: s.key, state: "waiting", due: dueOf(j, s) });
     }
   });
   return out;
@@ -685,6 +767,7 @@ function seedJobsRaw(): Job[] {
     mk({ id: "J-2611-0107", customer: "คุณสมหมาย แก้วมณี", phone: "089-555-0107", province: "เชียงใหม่", segment: "general", work: "roof", value: 98000, quote1Value: 90000, at: "close", daysIn: 14, surveyOffset: -5, touchH: 54 }),
     mk({ id: "J-2611-0119", customer: "คุณนิรันดร์ เจริญสุข", phone: "086-555-0119", province: "นครราชสีมา", segment: "general", work: "roof", value: 205000, quote1Value: 205000, at: "install_plan", daysIn: 14, surveyOffset: -8, touchH: 20 }),
     mk({ id: "J-2611-0108", owner: "นุ้ย", customer: "คุณลักขณา สายทอง", phone: "082-555-0108", province: "สงขลา", segment: "general", work: "roof", value: 245000, quote1Value: 240000, at: "install_plan", daysIn: 15, surveyOffset: -9, scm: { ordered: hAgo(60), readyEta: addWd(NOW.toISOString(), 6) }, touchH: 40 }),
+    mk({ id: "J-2611-0122", customer: "คุณวีระ ตั้งใจดี", phone: "081-555-0122", province: "สงขลา", segment: "general", work: "ase", value: 1250000, quote1Value: 1250000, at: "deliver_frame", daysIn: 24, surveyOffset: -16, scm: { ordered: hAgo(120), readyEta: addWd(NOW.toISOString(), 3) }, touchH: 30 }),
     mk({ id: "J-2611-0118", customer: "คุณอรทัย สมบูรณ์", phone: "084-555-0118", province: "นครสวรรค์", segment: "hbd", work: "ase", value: 640000, at: "deliver", daysIn: 20, scm: { ordered: hAgo(240), readyEta: addWd(NOW.toISOString(), 2) }, touchH: 30 }),
     mk({ id: "J-2611-0109", customer: "คุณบุญเรือง ทองคำ", phone: "080-555-0109", province: "ภูเก็ต", segment: "general", work: "truss", value: 310000, quote1Value: 300000, at: "install", daysIn: 36, surveyOffset: -28, scm: { ordered: hAgo(500), readyEta: hAgo(200) }, touchH: 8 }),
     mk({ id: "J-2611-0110", customer: "คุณไพโรจน์ ดวงดี", phone: "087-555-0110", province: "ขอนแก่น", segment: "hbd", work: "roof", value: 175000, at: "handover", daysIn: 22, scm: { ordered: hAgo(700), readyEta: hAgo(500) }, touchH: 52 }),
@@ -696,14 +779,14 @@ function seedJobsRaw(): Job[] {
 }
 
 /* ---------- น้องเลขา: สร้างงานจากกฎ ---------- */
-export type TaskKind = "lead_sla" | "lead_followup" | "lead_convert" | "se_step" | "deposit_chase" | "close_chase" | "survey_today" | "follow_party" | "scm_status" | "intake_missing";
+export type TaskKind = "lead_sla" | "lead_followup" | "lead_convert" | "se_step" | "deposit_chase" | "close_chase" | "survey_today" | "follow_party" | "scm_status" | "intake_missing" | "inst_hold";
 export interface Task {
   id: string; kind: TaskKind; priority: 1 | 2 | 3; title: string; who: string; reason: string; action: string;
   ref: { type: "lead" | "job"; id: string }; draft?: string; value?: number; phone?: string; party?: Party;
 }
 export const TASK_ICON: Record<TaskKind, string> = {
   lead_sla: "call", lead_followup: "forum", lead_convert: "rocket_launch", se_step: "task_alt", deposit_chase: "payments", close_chase: "account_balance_wallet",
-  survey_today: "pin_drop", follow_party: "support_agent", scm_status: "inventory_2", intake_missing: "assignment_late",
+  survey_today: "pin_drop", follow_party: "support_agent", scm_status: "inventory_2", intake_missing: "assignment_late", inst_hold: "lock",
 };
 
 export function buildTasks(leads: Lead[], jobs: Job[]): Task[] {
@@ -751,22 +834,39 @@ export function buildTasks(leads: Lead[], jobs: Job[]): Task[] {
         out.push({ ...base, id: `t-${j.id}`, kind: "deposit_chase", priority: 2, title: `ตามมัดจำ ${j.customer}`, reason: `รอมัดจำ ${baht(depositOf(j))} · ${late > 0 ? `เลยแผน ${late} วันทำการ` : `ลูกค้าเงียบมา ${durText(idle)}`}`, action: "แจ้งเตือน",
           draft: `สวัสดีค่ะ คุณ${fn} ขอแจ้งยอดมัดจำ ${baht(depositOf(j))} เพื่อล็อกคิวสำรวจหน้างานนะคะ ชำระผ่านแอปได้เลย หากโอนแล้วรบกวนส่งสลิปค่ะ` });
       } else if (cur.key === "close" && (idle > 48 || late > 0)) {
-        const remain = j.value - depositOf(j);
-        out.push({ ...base, id: `t-${j.id}`, kind: "close_chase", priority: late >= 2 ? 1 : 2, title: `ตามลูกค้าจ่ายครบ 100% · ${j.customer}`, reason: `ต้องเก็บครบก่อนส่งข้อมูลให้ KIM/SCM · คงเหลือ ${baht(remain)} · ${late > 0 ? `เลยแผน ${late} วันทำการ` : `เงียบมา ${durText(idle)}`}`, action: "บันทึกรับเงิน",
+        const remain = instNet(j, 1);
+        out.push({ ...base, id: `t-${j.id}`, kind: "close_chase", priority: late >= 2 ? 1 : 2, title: `ตามลูกค้าชำระงวดแรก · ${j.customer}`, reason: `ต้องเก็บงวดแรกก่อนส่งข้อมูลให้ KIM/SCM · คงเหลือ ${baht(remain)} · ${late > 0 ? `เลยแผน ${late} วันทำการ` : `เงียบมา ${durText(idle)}`}`, action: "บันทึกรับเงิน",
           draft: `สวัสดีค่ะ คุณ${fn} ใบเสนอราคาฉบับหลังสำรวจส่งให้แล้วนะคะ ยอดคงเหลือ ${baht(remain)} เมื่อชำระครบทีมจะเข้าคิวสั่งสินค้าและวางแผนติดตั้งทันทีค่ะ` });
       } else if (late >= 0) {
         out.push({ ...base, id: `t-${j.id}`, kind: "se_step", priority: late > 0 ? 1 : 2, title: `${cur.label} · ${j.customer}`, reason: `${dueLabel(due)} (แผน PT ${dateTh(due)}) · ${cur.hint}`, action: "ดูงาน" });
       }
     } else {
       const party = PARTY[cur.owner];
+      const hold = heldBy(j, cur.key);
+      if (hold) {
+        const amt = instNet(j, hold.no);
+        out.push({ ...base, id: `t-${j.id}-hold`, kind: "inst_hold", party: cur.owner, priority: 1, title: `ระงับ ${cur.label} · รอลูกค้าชำระ${hold.label.split(" · ")[0]} ${baht(amt)}`,
+          reason: `${j.customer} · ${party.label} ต้องรอเงินก่อน ครบกำหนดแผน ${dateTh(due)}${late > 0 ? ` (เลยแผน ${late} วันทำการ)` : ""} · ${hold.when}`, action: "ขอรับชำระ",
+          draft: `สวัสดีค่ะ คุณ${fn} ขอเตือน${hold.label.split(" · ")[0]} ${baht(amt)} เพื่อให้ทีมดำเนินการต่อได้ตามแผนค่ะ (${hold.unlocks.join(", ")}) ชำระได้ที่การ์ดในแชทนี้เลยนะคะ` });
+      }
       if (cur.key === "survey" && isToday(j.surveyAt)) {
         out.push({ ...base, id: `t-${j.id}-sv`, kind: "survey_today", priority: 2, title: `วันนี้ KIM เข้าสำรวจ ${j.customer}`, reason: `นัด ${timeTh(j.surveyAt)} · ${j.province} · แจ้งลูกค้าให้มีผู้ดูแลพื้นที่อยู่ด้วย`, action: "ดูงาน",
           draft: `สวัสดีค่ะ คุณ${fn} วันนี้ทีม KIM จะเข้าสำรวจหน้างานเวลา ${timeTh(j.surveyAt)} นะคะ รบกวนให้มีผู้ดูแลพื้นที่อยู่ด้วยค่ะ` });
       }
-      if (late >= 0) {
+      if (late >= 0 && !hold) {
         out.push({ ...base, id: `t-${j.id}`, kind: "follow_party", party: cur.owner, priority: late > 0 ? 1 : 2, title: `ตาม ${party.label}: ${cur.result ?? cur.label} · ${j.customer}`,
           reason: `${dueLabel(due)} (กำหนด ${dateTh(due)}) · รอ ${party.label} · ${cur.label}`, action: "ถามหน่วยงาน",
           draft: `สวัสดีครับ ทีม${party.label} ขอสถานะ "${cur.result ?? cur.label}" ของงาน ${j.id} (${j.customer}, ${j.province}) หน่อยครับ กำหนดเดิม ${dateTh(due)} ทีมขายต้องใช้ต่อในขั้นถัดไป` });
+      }
+    }
+    const ng = nextGate(j);
+    if (ng && !isFinished(j)) {
+      const all = stepsOf(j);
+      const gi = all.findIndex((x) => x.key === ng.step.key);
+      if (all[gi - 1]?.key === cur.key && !j.payments?.some((p) => p.step === `inst${ng.it.no}`)) {
+        out.push({ ...base, id: `t-${j.id}-ahead`, kind: "inst_hold", priority: 2, title: `ส่งคำขอชำระ${ng.it.label.split(" · ")[0]} ล่วงหน้า · ${j.customer}`,
+          reason: `ขั้นถัดไป "${ng.step.label}" ต้องชำระ ${baht(instNet(j, ng.it.no))} ก่อน (แผน ${dateTh(dueOf(j, ng.step))}) ส่งก่อนถึงกำหนด 5 วันทำการจะไม่ติดด่าน`, action: "ขอรับชำระ",
+          draft: `สวัสดีค่ะ คุณ${fn} ขอแจ้ง${ng.it.label.split(" · ")[0]} ${baht(instNet(j, ng.it.no))} ภายใน ${dateTh(addWd(dueOf(j, ng.step), -5))} เพื่อให้ทีมสามารถ${ng.it.unlocks[0]}ได้ตามแผนวันที่ ${dateTh(dueOf(j, ng.step))} ค่ะ` });
       }
     }
     if (j.done.close && !j.scm.ordered && !isFinished(j) && wdBetween(j.done.close, NOW.toISOString()) >= 2) {
@@ -792,7 +892,9 @@ export function dueMoney(j: Job): number {
   const c = currentStep(j);
   if (!c) return 0;
   if ((c.key === "deposit" && j.work !== "survey") || c.key === "survey_fee") return depositOf(j);
-  if (c.key === "close") return j.value - depositOf(j);
+  if (c.key === "close") return instNet(j, 1);
+  const h = heldBy(j, c.key);
+  if (h) return instNet(j, h.no);
   return 0;
 }
 
