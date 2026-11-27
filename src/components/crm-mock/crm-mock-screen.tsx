@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { chatRooms, seedChat, totalUnread, type ChatMsg, type ChatState, DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
+import { chatRooms, seedChat, totalUnread, type ChatMsg, type ChatState, type Nudge, DEFAULT_COVERAGE, ROLE_STORES, assignStore, ownerForProv, ownerOfLead, slaHoursOf, NOW, PARTY, addWd, buildTasks, missingOf, seedJobs, seedLeads, stepsOf, type Job, type Lead, type StepKey, type Task } from "./crm-mock-data";
 import { LeadDrawer } from "./crm-drawers";
 import { AddLeadDrawer } from "./crm-add-lead";
 import { AreasView } from "./crm-areas";
@@ -17,6 +17,7 @@ import { BoardView, ExchangeView } from "./crm-board";
 import { HomeView } from "./crm-home";
 import { AftersaleView, OverviewView } from "./crm-overview";
 import { PerformanceView } from "./crm-performance";
+import { PaceView, unreadNudges } from "./crm-pace";
 import { LeadsView, type Ctx, type View } from "./crm-views";
 import { ReportView, RoleBar, type Role } from "./crm-report";
 import { GuideCtx, setGuideOn, useGuidePref } from "./crm-guide";
@@ -26,6 +27,7 @@ import { grad } from "./crm-ui";
 
 const NAV: { key: View; label: string; icon: string }[] = [
   { key: "home", label: "หน้าหลัก", icon: "space_dashboard" },
+  { key: "pace", label: "เป้าและจังหวะ", icon: "speed" },
   { key: "perf", label: "ผลงานของฉัน", icon: "emoji_events" },
   { key: "overview", label: "ภาพรวมงาน", icon: "timeline" },
   { key: "leads", label: "Leads", icon: "person_search" },
@@ -38,9 +40,10 @@ const NAV: { key: View; label: string; icon: string }[] = [
 ];
 
 const MOBILE_MAIN: View[] = ["home", "overview", "leads", "inbox"];
-const MOBILE_MORE: View[] = ["perf", "board", "aftersale", "customers", "areas", "exchange"];
+const MOBILE_MORE: View[] = ["pace", "perf", "board", "aftersale", "customers", "areas", "exchange"];
 
 const NAV_RO: { key: View; label: string; icon: string }[] = [
+  { key: "pace", label: "เป้าและจังหวะ", icon: "speed" },
   { key: "report", label: "รายงานทีม", icon: "monitoring" },
   { key: "overview", label: "ภาพรวมงาน", icon: "timeline" },
   { key: "leads", label: "Leads", icon: "person_search" },
@@ -68,7 +71,7 @@ export function CrmMockScreen() {
   const guidePref = useGuidePref();
   const guideOn = guidePref && !readOnly;
   const seFilter = role === "se" && sp.get("se");
-  const [view, setView] = useState<View>((sp.get("v") as View) ?? (readOnly ? "report" : "home"));
+  const [view, setView] = useState<View>((sp.get("v") as View) ?? (readOnly ? "pace" : "home"));
   const [leads, setLeads] = useState<Lead[]>(() => seedLeads());
   const [jobs, setJobs] = useState<Job[]>(() => seedJobs());
   const [leadId, setLeadId] = useState<string | null>(sp.get("lead"));
@@ -90,6 +93,7 @@ export function CrmMockScreen() {
   const onDirty = useCallback((d: boolean) => { dirtyRef.current = d; }, []);
   const [toastMsg, setToastMsg] = useState("");
   const [more, setMore] = useState(false);
+  const [nudges, setNudges] = useState<Nudge[]>([]);
   const [preset, setPreset] = useState<{ key: string; label: string } | null>(null);
 
   useEffect(() => {
@@ -133,7 +137,7 @@ export function CrmMockScreen() {
     dirtyRef.current = false;
     setOpp(null); setLeadId(null); setJobId(null); setAddingLead(false); setSurvey(null);
     setRole(r);
-    setView(r === "se" ? "home" : "report");
+    setView(r === "se" ? "home" : "pace");
   };
   const nav = readOnly ? NAV_RO : NAV;
   const roView = (what: string) => setToastMsg(`มุมมองนี้อ่านอย่างเดียว เปิดรายละเอียด${what}ได้เฉพาะพนักงานขาย`);
@@ -183,7 +187,7 @@ export function CrmMockScreen() {
   };
 
   const ctx: Ctx = {
-    leads: vLeads, jobs: vJobs, tasks, toast: setToastMsg, go: goView, preset, setPreset, goPreset: (v, p) => { goView(v); setPreset(p); }, readOnly, seNick: seFilter ? seNick : undefined,
+    leads: vLeads, jobs: vJobs, tasks, toast: setToastMsg, go: goView, me: seNick, nudges, sendNudge: (n) => setNudges((a) => [...a, { ...n, id: `N${a.length + 1}`, at: NOW.toISOString() }]), readNudge: (id) => setNudges((a) => a.map((n) => (n.id === id ? { ...n, readAt: NOW.toISOString() } : n))), preset, setPreset, goPreset: (v, p) => { goView(v); setPreset(p); }, readOnly, seNick: seFilter ? seNick : undefined,
     openLead: (id) => (readOnly ? roView(" Lead") : setLeadId(id)), openJob: (id) => (readOnly ? roView("งาน") : setJobId(id)), openTask, ask: () => setChat(true),
     addLead: () => setAddingLead(true),
     newSurvey: (l) => { setLeadId(null); setSurvey({ lead: l ?? null }); },
@@ -271,7 +275,8 @@ export function CrmMockScreen() {
             <button key={n.key} onClick={() => goView(n.key)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition", isActive(n.key) ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25" : "text-slate-600 hover:bg-indigo-50")}>
               <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
               {n.key === "inbox" && chatUnread > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{chatUnread}</span>}
-              {n.key === "home" && urgent > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{urgent}</span>}
+              {n.key === "pace" && !readOnly && unreadNudges(nudges, seNick) > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-amber-100 text-amber-700")}>{unreadNudges(nudges, seNick)}</span>}
+                  {n.key === "home" && urgent > 0 && <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold", isActive(n.key) ? "bg-white/25 text-white" : "bg-rose-100 text-rose-700")}>{urgent}</span>}
             </button>
           ))}
         </nav>
@@ -300,7 +305,8 @@ export function CrmMockScreen() {
           ) : (
             <>
               {view === "home" && <HomeView c={ctx} />}
-              {view === "perf" && !readOnly && <PerformanceView c={ctx} />}
+              {view === "pace" && <PaceView c={ctx} role={role} stores={role === "se" ? [] : roleStores} />}
+          {view === "perf" && !readOnly && <PerformanceView c={ctx} />}
           {view === "overview" && <OverviewView c={ctx} />}
           {view === "aftersale" && <AftersaleView c={ctx} />}
           {view === "leads" && <LeadsView c={ctx} />}
@@ -320,25 +326,22 @@ export function CrmMockScreen() {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/70 bg-white/90 px-1 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-xl lg:hidden">
-        {(readOnly ? NAV_RO : MOBILE_MAIN.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
+        {(readOnly ? NAV_RO.slice(0, 3) : MOBILE_MAIN.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
           <button key={n.key} onClick={() => goView(n.key)} className={cn("relative flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", isActive(n.key) ? "text-indigo-600" : "text-slate-400")}>
             <Icon name={n.icon} fill={isActive(n.key)} />{n.label}
             {n.key === "inbox" && chatUnread > 0 && <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-rose-500" />}
           </button>
         ))}
-        {!readOnly && (
-          <button onClick={() => setMore(true)} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", MOBILE_MORE.some((k) => isActive(k)) ? "text-indigo-600" : "text-slate-400")}><Icon name="apps" />เพิ่มเติม</button>
-        )}
-        {readOnly && <button onClick={() => setChat(true)} className="flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold text-violet-600"><Icon name="auto_awesome" />น้องเลขา</button>}
+        <button onClick={() => setMore(true)} className={cn("flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] font-semibold", (readOnly ? NAV_RO.slice(3) : MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!)).some((n) => isActive(n.key)) ? "text-indigo-600" : "text-slate-400")}><Icon name="apps" />เพิ่มเติม</button>
       </nav>
 
-      {more && !readOnly && (
+      {more && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMore(false)}>
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
           <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white p-4 pb-[max(env(safe-area-inset-bottom),16px)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <p className="mb-3 text-[13px] font-bold text-slate-900">เมนูเพิ่มเติม</p>
             <div className="grid grid-cols-3 gap-2">
-              {MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!).map((n) => (
+              {(readOnly ? NAV_RO.slice(3) : MOBILE_MORE.map((k) => NAV.find((n) => n.key === k)!)).map((n) => (
                 <button key={n.key} onClick={() => { setMore(false); goView(n.key); }} className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 py-3 text-[11px] font-semibold text-slate-700 active:scale-95"><Icon name={n.icon} className="text-indigo-600" />{n.label}</button>
               ))}
               <button onClick={() => { setMore(false); setChat(true); }} className="flex flex-col items-center gap-1 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-[11px] font-semibold text-violet-700 active:scale-95"><Icon name="auto_awesome" />น้องเลขา</button>

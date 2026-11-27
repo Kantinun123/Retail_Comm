@@ -7,6 +7,7 @@ import {
   type Job, type Party, type Task,
 } from "./crm-mock-data";
 import { PartyBadge, Stat, glass, grad } from "./crm-ui";
+import { PaceMini } from "./crm-pace";
 import type { Ctx } from "./crm-views";
 
 const FOLLOW_KINDS = ["follow_party", "scm_status"];
@@ -65,6 +66,8 @@ export function HomeView({ c }: { c: Ctx }) {
           </div>
         </div>
       </section>
+
+      <PaceMini c={c} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Stat icon="person_search" label="Lead รอติดต่อ" value={waiting.length} sub={breach ? `เกิน SLA ${breach} ราย` : "ทันเวลาทั้งหมด"} tone={breach ? "rose" : "emerald"} onClick={() => (waiting.length === 1 ? c.openLead(waiting[0].id) : c.goPreset("leads", { key: "lead_waiting", label: "Lead รอติดต่อ" }))} />

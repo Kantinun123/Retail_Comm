@@ -2,16 +2,17 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
-import { BUY_LABEL, DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Task } from "./crm-mock-data";
+import { BUY_LABEL, DEALER_STEP, LEAD_STATUS, NOW, SE_ROSTER, interestGroups, agoText, dayKey, dtTh, hoursSince, leadSla, type Job, type Lead, type LeadStatus, type Nudge, type Task } from "./crm-mock-data";
 import { InterestChips } from "./crm-interests";
 import { BoardFrame } from "./crm-overview";
 import { Avatar, PresetBanner, SlaBadge, btnPrimary, glass, inputCls } from "./crm-ui";
 
-export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas" | "inbox" | "overview" | "aftersale" | "perf";
+export type View = "home" | "leads" | "board" | "exchange" | "report" | "customers" | "areas" | "inbox" | "overview" | "aftersale" | "perf" | "pace";
 export interface Ctx {
   leads: Lead[]; jobs: Job[]; tasks: Task[];
   openLead: (id: string) => void; openJob: (id: string) => void; openTask: (t: Task) => void;
   /** ตัวกรองที่ส่งมาจากหน้าหลัก (การ์ดตัวเลข) */ preset: { key: string; label: string } | null; setPreset: (p: { key: string; label: string } | null) => void; goPreset: (v: View, p: { key: string; label: string }) => void;
+  /** ชื่อเล่นพนักงานของมุมมองนี้ + คำเตือนงานค้างจากผู้จัดการ */ me: string; nudges: Nudge[]; sendNudge: (n: { se: string; by: string; text: string }) => void; readNudge: (id: string) => void;
   readOnly: boolean; seNick?: string; addLead: () => void; newJob: () => void; newSurvey: (lead?: Lead) => void; ask: () => void; toast: (m: string) => void; go: (v: View) => void;
 }
 

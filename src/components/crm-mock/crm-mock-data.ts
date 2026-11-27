@@ -409,6 +409,9 @@ export function rightState(r: Right): "ok" | "soon" | "used" | "expired" {
   const left = (new Date(r.expiresAt).getTime() - NOW.getTime()) / 86400e3;
   return left < 0 ? "expired" : left <= 14 ? "soon" : "ok";
 }
+/** คำเตือนงานค้างจากผู้จัดการถึงพนักงาน (จำลอง) */
+export interface Nudge { id: string; se: string; by: string; at: string; text: string; readAt?: string }
+
 /* ---------- คำขอชำระเงิน (ค่าสำรวจ / มัดจำ / ปิดขาย) : จำลองการส่งทาง LINE OA ---------- */
 export type PayMethod = "qr" | "card" | "transfer" | "store";
 export const PAY_METHOD: Record<PayMethod, { label: string; icon: string; sub: string }> = {
