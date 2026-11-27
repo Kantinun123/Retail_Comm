@@ -409,6 +409,7 @@ export const channelNet = (gross: number, m: Model) => Math.round(gross * (100 -
 /** GT : ค่าบริการประมาณการ (แจ้งทำประมาณการ / ประมาณการพร้อมค่าบริการ ราคาเท่ากัน) ร้านเซ็น PO ถึง SCG */
 export const GT_ESTIMATE_FEE = 2500;
 export const poNoOf = (j: { id: string; model: Model }, tag: string) => `PO-${j.model.toUpperCase()}-${j.id.slice(2)}-${tag}`;
+export interface QuoteVer { v: number; pkg: string; promo: string; prep: number; gross: number; total: number; agentNet?: number; at: string; sent?: boolean }
 export interface EstimatePo { no: string; fee: number; approver: string; role: "owner" | "delegate"; at: string }
 /** หมวดงานที่ห้องแบบถอดแบบ */
 export type Cat = "ase" | "truss" | "tile" | "fascia";
@@ -461,7 +462,7 @@ export interface Job {
   /** งานชนิดสำรวจ: รายละเอียดงาน เช่น ติดตั้งแอร์ 3 ห้อง */ scope?: string;
   csat?: { r1?: CsatRound; r2?: CsatRound }; rights?: Right[]; /** ร้านที่รับงาน (คำนวณจากจังหวัด) */ store?: string;
   scm: { ordered?: string; readyEta?: string }; lastTouchAt: string; log: JobLog[]; cancelReason?: string; payments?: PaymentReq[]; plan?: PayPlan;
-  /** ใครทำประมาณการ (เฉพาะงาน HBD / ทรัส / อะเส ; GT = ห้องแบบกลางทุกงาน) */ estimateBy?: "self" | "room"; /** GT : PO ค่าประมาณการที่ร้านอนุมัติแล้ว (CRM รันเลขให้เอง) */ estimatePo?: EstimatePo;
+  /** ใครทำประมาณการ (เฉพาะงาน HBD / ทรัส / อะเส ; GT = ห้องแบบกลางทุกงาน) */ estimateBy?: "self" | "room"; /** ใบเสนอราคาที่บันทึกไว้ (หลายเวอร์ชัน) */ quotes?: QuoteVer[]; /** GT : PO ค่าประมาณการที่ร้านอนุมัติแล้ว (CRM รันเลขให้เอง) */ estimatePo?: EstimatePo;
   /** ห้องแบบที่กดรับงานของแต่ละขั้น (คนแรกที่กดรับได้งาน) */ roomClaims?: Partial<Record<StepKey, { by: string; at: string }>>;
   /** รายงานสำรวจจาก KIM / ทีมสำรวจ */ surveyReport?: SurveyReport;
 }
