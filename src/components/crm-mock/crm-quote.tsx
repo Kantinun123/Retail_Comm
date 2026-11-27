@@ -109,7 +109,7 @@ export function QuoteBuilder({ job, onPatchJob, toast }: { job: Job; onPatchJob:
       )}
       <dl className="space-y-1 rounded-xl bg-slate-50 p-3">
         {([["ค่าสินค้าและบริการติดตั้ง", q.gross], [`ส่วนลดโปรโมชั่น`, -q.disc], ...(prep ? [["ส่วนลดค่าเตรียมการ", -prep] as [string, number]] : []), ["ยอดหลังหักส่วนลด", q.after], ["VAT 7%", q.vat]] as [string, number][]).map(([k, v]) => (
-          <div key={k} className="flex justify-between"><dt className="text-slate-500">{k}</dt><dd className={cn("tabular-nums", v < 0 ? "text-emerald-700" : "text-slate-800")}>{baht(v)}</dd></div>
+          <div key={k} className="flex justify-between"><dt className="text-slate-500">{k}</dt><dd className={cn("tabular-nums", v < 0 ? "text-emerald-700" : "text-slate-800")}>{v < 0 ? `-${baht(-v)}` : baht(v)}</dd></div>
         ))}
         <div className="flex justify-between border-t border-slate-200 pt-1 text-[13px] font-bold"><dt>ยอดรวมสุทธิ (ลูกค้า)</dt><dd className="tabular-nums text-indigo-700">{baht(q.total)}</dd></div>
         {hasAgent && view === "agent" && (

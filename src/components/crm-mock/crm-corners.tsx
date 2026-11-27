@@ -9,6 +9,7 @@ import {
   type Job, type StepDef, type StepKey, type SurveyReport,
 } from "./crm-mock-data";
 import { Avatar, PartyBadge, btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
+import { RsdEstimate } from "./crm-rsd";
 
 type Patch = (id: string, fn: (j: Job) => Job) => void;
 type Complete = (id: string, key: StepKey, extra?: { surveyAt?: string }) => void;
@@ -36,6 +37,7 @@ const startOf = (j: Job, key: StepKey) => { const st = stepsOf(j); const i = st.
 export function RoomCorner({ jobs, onPatch, onComplete, toast }: { jobs: Job[]; onPatch: Patch; onComplete: Complete; toast: (m: string) => void }) {
   const [me, setMe] = useState(ROOM_DESIGNERS[0]);
   const [checks, setChecks] = useState<Record<string, boolean[]>>({});
+  const [rsd, setRsd] = useState<{ j: Job; s: StepDef } | null>(null);
   const tasks = jobs.flatMap((j) => { if (j.cancelReason) return []; const s = currentStep(j); return s && ROOM_KEYS.includes(s.key) && !(j.model === "gt" && s.key === "estimate_room" && !j.estimatePo) ? [{ j, s, left: (ROOM_SLA[s.key] ?? 3) - wdBetween(startOf(j, s.key), NOW.toISOString()) }] : []; }).sort((a, b) => a.left - b.left);
   const done = jobs.flatMap((j) => ROOM_KEYS.filter((k) => j.done[k] && j.roomClaims?.[k]).map((k) => ({ j, k, at: j.done[k]!, by: j.roomClaims![k]!.by }))).sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 5);
   const waiting = tasks.filter((t) => !t.j.roomClaims?.[t.s.key]);
@@ -84,6 +86,7 @@ export function RoomCorner({ jobs, onPatch, onComplete, toast }: { jobs: Job[]; 
                 <div className="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
                   <p className="text-[11.5px] font-bold text-slate-700">ทำตามลำดับ แล้วส่งไฟล์กลับให้ทีมขาย</p>
                   {items.map((t, i) => <label key={t} className="flex cursor-pointer items-center gap-2 text-[12px] text-slate-700"><input type="checkbox" checked={ck[i]} onChange={() => tick(`${j.id}-${s.key}`, items.length, i)} className="h-4 w-4 accent-indigo-600" />{t}</label>)}
+                  {s.key === "estimate_room" && <button onClick={() => setRsd({ j, s })} className={btnGhost}><Icon name="roofing" style={{ fontSize: 18 }} />เปิดหน้าประมาณการ (RSD)</button>}
                   <button disabled={!ck.every(Boolean) || held} onClick={() => deliver(j, s)} className={cn(btnPrimary, "disabled:cursor-not-allowed")}><Icon name="upload_file" style={{ fontSize: 18 }} />ส่งไฟล์กลับให้ทีมขาย</button>
                   {held && <p className="text-[11px] font-semibold text-rose-600">ระงับ: รอลูกค้าชำระเงิน</p>}
                 </div>
@@ -93,6 +96,7 @@ export function RoomCorner({ jobs, onPatch, onComplete, toast }: { jobs: Job[]; 
         })}
         {!tasks.length && <p className="rounded-2xl border border-dashed border-slate-300 py-10 text-center text-[13px] text-slate-400">ไม่มีงานค้างของห้องแบบ</p>}
       </div>
+      {rsd && <RsdEstimate job={rsd.j} onClose={() => setRsd(null)} onDeliver={() => { const items = ROOM_TODO[rsd.s.key] ?? []; setChecks((c) => ({ ...c, [`${rsd.j.id}-${rsd.s.key}`]: Array(items.length).fill(true) })); deliver(rsd.j, rsd.s); setRsd(null); }} />}
       {done.length > 0 && (
         <div className={cn(glass, "p-4")}>
           <h3 className="mb-2 text-[13px] font-bold text-slate-900">ส่งแล้วล่าสุด</h3>

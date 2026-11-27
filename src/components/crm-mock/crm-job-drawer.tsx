@@ -9,6 +9,7 @@ import {
 import { IntakeCard } from "./crm-intake-card";
 import { GtEstimatePanel, StoreLoopPanel } from "./crm-gt";
 import { QuoteBuilder } from "./crm-quote";
+import { RsdButton } from "./crm-rsd";
 import { SurveyReportCard } from "./crm-corners";
 import { JourneyStrip } from "./crm-overview";
 import { GatePanel, PayStepPanel, PaymentsTab, PlanEditor, isPayStep, type SendLine } from "./crm-payment";
@@ -85,6 +86,7 @@ function JobBody({ job, task, onComplete, onRevise, onScm, onCancel, onEditIntak
       {tab === "info" && (
         <>
       {job.model === "gt" && job.estimateBy === "room" && !job.done.estimate_room && <GtEstimatePanel job={job} onPatchJob={onPatchJob} toast={toast} />}
+      {usesRoomEstimate(job) && job.done.estimate_room && <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px]"><Icon name="task_alt" className="!text-[17px] text-emerald-600" /><span className="flex-1 text-slate-600">ห้องแบบส่งผลประมาณการแล้ว (แปลน + BOQ + แรงงาน)</span><RsdButton job={job} /></div>}
       {job.model === "gt" && job.estimateBy === "room" && job.done.estimate_room && !job.cancelReason && <StoreLoopPanel job={job} onPatchJob={onPatchJob} toast={toast} />}
       {job.work !== "survey" && !job.cancelReason && (job.model !== "gt" || job.estimateBy !== "room" || job.done.estimate_room || job.estimatePo) && <QuoteBuilder job={job} onPatchJob={onPatchJob} toast={toast} />}
       {task && (
