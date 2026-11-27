@@ -8,7 +8,7 @@ import { TestAccountBanner } from "./test-account-banner";
 import { isRefundTeamRole } from "@/lib/commission/types";
 
 /** หน้าที่ Area ใช้ได้โดยยังไม่ต้องเลือกร้าน (ที่เหลือเป็นหน้าข้อมูลรายร้าน) */
-const AREA_NO_STORE_OK = [AREA_HOME, "/app/stores", "/app/store", "/app/change-password", "/app/chat", "/app/member", "/app/employee-requests", "/app/eval-tracking", "/app/line-groups", "/app/refund", "/app/exam"];
+const AREA_NO_STORE_OK = [AREA_HOME, "/app/stores", "/app/store", "/app/change-password", "/app/chat", "/app/member", "/app/employee-requests", "/app/eval-tracking", "/app/line-groups", "/app/refund", "/app/exam", "/app/tools"];
 
 /** Redirects to the login page when there is no active session. */
 export function AppGuard({ children }: { children: React.ReactNode }) {

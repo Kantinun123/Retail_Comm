@@ -13,6 +13,7 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { BoqSummaryCard } from "./boq/boq-summary-card";
 import { RefundHomeCard } from "./refund/refund-home-card";
+import { SalesToolsCard } from "./sales-tools-screen";
 import { ExamHomeCard } from "./exam/exam-home-card";
 import { ProfileCard } from "./profile-card";
 import { doLogout, useSession, enterStoreView, enterStaffView } from "@/lib/commission/session";
@@ -252,6 +253,7 @@ export function AdminHomeScreen() {
         </section>
 
         <BoqSummaryCard title="BOQ DECAAR" sub="ทุกร้าน · แตะเพื่อดูภาพรวม / รายการงาน / วันหยุด" showAttention rowsBy="stores" />
+        <SalesToolsCard />
         {/* กลุ่ม: จัดการระบบ */}
         <section>
           <h3 className="text-[12px] font-bold text-[#5b21b6] mb-2 px-1">จัดการระบบ</h3>

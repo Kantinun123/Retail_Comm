@@ -1,6 +1,7 @@
 "use client";
 import { BoqStaffCard } from "./boq/boq-staff-card";
 import { RefundHomeCard } from "./refund/refund-home-card";
+import { SalesToolsCard } from "./sales-tools-screen";
 import { ExamHomeCard } from "./exam/exam-home-card";
 
 /* =============================================================
@@ -272,6 +273,7 @@ export function HomeStaffHubScreen() {
         {session.isSales && <BoqStaffCard />}
         {session.isSales && <RefundHomeCard variant="sales" />}
         {session.isSales && <ExamHomeCard variant="sales" />}
+        {session.isSales && <SalesToolsCard />}
 
         <PeriodBar pick={pick} onChange={setPick} years={years} completeness={completeness} />
 

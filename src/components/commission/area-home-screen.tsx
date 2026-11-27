@@ -14,6 +14,7 @@ import { Icon } from "./icon";
 import { BottomNav } from "./bottom-nav";
 import { BoqSummaryCard } from "./boq/boq-summary-card";
 import { RefundHomeCard } from "./refund/refund-home-card";
+import { SalesToolsCard } from "./sales-tools-screen";
 import { ExamHomeCard } from "./exam/exam-home-card";
 import { SearchableSelect, type ComboOption } from "./searchable-select";
 import { doLogout, setAreaStaff, setAreaStore, useSession } from "@/lib/commission/session";
@@ -374,6 +375,7 @@ export function AreaHomeScreen() {
         <p className="text-[13.5px] font-bold text-[#231313] px-1">เลือกเรื่องที่ต้องการดู</p>
 
         {isCoach ? [workSection, viewSection] : [viewSection, workSection]}
+        <SalesToolsCard />
         <BoqSummaryCard title="BOQ DECAAR ร้านที่ดูแล" sub={`${storeCount} ร้านที่ดูแล · แตะเพื่อดูรายร้าน/รายพนักงาน`} showAttention rowsBy="stores" />
 
         <p className="text-[11px] text-slate-400 text-center">เห็นเฉพาะร้านที่ดูแล · เลือกการ์ดเพื่อเข้าดูข้อมูล</p>
