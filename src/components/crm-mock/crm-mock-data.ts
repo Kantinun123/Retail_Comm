@@ -425,7 +425,7 @@ export const PAY_METHOD: Record<PayMethod, { label: string; icon: string; sub: s
 };
 export interface PaymentReq {
   id: string; step: "survey_fee" | "deposit" | "close" | "inst2" | "inst3"; label: string; amount: number; methods: PayMethod[]; dueAt: string;
-  /** ผู้รับเงิน: ร้านตัวแทน หรือ ลูกค้าจ่ายตรงเข้า SCG */ payee?: "store" | "scg"; /** เลข PO / เครดิตเทอม (วัน) เมื่อเปิด PO */ po?: string; poTerm?: number; /** วิธีที่ลูกค้าเลือกไว้ตอนส่งสลิป/PO */ pending?: PayMethod;
+  /** ผู้รับเงิน: ร้านตัวแทน หรือ ลูกค้าจ่ายตรงเข้า SCG */ payee?: "store" | "scg"; /** เลข PO / เครดิตเทอม (วัน) เมื่อเปิด PO */ po?: string; poTerm?: number; /** วิธีที่ลูกค้าเลือกไว้ตอนส่งสลิป/PO */ pending?: PayMethod; /** เตือนอัตโนมัติที่ส่งแล้ว: t3 = ก่อนครบกำหนด 3 วันทำการ, t0 = วันครบกำหนด, over = เลยกำหนด */ reminders?: ("t3" | "t0" | "over")[];
   status: "requested" | "slip" | "paid"; method?: PayMethod; requestedAt: string; paidAt?: string; surveyAt?: string; receiptNo?: string;
 }
 export interface JobLog { at: string; text: string }

@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/commission/icon";
 import { cn } from "@/lib/utils";
 import {
-  MODEL_LABEL, NOW, PAY_METHOD, PLAN_THRESHOLD, SURVEY_FEE, addWd, baht, creditOf, dateTh, dayKey, depositOf, dueOf, instGross, instNet, instPaid, minFirstPct, needsApproval, planOf, planReady, stepsOf, withPcts,
+  MODEL_LABEL, NOW, PAY_METHOD, PLAN_THRESHOLD, SURVEY_FEE, addWd, wdBetween, baht, creditOf, dateTh, dayKey, depositOf, dueOf, instGross, instNet, instPaid, minFirstPct, needsApproval, planOf, planReady, stepsOf, withPcts,
   type ChatMsg, type Installment, type Job, type PayMethod, type PaymentReq, type StepDef, type StepKey,
 } from "./crm-mock-data";
 import { btnGhost, btnPrimary, glass, inputCls } from "./crm-ui";
@@ -440,12 +440,85 @@ export function PlanEditor({ job, onPatchJob, onSendLine, toast }: { job: Job; o
   );
 }
 
+/* ---------------- ตัวเตือนลูกค้าอัตโนมัติตามกำหนด (จำลอง) ---------------- */
+type Rem = "t3" | "t0" | "over";
+const REM_LABEL: Record<Rem, string> = { t3: "ก่อนครบกำหนด 3 วันทำการ", t0: "วันครบกำหนด", over: "เลยกำหนด" };
+function remText(job: Job, r: PaymentReq, k: Rem) {
+  const n = firstName(job.customer);
+  const it = r.step === "inst2" || r.step === "inst3" ? planOf(job).items.find((x) => x.no === (r.step === "inst2" ? 2 : 3)) : undefined;
+  const effect = it ? `เพื่อให้ทีมสามารถ${it.unlocks[0]}ได้ตามแผน` : "เพื่อให้ทีมดำเนินการขั้นถัดไปได้ตามแผน";
+  if (k === "t3") return `สวัสดีค่ะ คุณ${n} ขอแจ้งเตือนล่วงหน้า ${r.label} ${baht(r.amount)} ครบกำหนดวันที่ ${dateTh(r.dueAt)} (อีก 3 วันทำการ) ${effect} ชำระได้ที่การ์ดในแชทนี้เลยค่ะ`;
+  if (k === "t0") return `สวัสดีค่ะ คุณ${n} วันนี้ครบกำหนดชำระ ${r.label} ${baht(r.amount)} ค่ะ ${effect} หากโอนแล้วรบกวนส่งสลิปในแชทนี้ได้เลยนะคะ`;
+  return `สวัสดีค่ะ คุณ${n} ${r.label} ${baht(r.amount)} เลยกำหนดชำระแล้วนะคะ ตอนนี้ทีมยังดำเนินการขั้นถัดไปไม่ได้ วันส่งของและติดตั้งจะเลื่อนตามวันที่ชำระ รบกวนชำระโดยเร็วหรือแจ้งวันที่สะดวกได้เลยค่ะ`;
+}
+function ReminderBox({ job, onPatchJob, onSendLine, toast }: { job: Job; onPatchJob: (id: string, fn: (j: Job) => Job) => void; onSendLine: SendLine; toast: (m: string) => void }) {
+  const open = (job.payments ?? []).filter((p) => p.status !== "paid");
+  const [day, setDay] = useState<"today" | "due" | "over">("today");
+  if (!open.length) return null;
+  const asOf = (r: PaymentReq) => (day === "today" ? NOW.toISOString() : day === "due" ? r.dueAt : addWd(r.dueAt, 1));
+  const dueRems = (r: PaymentReq): Rem[] => {
+    const a = asOf(r);
+    const left = wdBetween(a, r.dueAt); // วันทำการที่เหลือถึงกำหนด (ติดลบ = เลยกำหนด)
+    const days = (new Date(r.dueAt).getTime() - new Date(a).getTime()) / 86400e3;
+    const out: Rem[] = [];
+    if (days <= 4.5 && left >= 0) out.push("t3");
+    if (days <= 0.5) out.push("t0");
+    if (days < -0.5) out.push("over");
+    return out.filter((x) => !(r.reminders ?? []).includes(x));
+  };
+  const total = open.reduce((n, r) => n + dueRems(r).length, 0);
+  const run = () => {
+    const stamp = NOW.toISOString();
+    let sent = 0;
+    for (const r of open) {
+      const ks = dueRems(r);
+      for (const k of ks) { onSendLine(job, { kind: "se", who: "ระบบ", text: remText(job, r, k) }); sent++; }
+      if (ks.length) onPatchJob(job.id, (j) => ({
+        ...j, lastTouchAt: stamp,
+        payments: (j.payments ?? []).map((x) => (x.id === r.id ? { ...x, reminders: [...(x.reminders ?? []), ...ks] } : x)),
+        log: [...j.log, ...ks.map((k) => ({ at: stamp, text: `ระบบเตือนลูกค้าทาง LINE OA (${REM_LABEL[k]}): ${r.label} ${baht(r.amount)}${k === "over" ? " · แจ้ง KIM/SCM และทีมขายว่าเลยกำหนด" : ""}` }))],
+      }));
+    }
+    toast(sent ? `ระบบส่งเตือนลูกค้า ${sent} ข้อความทาง LINE OA แล้ว (จำลอง)` : "วันนี้ไม่มีรายการที่ต้องเตือนเพิ่ม");
+  };
+  return (
+    <div className={cn(glass, "space-y-2 p-4")}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-slate-900"><Icon name="notifications_active" className="!text-[18px] text-amber-500" />เตือนลูกค้าอัตโนมัติตามกำหนด</h3>
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="text-slate-500">จำลองวันที่</span>
+          <select value={day} onChange={(e) => setDay(e.target.value as "today" | "due" | "over")} className={cn(inputCls, "!w-44 !py-1")}><option value="today">วันนี้ ({dateTh(NOW.toISOString())})</option><option value="due">วันครบกำหนด</option><option value="over">เลยกำหนด 1 วันทำการ</option></select>
+        </div>
+      </div>
+      <ul className="space-y-1.5">
+        {open.map((r) => (
+          <li key={r.id} className="rounded-xl bg-slate-50 px-3 py-2 text-[12px]">
+            <div className="flex flex-wrap items-center gap-2"><b className="text-slate-800">{r.label} · {baht(r.amount)}</b><span className="text-[10.5px] text-slate-500">ครบกำหนด {dateTh(r.dueAt)}</span></div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {(["t3", "t0", "over"] as Rem[]).map((k) => {
+                const sent = (r.reminders ?? []).includes(k);
+                const due = dueRems(r).includes(k);
+                return <span key={k} className={cn("rounded-full px-2 py-0.5 text-[10.5px] font-bold", sent ? "bg-emerald-100 text-emerald-700" : due ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-400")}>{REM_LABEL[k]} · {sent ? "ส่งแล้ว" : due ? "ถึงเวลา" : "ยังไม่ถึง"}</span>;
+              })}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <button onClick={run} className={cn(btnGhost, "!px-3 !py-1.5 !text-[12px]")}><Icon name="send" style={{ fontSize: 16 }} />จำลอง: ให้ระบบส่งเตือนตามกำหนด ({total} ข้อความ)</button>
+      <p className="text-[10.5px] text-slate-400">ของจริงระบบรันเองทุกเช้า เตือน 3 วันทำการก่อนครบกำหนด วันครบกำหนด และเมื่อเลยกำหนด (เลยกำหนดจะแจ้ง KIM/SCM และทีมขายด้วย) ข้อความบอกผลกระทบต่อวันส่งของและติดตั้ง</p>
+    </div>
+  );
+}
+
 /* ---------------- แท็บ "การเงิน" ในหน้ารายละเอียดงาน ---------------- */
 export function PaymentsTab({ job, onPatchJob, onSendLine, toast }: { job: Job; onPatchJob: (id: string, fn: (j: Job) => Job) => void; onSendLine: SendLine; toast: (m: string) => void }) {
   const list = job.payments ?? [];
   const paid = list.filter((p) => p.status === "paid").reduce((a, p) => a + p.amount, 0);
   const legacy = (job.done.survey_fee || job.done.deposit) && !list.some((p) => p.step === "survey_fee" || p.step === "deposit") && job.work !== "survey" ? depositOf(job) : (job.done.survey_fee && !list.some((p) => p.step === "survey_fee") ? depositOf(job) : 0);
-  const got = paid + legacy;
+  /* งวดที่ชำระไปแล้วก่อนมีระบบขอชำระ (งานเดิมที่ปิดขาย/ส่งของไปแล้ว) นับเป็นชำระแล้วด้วย */
+  const stepOf = (no: 1 | 2 | 3) => (no === 1 ? "close" : no === 2 ? "inst2" : "inst3");
+  const legacyInst = planOf(job).items.filter((it) => instPaid(job, it.no) && !list.some((p) => p.step === stepOf(it.no) && p.status === "paid")).reduce((a, it) => a + instNet(job, it.no), 0);
+  const got = paid + legacy + legacyInst;
   return (
     <div className="space-y-3">
       <div className={cn(glass, "grid gap-2 p-4 sm:grid-cols-3")}>
@@ -454,6 +527,7 @@ export function PaymentsTab({ job, onPatchJob, onSendLine, toast }: { job: Job; 
         ))}
       </div>
       {job.value > 0 && <PlanEditor job={job} onPatchJob={onPatchJob} onSendLine={onSendLine} toast={toast} />}
+      <ReminderBox job={job} onPatchJob={onPatchJob} onSendLine={onSendLine} toast={toast} />
       <div className={cn(glass, "p-4")}>
         <h3 className="mb-2 text-[13px] font-bold text-slate-900">รายการเก็บเงิน</h3>
         <ul className="space-y-1.5">
